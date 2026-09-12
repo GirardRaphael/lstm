@@ -82,6 +82,48 @@ def compare_against_baselines(
     }
 
 
+def training_diagnosis(history: dict, patience: int = 5) -> dict:
+    """Did the run plateau, overfit, or simply run out of epochs?
+
+    Worth computing automatically, because the three look identical in a final
+    metric and call for opposite fixes:
+
+    * **capped** - the epoch limit stopped it while it was still improving.
+      Train longer.
+    * **overfit** - validation loss bottomed out early and then climbed.
+      More patience cannot help: `restore_best_weights` hands back the same
+      epoch either way. Regularise, or shrink the model.
+    * **plateaued** - it converged. The result is what the setup can do.
+    """
+    val = [float(v) for v in history.get("val_loss", [])]
+    if len(val) < 3:
+        return {"verdict": "unknown", "detail": "not enough epochs to judge"}
+
+    best = min(val)
+    best_epoch = val.index(best) + 1
+    total = len(val)
+    final = val[-1]
+    rise = (final - best) / best * 100 if best else 0.0
+
+    if best_epoch >= total - 1:
+        verdict = "capped"
+        detail = ("still improving at epoch {} of {} - raise the epoch limit"
+                  .format(best_epoch, total))
+    elif best_epoch <= max(2, total // 3) and rise > 3.0:
+        verdict = "overfit"
+        detail = ("best at epoch {} of {}, then validation loss rose {:.1f}% - "
+                  "more patience would restore the same weights; regularise instead"
+                  .format(best_epoch, total, rise))
+    else:
+        verdict = "plateaued"
+        detail = ("best at epoch {} of {}, validation loss flat afterwards ({:+.1f}%)"
+                  .format(best_epoch, total, rise))
+
+    return {"verdict": verdict, "detail": detail, "best_epoch": best_epoch,
+            "epochs_run": total, "best_val_loss": best,
+            "final_vs_best_pct": round(rise, 2)}
+
+
 def traffic_level(volume: float, low: int = 2000, high: int = 4000) -> tuple[str, str]:
     """Turn a number of vehicles into something a dispatcher can act on."""
     if volume < low:

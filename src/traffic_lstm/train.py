@@ -19,7 +19,7 @@ import numpy as np
 from . import plots
 from .config import MODEL_DIR, REPORT_DIR, TrainingConfig
 from .data import DataBundle, build_datasets, inverse_target
-from .evaluate import compare_against_baselines
+from .evaluate import compare_against_baselines, training_diagnosis
 from .model import build_model, default_callbacks, set_seeds, summarise
 
 
@@ -102,6 +102,7 @@ def train(cfg: TrainingConfig, bundle: DataBundle | None = None, verbose: int = 
         "epochs_run": int(len(history.history["loss"])),
         "training_seconds": round(duration, 1),
         "history": {k: [float(v) for v in vals] for k, vals in history.history.items()},
+        "diagnosis": training_diagnosis(history.history, cfg.patience),
         "results": results,
         "model_path": str(cfg.model_path),
         "scaler": scaler_to_dict(bundle.scaler),
@@ -137,8 +138,10 @@ def _print_report(cfg: TrainingConfig, artifacts: dict) -> None:
         print(f"    Same hour yesterday  MAE {seasonal['mae']:8.1f}")
         print(f"    Last hour            MAE {persistence['mae']:8.1f}")
         print(f"    -> {block['improvement_over_best_naive_pct']:+.1f}% vs the best baseline")
+    diagnosis = artifacts["diagnosis"]
     print(f"\n  Trained {artifacts['epochs_run']} epochs in "
           f"{artifacts['training_seconds']}s. Model: {artifacts['model_path']}")
+    print(f"  Training health: {diagnosis['verdict'].upper()} - {diagnosis['detail']}")
     print("=" * 62 + "\n")
 
 
@@ -177,6 +180,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dropout", type=float, default=defaults.dropout)
     p.add_argument("--epochs", type=int, default=defaults.epochs)
     p.add_argument("--batch-size", type=int, default=defaults.batch_size)
+    p.add_argument("--patience", type=int, default=defaults.patience,
+                   help="EarlyStopping patience, in epochs.")
     p.add_argument("--run-name", default=defaults.run_name)
     p.add_argument("--exogenous", nargs="*", default=list(defaults.exogenous_columns),
                    help="Extra input columns, e.g. temp rain_1h snow_1h clouds_all")
@@ -206,6 +211,7 @@ def main(argv: list | None = None) -> None:
         dropout=args.dropout,
         epochs=args.epochs,
         batch_size=args.batch_size,
+        patience=args.patience,
         exogenous_columns=tuple(args.exogenous),
         calendar_features=args.calendar,
         drop_gapped_windows=args.drop_gapped_windows,

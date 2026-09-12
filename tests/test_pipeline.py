@@ -190,6 +190,42 @@ def _():
     assert m["mae"] == 0.0 and m["rmse"] == 0.0 and m["mape"] == 0.0, m
 
 
+@check("diagnosis: tells overfitting, capping and convergence apart")
+def _():
+    from traffic_lstm.evaluate import training_diagnosis
+
+    # Bottomed out at epoch 3 of 12, then climbed steadily.
+    overfit = {"val_loss": [0.9, 0.5, 0.30, 0.33, 0.36, 0.39, 0.42, 0.45,
+                            0.48, 0.51, 0.54, 0.57]}
+    assert training_diagnosis(overfit)["verdict"] == "overfit", training_diagnosis(overfit)
+
+    # Still falling on the final epoch.
+    capped = {"val_loss": [0.9, 0.7, 0.55, 0.44, 0.36, 0.30, 0.26, 0.23]}
+    assert training_diagnosis(capped)["verdict"] == "capped", training_diagnosis(capped)
+
+    # Best in the middle, flat afterwards.
+    flat = {"val_loss": [0.9, 0.5, 0.34, 0.31, 0.302, 0.300, 0.301, 0.303,
+                         0.302, 0.304]}
+    assert training_diagnosis(flat)["verdict"] == "plateaued", training_diagnosis(flat)
+
+    assert training_diagnosis({"val_loss": [0.4]})["verdict"] == "unknown"
+
+
+@check("diagnosis: matches the real runs already on disk")
+def _():
+    import json
+    from traffic_lstm.config import MODEL_DIR
+    from traffic_lstm.evaluate import training_diagnosis
+
+    path = MODEL_DIR / "baseline_univariate_artifacts.json"
+    if not path.exists():
+        return  # nothing trained yet; the synthetic cases above still cover it
+    artifacts = json.loads(path.read_text(encoding="utf-8"))
+    result = training_diagnosis(artifacts["history"])
+    assert result["verdict"] in {"plateaued", "overfit", "capped"}, result
+    assert result["best_epoch"] <= result["epochs_run"], result
+
+
 @check("introspection: the NumPy replay matches Keras to floating-point noise")
 def _():
     from traffic_lstm.introspect import trace_network

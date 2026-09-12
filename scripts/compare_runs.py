@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from traffic_lstm.config import MODEL_DIR, REPORT_DIR, VAULT_DIR, TrainingConfig  # noqa: E402
+from traffic_lstm.evaluate import training_diagnosis  # noqa: E402
 from traffic_lstm.plots import plot_horizon_degradation, plot_model_comparison  # noqa: E402
 
 FRIENDLY = {
@@ -94,6 +95,12 @@ def build_table(runs, benchmarks) -> dict:
             "train_sequences": artifacts["train_sequences"],
             "seconds": artifacts["training_seconds"],
             "epochs": artifacts["epochs_run"],
+            # Older artifacts predate the stored diagnosis; recompute it so the
+            # column is filled in for every run rather than only recent ones.
+            "diagnosis": artifacts.get("diagnosis") or training_diagnosis(
+                artifacts.get("history", {}), cfg.patience),
+            "dropout": cfg.dropout,
+            "patience": cfg.patience,
         })
         naive_seen[(key, "Naive - same hour yesterday")] = \
             block["naive_same_hour_yesterday"]["mae"]
@@ -334,10 +341,12 @@ def main(argv=None) -> None:
         print("{:<46} {:>10} {:>10} {:>9}".format("MODEL", "MAE", "RMSE", "TIME"))
         print("-" * 78)
         for row in rows:
-            print("{:<46} {:>10,.1f} {:>10} {:>9}".format(
+            diagnosis = row.get("diagnosis") or {}
+            print("{:<46} {:>10,.1f} {:>10} {:>9}  {}".format(
                 row["label"][:46], row["mae"],
                 "{:,.1f}".format(row["rmse"]) if row["rmse"] else "-",
-                "{:,.0f}s".format(row["seconds"]) if row["seconds"] else "-"))
+                "{:,.0f}s".format(row["seconds"]) if row["seconds"] else "-",
+                diagnosis.get("verdict", "")))
 
 
 if __name__ == "__main__":
