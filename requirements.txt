@@ -1,0 +1,10 @@
+# Python 3.12 recommended (TensorFlow does not yet ship wheels for 3.13 on Windows)
+numpy
+pandas
+matplotlib
+scikit-learn
+tensorflow-cpu>=2.16   # use `tensorflow` instead if you have a CUDA GPU on Linux
+streamlit
+plotly
+jupyterlab
+ipykernel

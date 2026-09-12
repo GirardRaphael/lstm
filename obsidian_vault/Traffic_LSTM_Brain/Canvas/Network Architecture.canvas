@@ -1,0 +1,152 @@
+{
+ "nodes": [
+  {
+   "id": "n1",
+   "type": "text",
+   "text": "# Traffic LSTM\n**baseline_univariate**\n\n48,204 hourly rows\n2012-10-02 to 2018-09-30",
+   "x": -40,
+   "y": -280,
+   "width": 430,
+   "height": 200,
+   "color": "6"
+  },
+  {
+   "id": "n2",
+   "type": "text",
+   "text": "Input\n`(24, 1)`\n24 hours of traffic volume",
+   "x": 0,
+   "y": 0,
+   "width": 430,
+   "height": 130,
+   "color": "1"
+  },
+  {
+   "id": "n3",
+   "type": "text",
+   "text": "LSTM 64\n`return_sequences=True`\none hidden state per hour",
+   "x": 0,
+   "y": 180,
+   "width": 430,
+   "height": 130,
+   "color": "2"
+  },
+  {
+   "id": "n4",
+   "type": "text",
+   "text": "Dropout 0.2\nregularisation",
+   "x": 0,
+   "y": 360,
+   "width": 430,
+   "height": 130,
+   "color": "0"
+  },
+  {
+   "id": "n5",
+   "type": "text",
+   "text": "LSTM 32\n`return_sequences=False`\none summary vector for the day",
+   "x": 0,
+   "y": 540,
+   "width": 430,
+   "height": 130,
+   "color": "3"
+  },
+  {
+   "id": "n6",
+   "type": "text",
+   "text": "Dropout 0.2\nregularisation",
+   "x": 0,
+   "y": 720,
+   "width": 430,
+   "height": 130,
+   "color": "0"
+  },
+  {
+   "id": "n7",
+   "type": "text",
+   "text": "Dense 16\n`relu`\nnon-linear recombination",
+   "x": 0,
+   "y": 900,
+   "width": 430,
+   "height": 130,
+   "color": "4"
+  },
+  {
+   "id": "n8",
+   "type": "text",
+   "text": "Dense 1\n`linear`\nvehicles per hour",
+   "x": 0,
+   "y": 1080,
+   "width": 430,
+   "height": 130,
+   "color": "5"
+  },
+  {
+   "id": "n16",
+   "type": "text",
+   "text": "## How to read this vault\n\n- **Neurons - Rush Hour** - every unit coloured by what it actually did\n- **Neurons - Quiet Night** - the same units on a near-empty road\n- **Timeline/** - one canvas per hour: watch the memory build up\n- **Neurons/** - one note per unit, with its own trace\n\nEvery number here was replayed from the trained weights.",
+   "x": 540,
+   "y": 180,
+   "width": 480,
+   "height": 340,
+   "color": "6"
+  }
+ ],
+ "edges": [
+  {
+   "id": "e9",
+   "fromNode": "n1",
+   "fromSide": "bottom",
+   "toNode": "n2",
+   "toSide": "top"
+  },
+  {
+   "id": "e10",
+   "fromNode": "n2",
+   "fromSide": "bottom",
+   "toNode": "n3",
+   "toSide": "top"
+  },
+  {
+   "id": "e11",
+   "fromNode": "n3",
+   "fromSide": "bottom",
+   "toNode": "n4",
+   "toSide": "top"
+  },
+  {
+   "id": "e12",
+   "fromNode": "n4",
+   "fromSide": "bottom",
+   "toNode": "n5",
+   "toSide": "top"
+  },
+  {
+   "id": "e13",
+   "fromNode": "n5",
+   "fromSide": "bottom",
+   "toNode": "n6",
+   "toSide": "top"
+  },
+  {
+   "id": "e14",
+   "fromNode": "n6",
+   "fromSide": "bottom",
+   "toNode": "n7",
+   "toSide": "top"
+  },
+  {
+   "id": "e15",
+   "fromNode": "n7",
+   "fromSide": "bottom",
+   "toNode": "n8",
+   "toSide": "top"
+  },
+  {
+   "id": "e17",
+   "fromNode": "n5",
+   "fromSide": "right",
+   "toNode": "n16",
+   "toSide": "left"
+  }
+ ]
+}

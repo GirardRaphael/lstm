@@ -1,0 +1,50 @@
+{
+  "collapse-filter": false,
+  "search": "",
+  "showTags": true,
+  "showAttachments": false,
+  "hideUnresolved": true,
+  "showOrphans": false,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:Neurons/lstm_1",
+      "color": {
+        "a": 1,
+        "rgb": 14043432
+      }
+    },
+    {
+      "query": "path:Neurons/lstm_2",
+      "color": {
+        "a": 1,
+        "rgb": 2071764
+      }
+    },
+    {
+      "query": "path:Gates",
+      "color": {
+        "a": 1,
+        "rgb": 11780968
+      }
+    },
+    {
+      "query": "path:Layers",
+      "color": {
+        "a": 1,
+        "rgb": 9737471
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": -0.6,
+  "nodeSizeMultiplier": 1.15,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.42,
+  "repelStrength": 12,
+  "linkStrength": 0.6,
+  "linkDistance": 180,
+  "scale": 0.5
+}

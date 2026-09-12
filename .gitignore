@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Obsidian per-machine UI state (the notes and canvases ARE committed)
+obsidian_vault/*/.obsidian/workspace*
+obsidian_vault/*/.obsidian/cache
+
+# Scratch
+*.tmp

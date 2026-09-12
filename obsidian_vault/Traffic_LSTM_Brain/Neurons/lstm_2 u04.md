@@ -1,0 +1,35 @@
+---
+tags: [neuron, lstm_2]
+layer: lstm_2
+unit: 4
+---
+# lstm_2 u04
+
+**Role on the rush-hour window:** Mixed - balances recent hours against the daily pattern
+
+## Hidden state across the 24-hour window
+
+| Window | Trace | final `h` | peak |
+| --- | --- | --- | --- |
+| Rush hour | `█▇▄▃▃▃▂▂▁▁▂▂▃▆█▇▆▅▄▄▄▄▄▅` | +0.061 | +0.155 at t-10h |
+| Quiet night | `▇▅▅██▇▇▇▇▆▅▅▅▄▄▂▂▁▃▂▃▂▃▃` | -0.061 | -0.074 at t-7h |
+
+Reacted most strongly at: **t-10h, t-24h, t-23h**
+
+## Gates on the rush-hour window
+
+| Gate | Trace | mean |
+| --- | --- | --- |
+| [[Forget gate]] | `█▇▆▆▆▆▅▄▂▁▁▁▂▄▇▇▆▆▆▆▆▆▆▇` | 0.666 |
+| [[Input gate]] | `▅▃▂▂▂▂▃▄▆▇███▇▅▄▃▂▂▂▂▁▁▁` | 0.445 |
+| [[Output gate]] | `▇▅▃▁▁▁▂▃▅▇█████▆▄▃▂▁▂▂▂▃` | 0.487 |
+| [[Cell state]] | `█▇▅▄▄▃▂▁▁▁▂▂▃▆█▇▆▆▅▆▆▅▅▅` | final +0.140 |
+
+A mean forget value of **0.67** means this unit keeps roughly
+67% of its memory from one hour to the next.
+
+## Where to see it
+
+- [[Neurons - Rush Hour.canvas]] and [[Neurons - Quiet Night.canvas]]
+- [[t00.canvas]] onwards, for this hour by hour
+- Part of [[lstm_2]]
