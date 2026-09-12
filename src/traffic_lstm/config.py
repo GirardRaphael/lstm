@@ -113,7 +113,7 @@ class TrainingConfig:
         self.horizons = tuple(int(h) for h in self.horizons)
         self.lstm_units = tuple(int(u) for u in self.lstm_units)
         self.exogenous_columns = tuple(self.exogenous_columns)
-        if min(self.horizons) < 1:
+        if not self.horizons or min(self.horizons) < 1:
             raise ValueError("horizons must be >= 1")
         if self.sequence_length < 1:
             raise ValueError("sequence_length must be >= 1")
