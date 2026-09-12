@@ -9,6 +9,8 @@ open the model up and look at what every neuron did.
 from __future__ import annotations
 
 import sys
+import json
+from uuid import uuid4
 from pathlib import Path
 
 # Make `src/` importable whichever directory Streamlit was launched from.
@@ -199,24 +201,25 @@ def page_train():
         sequence_length=int(sequence_length), horizons=tuple(sorted(horizons)),
         lstm_units=(int(units_1), int(units_2)), dropout=float(dropout),
         epochs=int(epochs), batch_size=int(batch_size), patience=int(patience),
-        train_ratio=float(train_ratio), run_name="streamlit_run")
+        train_ratio=float(train_ratio), run_name="streamlit_" + uuid4().hex[:12])
 
     from traffic_lstm.train import train
 
-    with st.spinner("Preparing sequences…"):
-        bundle = build_datasets(cfg, df=state("raw"))
+    try:
+        with st.spinner("Preparing sequences…"):
+            bundle = build_datasets(cfg, df=state("raw"))
+    except (ValueError, KeyError) as exc:
+        st.error("Cannot prepare this dataset: {}".format(exc))
+        return
     st.caption("{:,} training sequences · {:,} test sequences · input shape ({}, 1)".format(
         len(bundle.X_train), len(bundle.X_test), cfg.sequence_length))
 
     progress = StreamlitProgress(cfg.epochs)
-    import traffic_lstm.model as model_module
-
-    original = model_module.default_callbacks
-    model_module.default_callbacks = lambda c: original(c) + [progress.callback]
     try:
-        outcome = train(cfg, bundle=bundle, verbose=0)
-    finally:
-        model_module.default_callbacks = original
+        outcome = train(cfg, bundle=bundle, verbose=0, extra_callbacks=[progress.callback])
+    except (ValueError, OSError) as exc:
+        st.error("Training failed: {}".format(exc))
+        return
 
     progress.bar.progress(1.0, text="Done — {} epochs".format(
         outcome["artifacts"]["epochs_run"]))
@@ -268,7 +271,10 @@ def page_results():
     hours = st.slider("Hours of the test set to display", 50, 1000, 250, 50)
     actual = outcome["actual"][:hours, k]
     predicted = outcome["predicted"][:hours, k]
-    timestamps = outcome["bundle"].test_timestamps.to_numpy()[:hours]
+    bundle = outcome["bundle"]
+    target_rows = (bundle.test_indices[:hours] + bundle.train_size
+                   - cfg.sequence_length + horizon - 1)
+    timestamps = bundle.series[cfg.datetime_column].iloc[target_rows].to_numpy()
 
     fig2 = go.Figure()
     fig2.add_scatter(x=timestamps, y=actual, name="Actual", line=dict(color=BLUE, width=1.8))
@@ -317,7 +323,9 @@ def page_neurons():
         trace = trace_network(model, window)
 
     metric_row([
-        ("Window ends", str(bundle.test_timestamps.iloc[index])[:16], "Last hour fed in"),
+        ("Window ends", str(bundle.series[cfg.datetime_column].iloc[
+            bundle.train_size - cfg.sequence_length + bundle.test_indices[index] - 1])[:16],
+         "Last observation fed in"),
         ("Predicted", "{:,.0f}".format(prediction), level + " — " + comment),
         ("Actual", "{:,.0f}".format(truth), "Ground truth"),
         ("Replay error", "{:.1e}".format(trace.max_abs_error or 0.0),
@@ -432,13 +440,13 @@ def page_predict():
         st.warning("Train a model first.")
         return
     cfg, bundle, model = state("cfg"), outcome["bundle"], outcome["model"]
-    series, target = state("series"), state("target_column")
+    series, target = bundle.series, cfg.target_column
 
     mode = st.radio("Input", ["Last {} hours of the dataset".format(cfg.sequence_length),
                               "Type the values myself"], horizontal=True)
     if mode.startswith("Last"):
         window = series[target].to_numpy()[-cfg.sequence_length:]
-        ends_at = str(series[state("datetime_column")].iloc[-1])
+        ends_at = str(series[cfg.datetime_column].iloc[-1])
     else:
         default = ", ".join("{:.0f}".format(v) for v in
                             series[target].to_numpy()[-cfg.sequence_length:])
@@ -455,10 +463,13 @@ def page_predict():
             return
         ends_at = "manual input"
 
-    scaled = bundle.scaler.transform(np.asarray(window, dtype="float64").reshape(-1, 1))
-    predicted = bundle.scaler.inverse_transform(
-        model.predict(scaled.reshape(1, cfg.sequence_length, 1), verbose=0).reshape(-1, 1)
-    ).ravel()
+    from traffic_lstm.predict import TrafficForecaster
+    try:
+        result = TrafficForecaster(model, bundle.scaler, cfg).predict(window)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    predicted = np.array([forecast["volume"] for forecast in result["forecasts"]])
 
     st.caption("Window ends: {}".format(ends_at))
     cols = st.columns(len(cfg.horizons))
@@ -469,7 +480,7 @@ def page_predict():
                    "{} {} — {}".format(badge, level, comment))
 
     fig = go.Figure()
-    fig.add_scatter(x=list(range(-cfg.sequence_length, 0)), y=window,
+    fig.add_scatter(x=list(range(1 - cfg.sequence_length, 1)), y=window,
                     name="History", line=dict(color=BLUE, width=2))
     fig.add_scatter(x=[h for h in cfg.horizons], y=predicted, name="Forecast",
                     mode="markers+lines", line=dict(color=ACCENT, width=2, dash="dot"),
@@ -504,6 +515,47 @@ def page_vault():
                    "start from `00 Start Here`.")
 
 
+def page_street_data():
+    from traffic_lstm.street_data import (
+        ObservationContract, demo_observations, inspect_observations,
+    )
+
+    st.header("7 · Street data checks")
+    st.warning("Read-only prototype. No traffic-light control. Existing hourly motorway "
+               "models are not validated for Montréal intersections.")
+    demo = st.checkbox("Use synthetic demonstration data", value=True)
+    interval = st.number_input("Aggregation interval (seconds)", 1, 86400, 300)
+    max_age = st.number_input("Maximum data age (seconds)", 1, 86400, 600)
+    if demo:
+        st.info("Synthetic data — not a live street feed. Demo cadence is fixed at 300 seconds.")
+        frame = demo_observations()
+        stream_id = "DEMO-NOT-A-REAL-STREET"
+    else:
+        st.caption("CSV columns: stream_id, timestamp, interval_seconds, vehicle_count. "
+                   "Timestamp = end of a completed interval, including a UTC offset.")
+        stream_id = st.text_input("Expected stream ID (site / approach / movement / sensor)")
+        uploaded = st.file_uploader("Street observations CSV", type=["csv"])
+        if uploaded is None or not stream_id.strip():
+            st.info("Provide a CSV and its expected stream ID.")
+            return
+        try:
+            frame = pd.read_csv(uploaded)
+        except (ValueError, OSError) as exc:
+            st.error(str(exc))
+            return
+    contract = ObservationContract(stream_id, int(interval), 24, int(max_age))
+    report = inspect_observations(frame, contract)
+    report["synthetic_demo"] = demo
+    if report["valid_for_analysis"]:
+        st.success("Data contract passed for analysis only — not deployment approval.")
+    else:
+        st.error("Data contract blocked. Resolve the issues before using this window.")
+    st.dataframe(frame.tail(24), width="stretch")
+    st.json(report)
+    st.download_button("Download quality report", json.dumps(report, indent=2, allow_nan=False),
+                       file_name="street-data-quality.json", mime="application/json")
+
+
 # ------------------------------------------------------------------- main ---
 st.title("🚦 Traffic LSTM")
 st.caption("Forecast the next hour of traffic from the last 24 — and look inside the network "
@@ -516,6 +568,7 @@ PAGES = {
     "4 · Inside the network": page_neurons,
     "5 · Forecast": page_predict,
     "6 · Obsidian vault": page_vault,
+    "7 · Street data checks": page_street_data,
 }
 with st.sidebar:
     st.subheader("Steps")

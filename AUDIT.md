@@ -1,5 +1,10 @@
 # Repository audit
 
+> Follow-up: [ROAD_PRODUCT_PLAN.md](ROAD_PRODUCT_PLAN.md) documents additional
+> look-ahead and validation-preprocessing risks uncovered after this first audit.
+> The checks below are scoped smoke tests, not evidence of a fully leakage-free
+> pipeline or permission to deploy on streets.
+
 Audit performed on 2026-09-12 with Python 3.12 and TensorFlow CPU 2.21.
 
 ## Verified

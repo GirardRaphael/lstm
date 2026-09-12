@@ -19,3 +19,4 @@ jobs:
       - run: PYTHONPATH=src python tests/test_pipeline.py
       - run: PYTHONPATH=src python tests/test_saved_models.py
       - run: PYTHONPATH=src python tests/test_app.py
+      - run: PYTHONPATH=src python tests/test_readiness.py

@@ -1,5 +1,10 @@
 # Traffic LSTM
 
+> Research workbench, not a deployed street-control product. See
+> [ROAD_PRODUCT_PLAN.md](ROAD_PRODUCT_PLAN.md) for the new read-only street-data
+> checks, implementation roadmap and unresolved temporal-preprocessing findings.
+> The earlier smoke-test audit does not establish production readiness.
+
 Forecast the next hour of motorway traffic from the last 24 — and then open the
 network up and look at what every neuron actually did.
 
