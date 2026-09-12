@@ -1,0 +1,574 @@
+<title>Inside the Traffic LSTM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@700;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+/* ── tokens: light is the base, both dark paths redefine only these ───────── */
+:root {
+  --paper:      #f6f7f9;
+  --surface:    #ffffff;
+  --surface-2:  #eef1f4;
+  --ink:        #0e1419;
+  --ink-soft:   #35414c;
+  --muted:      #63707d;
+  --line:       #dde2e7;
+  --line-soft:  #e9edf1;
+
+  --signal:     #1f77b4;   /* "actual" in every figure */
+  --accent:     #cf5f14;   /* "predicted" in every figure */
+  --good:       #2f8f46;   /* XGBoost in the comparison chart */
+  --signal-wash:#e8f1f8;
+  --accent-wash:#fbeee4;
+  --good-wash:  #e7f3ea;
+
+  --shadow: 0 1px 2px rgba(14,20,25,.05), 0 8px 24px -12px rgba(14,20,25,.18);
+
+  --measure: 68ch;
+  --step--1: clamp(.82rem, .8rem + .1vw, .88rem);
+  --step-0:  clamp(1.02rem, .99rem + .16vw, 1.12rem);
+  --step-1:  clamp(1.22rem, 1.15rem + .34vw, 1.45rem);
+  --step-2:  clamp(1.5rem, 1.34rem + .74vw, 2.05rem);
+  --step-3:  clamp(2rem, 1.65rem + 1.6vw, 3.1rem);
+  --step-4:  clamp(2.6rem, 1.9rem + 3.2vw, 4.6rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #0e1419;
+    --surface:    #151d25;
+    --surface-2:  #1c262f;
+    --ink:        #e7ecf1;
+    --ink-soft:   #bcc7d1;
+    --muted:      #8b99a6;
+    --line:       #26323c;
+    --line-soft:  #1e2831;
+    --signal:     #63aada;
+    --accent:     #f08b3f;
+    --good:       #5cba71;
+    --signal-wash:#162a38;
+    --accent-wash:#2e1f12;
+    --good-wash:  #162a1c;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:      #0e1419;
+  --surface:    #151d25;
+  --surface-2:  #1c262f;
+  --ink:        #e7ecf1;
+  --ink-soft:   #bcc7d1;
+  --muted:      #8b99a6;
+  --line:       #26323c;
+  --line-soft:  #1e2831;
+  --signal:     #63aada;
+  --accent:     #f08b3f;
+  --good:       #5cba71;
+  --signal-wash:#162a38;
+  --accent-wash:#2e1f12;
+  --good-wash:  #162a1c;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size: var(--step-0);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+.wrap {
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 0 clamp(1.1rem, 4vw, 3rem) 6rem;
+}
+.col { max-width: var(--measure); }
+
+h1, h2, h3, .display {
+  font-family: Chivo, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 900;
+  letter-spacing: -.022em;
+  text-wrap: balance;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.mono, code, td.num, th.num, .stat-value, .gate-val {
+  font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--step--1);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+a { color: var(--signal); text-underline-offset: .18em; }
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ── masthead ─────────────────────────────────────────────────────────────── */
+.masthead {
+  border-bottom: 1px solid var(--line);
+  padding: clamp(3rem, 8vw, 6rem) 0 clamp(2rem, 4vw, 3rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+.masthead h1 { font-size: var(--step-4); }
+.masthead .lede {
+  max-width: var(--measure);
+  font-size: var(--step-1);
+  color: var(--ink-soft);
+  margin: 0;
+}
+.rule-signal {
+  height: 4px;
+  width: 6rem;
+  background: linear-gradient(90deg, var(--signal), var(--accent));
+  border-radius: 2px;
+}
+
+.statbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: .8rem;
+}
+.stat { background: var(--surface); padding: 1.05rem 1.15rem; display: flex; flex-direction: column; gap: .3rem; }
+.stat-label { font-family: "IBM Plex Mono", monospace; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.stat-value { font-size: var(--step-2); font-weight: 600; line-height: 1; color: var(--ink); }
+.stat-note { font-size: var(--step--1); color: var(--muted); font-family: Chivo, sans-serif; font-weight: 700; letter-spacing: -.01em; }
+
+/* ── sections ─────────────────────────────────────────────────────────────── */
+section { padding-top: clamp(3rem, 7vw, 5.5rem); }
+section > .col + .col { margin-top: 1.1rem; }
+h2 { font-size: var(--step-3); margin-bottom: .9rem; }
+h3 { font-size: var(--step-1); font-weight: 700; margin: 2.2rem 0 .6rem; }
+p { margin: 0 0 1.05rem; }
+p:last-child { margin-bottom: 0; }
+strong { font-weight: 600; color: var(--ink); }
+
+.sec-head { display: flex; flex-direction: column; gap: .45rem; margin-bottom: 1.4rem; }
+
+/* ── the flip: two facing panels, winner's colour fills the panel ─────────── */
+.flip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1.1rem;
+  margin: 1.8rem 0;
+}
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.5rem 1.5rem 1.35rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+}
+.panel--xgb { background: var(--good-wash); border-color: color-mix(in srgb, var(--good) 32%, var(--line)); }
+.panel--lstm { background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); }
+.panel h3 { margin: 0; font-size: var(--step-1); }
+.panel-sub { font-size: var(--step--1); color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+.duel { display: flex; flex-direction: column; gap: .5rem; margin-top: .2rem; }
+.duel-row { display: grid; grid-template-columns: 7.5rem 1fr auto; align-items: center; gap: .75rem; }
+.duel-name { font-family: Chivo, sans-serif; font-weight: 700; font-size: var(--step--1); }
+.duel-bar { height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.duel-fill { height: 100%; border-radius: 6px; display: block; }
+.duel-fill--lstm { background: var(--accent); }
+.duel-fill--xgb { background: var(--good); }
+.duel-val { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--step--1); }
+.verdict {
+  font-family: Chivo, sans-serif;
+  font-weight: 900;
+  font-size: var(--step-1);
+  letter-spacing: -.02em;
+  margin-top: .3rem;
+}
+.verdict--xgb { color: var(--good); }
+.verdict--lstm { color: var(--accent); }
+.panel .unit { font-size: var(--step--1); color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  padding: 1.15rem 1.35rem;
+  border-radius: 0 6px 6px 0;
+  margin: 1.6rem 0;
+  max-width: var(--measure);
+}
+.callout p:last-child { margin-bottom: 0; }
+
+/* ── figures ──────────────────────────────────────────────────────────────── */
+figure {
+  margin: 2rem 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+figure img { display: block; width: 100%; height: auto; background: #fff; }
+figcaption {
+  padding: .9rem 1.2rem 1rem;
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--step--1);
+  color: var(--muted);
+  line-height: 1.55;
+}
+figcaption b { color: var(--ink-soft); font-weight: 600; }
+
+/* ── pipeline: numbered because it genuinely is a sequence ────────────────── */
+.steps { list-style: none; margin: 1.6rem 0; padding: 0; display: flex; flex-direction: column; gap: 0; counter-reset: step; }
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 2.6rem 1fr;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--line-soft);
+}
+.steps li:last-child { border-bottom: 1px solid var(--line-soft); }
+.steps li::before {
+  content: counter(step, decimal-leading-zero);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--accent);
+  padding-top: .28rem;
+}
+.steps b { font-family: Chivo, sans-serif; font-weight: 700; letter-spacing: -.01em; display: block; margin-bottom: .15rem; }
+.steps span { font-size: var(--step--1); color: var(--ink-soft); }
+
+/* ── tables ───────────────────────────────────────────────────────────────── */
+.table-scroll { overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
+caption {
+  text-align: left;
+  padding: .95rem 1.1rem .5rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .74rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+th, td { padding: .58rem 1.1rem; text-align: left; border-top: 1px solid var(--line-soft); }
+thead th { font-family: Chivo, sans-serif; font-weight: 700; font-size: .8rem; letter-spacing: .01em; color: var(--muted); border-top: 1px solid var(--line); }
+.num { text-align: right; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--surface-2); }
+.tag { font-family: "IBM Plex Mono", monospace; font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: .15rem .45rem; border-radius: 3px; }
+.tag--lstm { background: var(--accent-wash); color: var(--accent); }
+.tag--xgb { background: var(--good-wash); color: var(--good); }
+.tag--naive { background: var(--surface-2); color: var(--muted); }
+.best td { font-weight: 600; }
+
+/* ── gates ────────────────────────────────────────────────────────────────── */
+.gates { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin: 1.7rem 0; }
+.gate { border: 1px solid var(--line); border-radius: 8px; padding: 1.1rem 1.2rem; background: var(--surface); display: flex; flex-direction: column; gap: .4rem; }
+.gate-name { font-family: Chivo, sans-serif; font-weight: 700; }
+.gate-eq { font-family: "IBM Plex Mono", monospace; font-size: .78rem; color: var(--signal); word-break: break-word; }
+.gate p { font-size: var(--step--1); color: var(--ink-soft); margin: 0; }
+
+pre {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.1rem 1.2rem;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .84rem;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  margin: 1.4rem 0;
+}
+code { font-size: .9em; background: var(--surface-2); padding: .1em .35em; border-radius: 3px; }
+pre code { background: none; padding: 0; }
+
+.footer { margin-top: clamp(3.5rem, 8vw, 6rem); padding-top: 2rem; border-top: 1px solid var(--line); color: var(--muted); font-size: var(--step--1); display: flex; flex-wrap: wrap; gap: 1.4rem; justify-content: space-between; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .duel-fill { animation: grow .9s cubic-bezier(.22,.8,.3,1) both; }
+  @keyframes grow { from { transform: scaleX(0); transform-origin: left; } to { transform: scaleX(1); } }
+}
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="eyebrow">Machine learning coursework &middot; hourly time series &middot; regression</div>
+  <h1>Inside the Traffic LSTM</h1>
+  <div class="rule-signal"></div>
+  <p class="lede">A stacked LSTM predicts the next hour of motorway traffic from the last 24. Then the network is taken apart, gate by gate, to show what it actually did &mdash; and benchmarked against a much simpler model, which turned out to be the most interesting part.</p>
+
+  <div class="statbar">
+    <div class="stat">
+      <span class="stat-label">Test MAE</span>
+      <span class="stat-value">228.8</span>
+      <span class="stat-note">vehicles per hour</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">vs best naive</span>
+      <span class="stat-value">+60.9%</span>
+      <span class="stat-note">beats &ldquo;same hour yesterday&rdquo;</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Unseen hours</span>
+      <span class="stat-value">8,115</span>
+      <span class="stat-note">Nov 2017 &rarr; Sep 2018</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Replay error</span>
+      <span class="stat-value">1.2e-07</span>
+      <span class="stat-note">NumPy cell vs Keras</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="sec-head col">
+    <div class="eyebrow">The finding</div>
+    <h2>The answer to &ldquo;why an LSTM?&rdquo; depends on the dataset</h2>
+  </div>
+  <div class="col">
+    <p>The obvious way to defend an LSTM is to explain that traffic is sequential. The better way is to build the competitor and measure it. XGBoost was trained on <strong>exactly the same tensors</strong> &mdash; same windows, same chronological split, same scaler &mdash; just flattened from <code>(n, 24, F)</code> to <code>(n, 24&times;F)</code>. The only thing the tree model loses is the order of the timesteps.</p>
+    <p>Run on motorway traffic, it wins comfortably. Run on a second, unrelated series, it loses. Both results come from the same code.</p>
+  </div>
+
+  <div class="flip">
+    <div class="panel panel--xgb">
+      <h3>Motorway traffic</h3>
+      <div class="panel-sub">UCI Metro Interstate &middot; 48,204 rows &middot; I-94</div>
+      <div class="duel">
+        <div class="duel-row">
+          <span class="duel-name">LSTM</span>
+          <span class="duel-bar"><span class="duel-fill duel-fill--lstm" style="width:100%"></span></span>
+          <span class="duel-val">228.8</span>
+        </div>
+        <div class="duel-row">
+          <span class="duel-name">XGBoost</span>
+          <span class="duel-bar"><span class="duel-fill duel-fill--xgb" style="width:67.5%"></span></span>
+          <span class="duel-val">154.5</span>
+        </div>
+      </div>
+      <div class="verdict verdict--xgb">XGBoost wins by 32.5%</div>
+      <div class="unit">MAE, vehicles per hour &middot; 77&times; faster to train</div>
+    </div>
+
+    <div class="panel panel--lstm">
+      <h3>Bike rentals</h3>
+      <div class="panel-sub">UCI Bike Sharing &middot; 17,379 rows &middot; Washington DC</div>
+      <div class="duel">
+        <div class="duel-row">
+          <span class="duel-name">LSTM</span>
+          <span class="duel-bar"><span class="duel-fill duel-fill--lstm" style="width:99.7%"></span></span>
+          <span class="duel-val">38.5</span>
+        </div>
+        <div class="duel-row">
+          <span class="duel-name">XGBoost</span>
+          <span class="duel-bar"><span class="duel-fill duel-fill--xgb" style="width:100%"></span></span>
+          <span class="duel-val">38.6</span>
+        </div>
+      </div>
+      <div class="verdict verdict--lstm">LSTM wins by 0.3%</div>
+      <div class="unit">MAE, rentals per hour &middot; only two arguments changed</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <p>MAE is measured in the units of whatever is being predicted, so the two panels must never be compared to each other &mdash; only within a panel. That is also why every chart on this page carries one dataset and one dataset only.</p>
+  </div>
+
+  <div class="col">
+    <p>The weather and calendar columns behave just as inconsistently: they <strong>help</strong> the network on bike rentals (41.3 &rarr; 38.5) and <strong>hurt</strong> it on traffic (228.8 &rarr; 241.1), while helping the tree model on both. A plausible reading, offered as a hypothesis rather than a result: bike demand leans far more on the same hour yesterday &mdash; <code>t-24h</code> carries 21% of the tree&rsquo;s signal for rentals against 3.6% for traffic &mdash; and nobody cycles in the rain, so there is real information in the exogenous columns for a recurrence to use.</p>
+    <p>The honest takeaway is not &ldquo;LSTMs are good&rdquo; or &ldquo;LSTMs are bad&rdquo;. It is that the question is empirical, the experiment costs ten seconds, and one dataset is not enough to settle it.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head col">
+    <div class="eyebrow">The data</div>
+    <h2>A cycle worth learning, and two flaws worth admitting</h2>
+  </div>
+  <div class="col">
+    <p>Hourly westbound traffic on I-94 between Minneapolis and Saint Paul, October 2012 to September 2018. The target is <code>traffic_volume</code>: vehicles counted during the hour, ranging from 0 to 7,280.</p>
+  </div>
+
+  <figure>
+    {{IMG:02_daily_profile.png}}
+    <figcaption><b>The pattern the network has to learn.</b> Average volume by hour of day, with one standard deviation shaded. A morning peak, an evening peak, an overnight trough &mdash; and a spread that widens during the day. This is why the input window is 24 hours: one window covers exactly one full cycle.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>Two imperfections were handled out loud rather than quietly. <strong>7,629 duplicate timestamps</strong> &mdash; the same hour logged twice with different weather text &mdash; are collapsed by averaging the target, which neither invents data nor keeps two conflicting rows. <strong>11,976 hours are missing entirely</strong>, mostly a 308-day outage, and they are <em>not</em> interpolated; fabricating traffic volumes would flatter every metric that follows.</p>
+    <p>Those gaps have a consequence worth stating before anyone else finds it: because windows slide over the rows that exist, <strong>28.7% of the training windows silently span a jump in time</strong>. &ldquo;The last 24 hours&rdquo; is sometimes 24 readings spread across much longer. Only 5.3% of the <em>test</em> windows are affected, so the headline metrics barely move &mdash; and when the offending windows were dropped and the model retrained, accuracy did not improve. The flaw is real; it is not material.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head col">
+    <div class="eyebrow">Method</div>
+    <h2>Three decisions carry the whole result</h2>
+  </div>
+  <ol class="steps col">
+    <li><b>Sort chronologically, collapse duplicate hours</b><span>One row per hour, target averaged where the source disagrees with itself.</span></li>
+    <li><b>Split by time, never by shuffle</b><span>Shuffling would put future hours in the training set. The score would look excellent and mean nothing, because in production only the past exists.</span></li>
+    <li><b>Fit the scaler on the training slice only</b><span>Had it seen the test set, the model would indirectly know the range of the future. That is data leakage.</span></li>
+    <li><b>Give the test set its history</b><span>The first test window needs 24 hours of context, taken from the end of training. That is history, not leakage &mdash; the model only ever looks backwards.</span></li>
+    <li><b>Slide the window, reshape to (samples, 24, features)</b><span>32,436 training sequences, 8,115 test sequences.</span></li>
+  </ol>
+  <div class="col">
+    <p>All three claims are checked by a test suite rather than asserted in prose, along with the exactness of the gate reconstruction below. <code>python tests/test_pipeline.py</code> &mdash; 14 passing.</p>
+  </div>
+  <pre><code>(24, F) → LSTM 64  return_sequences → Dropout 0.2
+        → LSTM 32                   → Dropout 0.2
+        → Dense 16  relu            → Dense 1  linear</code></pre>
+  <div class="col">
+    <p>The last layer has no activation, because the output is a count of vehicles rather than a probability. Overfitting is held back by dropout, a validation split watched every epoch, and early stopping that restores the best weights &mdash; it fired at epoch 49 of a permitted 50.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head col">
+    <div class="eyebrow">Results</div>
+    <h2>228.8 vehicles an hour, and why that number needed company</h2>
+  </div>
+  <div class="col">
+    <p>On 8,115 hours it had never seen, the model is wrong by about <strong>229 vehicles per hour</strong> on average &mdash; roughly 11% of the value being predicted. On its own that figure is unfalsifiable, so two naive predictors were scored on identical windows: &ldquo;the same hour yesterday&rdquo; (594.3) and &ldquo;the last hour&rdquo; (585.6). Had the network not beaten both, the honest conclusion would have been that an LSTM is the wrong tool here.</p>
+  </div>
+
+  <figure>
+    {{IMG:04_actual_vs_predicted.png}}
+    <figcaption><b>Eight days of the test set.</b> The model tracks the daily cycle closely and shaves the very tops of the sharpest peaks &mdash; expected, because MSE rewards being close on average more than nailing the extremes.</figcaption>
+  </figure>
+
+  <div class="table-scroll">
+    <table>
+      <caption>Every model tried &middot; motorway traffic &middot; MAE in vehicles per hour</caption>
+      <thead>
+        <tr><th>Model</th><th>Family</th><th class="num">Inputs</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">Train time</th></tr>
+      </thead>
+      <tbody>
+        <tr class="best"><td>Traffic + weather + calendar</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">264</td><td class="num">154.5</td><td class="num">238.6</td><td class="num">14s</td></tr>
+        <tr><td>Gap-guarded windows</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">24</td><td class="num">157.7</td><td class="num">242.4</td><td class="num">5s</td></tr>
+        <tr><td>Multi-horizon, +1h head</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">24</td><td class="num">175.1</td><td class="num">266.4</td><td class="num">5s</td></tr>
+        <tr><td>Past traffic only</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">24</td><td class="num">177.3</td><td class="num">268.8</td><td class="num">10s</td></tr>
+        <tr><td>Past traffic only</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">1</td><td class="num">228.8</td><td class="num">326.2</td><td class="num">1,072s</td></tr>
+        <tr><td>Gap-guarded windows</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">1</td><td class="num">240.6</td><td class="num">332.8</td><td class="num">369s</td></tr>
+        <tr><td>Traffic + weather + calendar</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">11</td><td class="num">241.1</td><td class="num">349.2</td><td class="num">204s</td></tr>
+        <tr><td>Multi-horizon, +1h head</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">1</td><td class="num">244.5</td><td class="num">346.5</td><td class="num">834s</td></tr>
+        <tr><td>Last hour</td><td><span class="tag tag--naive">Naive</span></td><td class="num">&mdash;</td><td class="num">585.6</td><td class="num">&mdash;</td><td class="num">&mdash;</td></tr>
+        <tr><td>Same hour yesterday</td><td><span class="tag tag--naive">Naive</span></td><td class="num">&mdash;</td><td class="num">594.3</td><td class="num">&mdash;</td><td class="num">&mdash;</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    {{IMG:11_horizons.png}}
+    <figcaption><b>One model, three outputs.</b> Predicting +1h, +3h and +6h from the same 24-hour window. Accuracy decays as the horizon grows, which is the expected and honest result: the further ahead you look, the less the last day determines the answer.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="sec-head col">
+    <div class="eyebrow">Inside the network</div>
+    <h2>Not a diagram from a textbook</h2>
+  </div>
+  <div class="col">
+    <p>Keras returns a prediction, not an explanation. So the LSTM cell was re-implemented in NumPy from the trained weights and replayed step by step, recording all four gates of all 64 units at every one of the 24 hours.</p>
+    <p>The reconstruction is checked against Keras on every run. The maximum absolute difference is <strong>1.17&times;10<sup>&minus;7</sup></strong> &mdash; floating-point noise. The replay <em>is</em> the network, so every activation shown here is the one the model computed, not an illustration of one.</p>
+  </div>
+
+  <div class="gates">
+    <div class="gate">
+      <span class="gate-name">Forget gate</span>
+      <span class="gate-eq">f = σ(x·W<sub>f</sub> + h·U<sub>f</sub> + b<sub>f</sub>)</span>
+      <p>How much of the existing memory survives this hour. Near 1, the unit holds the whole day; near 0, it starts fresh.</p>
+    </div>
+    <div class="gate">
+      <span class="gate-name">Input gate</span>
+      <span class="gate-eq">i = σ(x·W<sub>i</sub> + h·U<sub>i</sub> + b<sub>i</sub>)</span>
+      <p>How much of the new candidate gets written. This hour is worth remembering, or it is not.</p>
+    </div>
+    <div class="gate">
+      <span class="gate-name">Candidate</span>
+      <span class="gate-eq">g = tanh(x·W<sub>g</sub> + h·U<sub>g</sub> + b<sub>g</sub>)</span>
+      <p>The content the unit proposes to store, squashed into [&minus;1, 1].</p>
+    </div>
+    <div class="gate">
+      <span class="gate-name">Output gate</span>
+      <span class="gate-eq">o = σ(x·W<sub>o</sub> + h·U<sub>o</sub> + b<sub>o</sub>)</span>
+      <p>How much memory leaks out as <code>h = o · tanh(c)</code>. A unit can hold information for hours and open only when it matters.</p>
+    </div>
+  </div>
+
+  <figure>
+    {{IMG:06_heatmap_lstm_1.png}}
+    <figcaption><b>Every neuron, every hour.</b> Rows are the 64 units of the first LSTM layer, columns are the hours of the input window. Red is a positive activation, blue negative, white silent. The colour scale is fitted to the data (&plusmn;0.21) rather than pinned to the tanh bounds, and says so in its own title &mdash; at &plusmn;1 the whole picture washes out to nothing.</figcaption>
+  </figure>
+
+  <figure>
+    {{IMG:08_input_sensitivity.png}}
+    <figcaption><b>Which past hours actually move the answer.</b> Each input hour was nudged in turn and the change in output measured. The last two hours carry about half the movement &mdash; but there is a clear second cluster around <b>t&minus;14h to t&minus;11h</b>, the opposite phase of the daily cycle. The network is not simply copying the last value.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>All of it is exported into an Obsidian vault: 114 notes and 27 canvases, including one canvas per hour of the input window so the memory can be watched forming, and one note per neuron carrying its own activation trace. The busiest hour of the test set and the quietest are documented side by side &mdash; different subsets of units light up, which is what specialisation looks like from the inside.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head col">
+    <div class="eyebrow">Honest limits</div>
+    <h2>What this model cannot do</h2>
+  </div>
+  <div class="col">
+    <p>The headline version sees <strong>only past traffic</strong>. Snow, a closed lane, a stadium emptying out &mdash; all invisible, and all precisely the hours when a forecast would earn its keep. It cannot predict a first-time event, because it extrapolates patterns it has already seen. It is harder to interpret than a decision tree; the vault narrows that gap without closing it. And on this dataset it is both slower and less accurate than gradient boosting.</p>
+    <p>One claim deserves care, because overstating it is the easiest mistake to make: <strong>this model does not control traffic lights.</strong> It produces a forecast that a controller could consume.</p>
+    <pre><code>sensors → hourly history → model → forecast → controller → adaptive lights</code></pre>
+    <p>The most useful next step is not a bigger network. It is rerunning the multivariate model with a longer early-stopping patience, to separate &ldquo;the extra features do not help&rdquo; from &ldquo;the run stopped after 12 epochs while the baseline got 49&rdquo;. The current evidence cannot tell those apart.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head col">
+    <div class="eyebrow">Running it</div>
+    <h2>Point it at any hourly CSV</h2>
+  </div>
+  <div class="col">
+    <p>The pipeline takes any file with a timestamp column and a numeric column &mdash; the bike-rental result above was produced by changing two arguments and nothing else.</p>
+  </div>
+  <pre><code>python -m traffic_lstm.train --export-vault
+python -m traffic_lstm.train --data data/samples/bike_sharing_hourly.csv \
+       --target rentals --run-name bike_sharing
+python -m traffic_lstm.benchmark --run-name baseline_univariate
+python scripts/compare_runs.py
+streamlit run app/streamlit_app.py</code></pre>
+  <div class="col">
+    <p>The Streamlit workbench carries the whole loop: upload a CSV, pick the columns, set the hyper-parameters, watch the loss curve fall live, then step through the network hour by hour and forecast from the final window.</p>
+  </div>
+</section>
+
+<div class="footer">
+  <span>Metro Interstate Traffic Volume &amp; Bike Sharing &mdash; UCI Machine Learning Repository</span>
+  <span class="mono">LSTM 64→32 &middot; MAE 228.8 &middot; replay error 1.2e-07</span>
+</div>
+
+</div>
