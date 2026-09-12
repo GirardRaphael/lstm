@@ -320,14 +320,14 @@ pre code { background: none; padding: 0; }
 
   <div class="statbar">
     <div class="stat">
-      <span class="stat-label">Test MAE</span>
-      <span class="stat-value">228.8</span>
-      <span class="stat-note">vehicles per hour</span>
+      <span class="stat-label">Best LSTM</span>
+      <span class="stat-value">201.4</span>
+      <span class="stat-note">MAE, vehicles per hour</span>
     </div>
     <div class="stat">
       <span class="stat-label">vs best naive</span>
-      <span class="stat-value">+60.9%</span>
-      <span class="stat-note">beats &ldquo;same hour yesterday&rdquo;</span>
+      <span class="stat-value">+65.6%</span>
+      <span class="stat-note">beats &ldquo;the last hour&rdquo;</span>
     </div>
     <div class="stat">
       <span class="stat-label">Unseen hours</span>
@@ -360,16 +360,16 @@ pre code { background: none; padding: 0; }
         <div class="duel-row">
           <span class="duel-name">LSTM</span>
           <span class="duel-bar"><span class="duel-fill duel-fill--lstm" style="width:100%"></span></span>
-          <span class="duel-val">228.8</span>
+          <span class="duel-val">201.4</span>
         </div>
         <div class="duel-row">
           <span class="duel-name">XGBoost</span>
-          <span class="duel-bar"><span class="duel-fill duel-fill--xgb" style="width:67.5%"></span></span>
-          <span class="duel-val">154.5</span>
+          <span class="duel-bar"><span class="duel-fill duel-fill--xgb" style="width:76.6%"></span></span>
+          <span class="duel-val">154.3</span>
         </div>
       </div>
-      <div class="verdict verdict--xgb">XGBoost wins by 32.5%</div>
-      <div class="unit">MAE, vehicles per hour &middot; 77&times; faster to train</div>
+      <div class="verdict verdict--xgb">XGBoost wins by 23.4%</div>
+      <div class="unit">MAE, vehicles per hour &middot; 49&times; faster to train</div>
     </div>
 
     <div class="panel panel--lstm">
@@ -397,8 +397,42 @@ pre code { background: none; padding: 0; }
   </div>
 
   <div class="col">
-    <p>The weather and calendar columns behave just as inconsistently: they <strong>help</strong> the network on bike rentals (41.3 &rarr; 38.5) and <strong>hurt</strong> it on traffic (228.8 &rarr; 241.1), while helping the tree model on both. A plausible reading, offered as a hypothesis rather than a result: bike demand leans far more on the same hour yesterday &mdash; <code>t-24h</code> carries 21% of the tree&rsquo;s signal for rentals against 3.6% for traffic &mdash; and nobody cycles in the rain, so there is real information in the exogenous columns for a recurrence to use.</p>
     <p>The honest takeaway is not &ldquo;LSTMs are good&rdquo; or &ldquo;LSTMs are bad&rdquo;. It is that the question is empirical, the experiment costs ten seconds, and one dataset is not enough to settle it.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head col">
+    <div class="eyebrow">The ablation</div>
+    <h2>A worse score that turned out to be the most informative run</h2>
+  </div>
+  <div class="col">
+    <p>Feeding the network weather <em>and</em> calendar columns made it <strong>worse</strong> &mdash; 241.1 against the plain baseline&rsquo;s 228.8. The easy reading was that the extra columns are useless. The training history said something more specific: validation loss bottomed out at <strong>epoch 7 of 12</strong> and then climbed 7%. That is overfitting, not under-training, and more patience cannot repair it &mdash; <code>restore_best_weights</code> hands back epoch 7 either way.</p>
+    <p>So the next step was an ablation with a control, which is the part that actually answers the question.</p>
+  </div>
+
+  <div class="table-scroll">
+    <table>
+      <caption>Feature ablation &middot; motorway traffic &middot; MAE in vehicles per hour</caption>
+      <thead>
+        <tr><th>Inputs</th><th class="num">Columns</th><th class="num">Dropout</th><th class="num">MAE</th><th>Reads as</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Past traffic only</td><td class="num">1</td><td class="num">0.20</td><td class="num">228.8</td><td>the starting point</td></tr>
+        <tr><td>Past traffic only <em>(control)</em></td><td class="num">1</td><td class="num">0.35</td><td class="num">229.8</td><td>dropout alone buys nothing</td></tr>
+        <tr class="best"><td>Traffic + <strong>calendar</strong>, no weather</td><td class="num">7</td><td class="num">0.20</td><td class="num">201.4</td><td>the calendar is the signal</td></tr>
+        <tr><td>Traffic + calendar + weather</td><td class="num">11</td><td class="num">0.20</td><td class="num">241.1</td><td>weather costs 40 points</td></tr>
+        <tr><td>Traffic + calendar + weather</td><td class="num">11</td><td class="num">0.35</td><td class="num">206.0</td><td>regularising repairs most of it</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>Read top to bottom, the table closes three questions at once. <strong>The control does not move</strong>, so none of the gains below it are really about regularisation. <strong>Hour and weekday</strong>, encoded as sine/cosine pairs so that 23:00 sits next to 00:00, take the network from 228.8 to 201.4 at unchanged dropout. And <strong>the weather columns are noise that costs</strong>: <code>rain_1h</code> and <code>snow_1h</code> are zero for the overwhelming majority of hours, adding parameters to overfit and no information to use.</p>
+  </div>
+
+  <div class="callout">
+    <p>The tree model shows the mirror image. XGBoost scores <strong>154.3</strong> with calendar only and <strong>154.5</strong> with weather added &mdash; the same number. Both families gain from the calendar and neither uses the weather; the difference is that gradient boosting <em>ignores</em> an irrelevant column where the LSTM <em>overfits</em> it. That robustness is a practical argument for tree ensembles that no amount of theory about sequences addresses.</p>
   </div>
 </section>
 
@@ -448,10 +482,11 @@ pre code { background: none; padding: 0; }
 <section>
   <div class="sec-head col">
     <div class="eyebrow">Results</div>
-    <h2>228.8 vehicles an hour, and why that number needed company</h2>
+    <h2>A number is not a result until something else has been scored beside it</h2>
   </div>
   <div class="col">
-    <p>On 8,115 hours it had never seen, the model is wrong by about <strong>229 vehicles per hour</strong> on average &mdash; roughly 11% of the value being predicted. On its own that figure is unfalsifiable, so two naive predictors were scored on identical windows: &ldquo;the same hour yesterday&rdquo; (594.3) and &ldquo;the last hour&rdquo; (585.6). Had the network not beaten both, the honest conclusion would have been that an LSTM is the wrong tool here.</p>
+    <p>The baseline network &mdash; past traffic only, the version documented neuron by neuron below &mdash; is wrong by about <strong>229 vehicles per hour</strong> on 8,115 hours it had never seen, roughly 11% of the value being predicted. The best LSTM, once the calendar columns are added, reaches <strong>201.4</strong>.</p>
+    <p>On its own either figure is unfalsifiable, so two naive predictors were scored on identical windows: &ldquo;the same hour yesterday&rdquo; (594.3) and &ldquo;the last hour&rdquo; (585.6). Had the network not beaten both, the honest conclusion would have been that an LSTM is the wrong tool here.</p>
   </div>
 
   <figure>
@@ -466,13 +501,17 @@ pre code { background: none; padding: 0; }
         <tr><th>Model</th><th>Family</th><th class="num">Inputs</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">Train time</th></tr>
       </thead>
       <tbody>
-        <tr class="best"><td>Traffic + weather + calendar</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">264</td><td class="num">154.5</td><td class="num">238.6</td><td class="num">14s</td></tr>
+        <tr class="best"><td>Traffic + calendar, no weather</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">168</td><td class="num">154.3</td><td class="num">239.0</td><td class="num">14s</td></tr>
+        <tr><td>Traffic + calendar + weather</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">264</td><td class="num">154.5</td><td class="num">238.6</td><td class="num">14s</td></tr>
         <tr><td>Gap-guarded windows</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">24</td><td class="num">157.7</td><td class="num">242.4</td><td class="num">5s</td></tr>
         <tr><td>Multi-horizon, +1h head</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">24</td><td class="num">175.1</td><td class="num">266.4</td><td class="num">5s</td></tr>
         <tr><td>Past traffic only</td><td><span class="tag tag--xgb">XGBoost</span></td><td class="num">24</td><td class="num">177.3</td><td class="num">268.8</td><td class="num">10s</td></tr>
+        <tr><td>Traffic + calendar, no weather</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">7</td><td class="num">201.4</td><td class="num">276.4</td><td class="num">688s</td></tr>
+        <tr><td>All 11 inputs, dropout 0.35</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">11</td><td class="num">206.0</td><td class="num">294.9</td><td class="num">723s</td></tr>
         <tr><td>Past traffic only</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">1</td><td class="num">228.8</td><td class="num">326.2</td><td class="num">1,072s</td></tr>
+        <tr><td>Past traffic only, dropout 0.35</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">1</td><td class="num">229.8</td><td class="num">314.3</td><td class="num">630s</td></tr>
         <tr><td>Gap-guarded windows</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">1</td><td class="num">240.6</td><td class="num">332.8</td><td class="num">369s</td></tr>
-        <tr><td>Traffic + weather + calendar</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">11</td><td class="num">241.1</td><td class="num">349.2</td><td class="num">204s</td></tr>
+        <tr><td>Traffic + calendar + weather</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">11</td><td class="num">241.1</td><td class="num">349.2</td><td class="num">204s</td></tr>
         <tr><td>Multi-horizon, +1h head</td><td><span class="tag tag--lstm">LSTM</span></td><td class="num">1</td><td class="num">244.5</td><td class="num">346.5</td><td class="num">834s</td></tr>
         <tr><td>Last hour</td><td><span class="tag tag--naive">Naive</span></td><td class="num">&mdash;</td><td class="num">585.6</td><td class="num">&mdash;</td><td class="num">&mdash;</td></tr>
         <tr><td>Same hour yesterday</td><td><span class="tag tag--naive">Naive</span></td><td class="num">&mdash;</td><td class="num">594.3</td><td class="num">&mdash;</td><td class="num">&mdash;</td></tr>
@@ -543,7 +582,7 @@ pre code { background: none; padding: 0; }
     <p>The headline version sees <strong>only past traffic</strong>. Snow, a closed lane, a stadium emptying out &mdash; all invisible, and all precisely the hours when a forecast would earn its keep. It cannot predict a first-time event, because it extrapolates patterns it has already seen. It is harder to interpret than a decision tree; the vault narrows that gap without closing it. And on this dataset it is both slower and less accurate than gradient boosting.</p>
     <p>One claim deserves care, because overstating it is the easiest mistake to make: <strong>this model does not control traffic lights.</strong> It produces a forecast that a controller could consume.</p>
     <pre><code>sensors → hourly history → model → forecast → controller → adaptive lights</code></pre>
-    <p>The most useful next step is not a bigger network. It is rerunning the multivariate model with a longer early-stopping patience, to separate &ldquo;the extra features do not help&rdquo; from &ldquo;the run stopped after 12 epochs while the baseline got 49&rdquo;. The current evidence cannot tell those apart.</p>
+    <p>The most useful next step is not a bigger network. Every experiment above shares one architecture and one 24-hour window; the open question is whether an LSTM starts to pay for itself where a lag table cannot follow &mdash; several junctions sharing one model, dependencies longer than the window, variable-length sequences. That is a different experiment, not a bigger one.</p>
   </div>
 </section>
 
@@ -568,7 +607,7 @@ streamlit run app/streamlit_app.py</code></pre>
 
 <div class="footer">
   <span>Metro Interstate Traffic Volume &amp; Bike Sharing &mdash; UCI Machine Learning Repository</span>
-  <span class="mono">LSTM 64→32 &middot; MAE 228.8 &middot; replay error 1.2e-07</span>
+  <span class="mono">LSTM 64→32 &middot; best MAE 201.4 &middot; replay error 1.2e-07</span>
 </div>
 
 </div>

@@ -1,6 +1,19 @@
 {
   "rows": [
     {
+      "label": "XGBoost - traffic + calendar (no weather)",
+      "run_name": "calendar_only",
+      "dataset": "Metro_Interstate_Traffic_Volume",
+      "kind": "xgboost",
+      "mae": 154.29821979108962,
+      "rmse": 239.02522606143455,
+      "mape": 6.557001518903088,
+      "features": 168,
+      "train_sequences": null,
+      "seconds": 14.2,
+      "epochs": 529
+    },
+    {
       "label": "XGBoost - traffic + weather + calendar",
       "run_name": "multivariate",
       "dataset": "Metro_Interstate_Traffic_Volume",
@@ -11,6 +24,19 @@
       "features": 264,
       "train_sequences": null,
       "seconds": 14.3,
+      "epochs": 574
+    },
+    {
+      "label": "XGBoost - all 11 inputs, dropout 0.35",
+      "run_name": "multivariate_reg",
+      "dataset": "Metro_Interstate_Traffic_Volume",
+      "kind": "xgboost",
+      "mae": 154.50478245392304,
+      "rmse": 238.58592895667235,
+      "mape": 6.635456684547032,
+      "features": 264,
+      "train_sequences": null,
+      "seconds": 23.4,
       "epochs": 574
     },
     {
@@ -40,6 +66,19 @@
       "epochs": 602
     },
     {
+      "label": "XGBoost - past traffic only, dropout 0.35",
+      "run_name": "baseline_reg",
+      "dataset": "Metro_Interstate_Traffic_Volume",
+      "kind": "xgboost",
+      "mae": 177.2996667194572,
+      "rmse": 268.7613127632824,
+      "mape": 7.935454960708553,
+      "features": 24,
+      "train_sequences": null,
+      "seconds": 8.2,
+      "epochs": 464
+    },
+    {
       "label": "XGBoost - past traffic only",
       "run_name": "baseline_univariate",
       "dataset": "Metro_Interstate_Traffic_Volume",
@@ -53,6 +92,52 @@
       "epochs": 464
     },
     {
+      "label": "LSTM - traffic + calendar (no weather)",
+      "run_name": "calendar_only",
+      "dataset": "Metro_Interstate_Traffic_Volume",
+      "kind": "lstm",
+      "mae": 201.38655869698567,
+      "rmse": 276.42326147307085,
+      "mape": 12.745407340428802,
+      "features": 7,
+      "train_sequences": 32436,
+      "seconds": 687.6,
+      "epochs": 36,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 24 of 36, validation loss flat afterwards (+6.0%)",
+        "best_epoch": 24,
+        "epochs_run": 36,
+        "best_val_loss": 0.0018197440076619387,
+        "final_vs_best_pct": 6.03
+      },
+      "dropout": 0.2,
+      "patience": 12
+    },
+    {
+      "label": "LSTM - all 11 inputs, dropout 0.35",
+      "run_name": "multivariate_reg",
+      "dataset": "Metro_Interstate_Traffic_Volume",
+      "kind": "lstm",
+      "mae": 206.01074400623125,
+      "rmse": 294.8585514543259,
+      "mape": 11.662530283826872,
+      "features": 11,
+      "train_sequences": 32436,
+      "seconds": 723.2,
+      "epochs": 38,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 26 of 38, validation loss flat afterwards (+13.9%)",
+        "best_epoch": 26,
+        "epochs_run": 38,
+        "best_val_loss": 0.0018397850217297673,
+        "final_vs_best_pct": 13.94
+      },
+      "dropout": 0.35,
+      "patience": 12
+    },
+    {
       "label": "LSTM - past traffic only",
       "run_name": "baseline_univariate",
       "dataset": "Metro_Interstate_Traffic_Volume",
@@ -63,7 +148,40 @@
       "features": 1,
       "train_sequences": 32436,
       "seconds": 1072.1,
-      "epochs": 49
+      "epochs": 49,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 44 of 49, validation loss flat afterwards (+0.7%)",
+        "best_epoch": 44,
+        "epochs_run": 49,
+        "best_val_loss": 0.0023819778580218554,
+        "final_vs_best_pct": 0.73
+      },
+      "dropout": 0.2,
+      "patience": 5
+    },
+    {
+      "label": "LSTM - past traffic only, dropout 0.35",
+      "run_name": "baseline_reg",
+      "dataset": "Metro_Interstate_Traffic_Volume",
+      "kind": "lstm",
+      "mae": 229.81946537524774,
+      "rmse": 314.2747765728501,
+      "mape": 14.487792820216367,
+      "features": 1,
+      "train_sequences": 32436,
+      "seconds": 630.2,
+      "epochs": 37,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 25 of 37, validation loss flat afterwards (+13.6%)",
+        "best_epoch": 25,
+        "epochs_run": 37,
+        "best_val_loss": 0.0021056202240288258,
+        "final_vs_best_pct": 13.55
+      },
+      "dropout": 0.35,
+      "patience": 12
     },
     {
       "label": "LSTM - gap-guarded windows",
@@ -76,7 +194,17 @@
       "features": 1,
       "train_sequences": 21185,
       "seconds": 368.7,
-      "epochs": 30
+      "epochs": 30,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 25 of 30, validation loss flat afterwards (+2.0%)",
+        "best_epoch": 25,
+        "epochs_run": 30,
+        "best_val_loss": 0.0019709686748683453,
+        "final_vs_best_pct": 2.0
+      },
+      "dropout": 0.2,
+      "patience": 5
     },
     {
       "label": "LSTM - traffic + weather + calendar",
@@ -89,7 +217,17 @@
       "features": 11,
       "train_sequences": 32436,
       "seconds": 204.5,
-      "epochs": 12
+      "epochs": 12,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 7 of 12, validation loss flat afterwards (+7.0%)",
+        "best_epoch": 7,
+        "epochs_run": 12,
+        "best_val_loss": 0.0024796463549137115,
+        "final_vs_best_pct": 6.99
+      },
+      "dropout": 0.2,
+      "patience": 5
     },
     {
       "label": "LSTM - multi-horizon (+1h head)",
@@ -102,7 +240,17 @@
       "features": 1,
       "train_sequences": 32431,
       "seconds": 834.0,
-      "epochs": 42
+      "epochs": 42,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 37 of 42, validation loss flat afterwards (+0.3%)",
+        "best_epoch": 37,
+        "epochs_run": 42,
+        "best_val_loss": 0.005791616626083851,
+        "final_vs_best_pct": 0.27
+      },
+      "dropout": 0.2,
+      "patience": 5
     },
     {
       "label": "Naive - last hour",
@@ -141,7 +289,17 @@
       "features": 11,
       "train_sequences": 13879,
       "seconds": 234.9,
-      "epochs": 30
+      "epochs": 30,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 25 of 30, validation loss flat afterwards (+24.9%)",
+        "best_epoch": 25,
+        "epochs_run": 30,
+        "best_val_loss": 0.0031254307832568884,
+        "final_vs_best_pct": 24.86
+      },
+      "dropout": 0.2,
+      "patience": 5
     },
     {
       "label": "XGBoost - rentals + weather + calendar",
@@ -167,7 +325,17 @@
       "features": 1,
       "train_sequences": 13879,
       "seconds": 153.5,
-      "epochs": 24
+      "epochs": 24,
+      "diagnosis": {
+        "verdict": "plateaued",
+        "detail": "best at epoch 19 of 24, validation loss flat afterwards (+12.8%)",
+        "best_epoch": 19,
+        "epochs_run": 24,
+        "best_val_loss": 0.003680128837004304,
+        "final_vs_best_pct": 12.82
+      },
+      "dropout": 0.2,
+      "patience": 5
     },
     {
       "label": "XGBoost - past rentals only",

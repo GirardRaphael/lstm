@@ -9,25 +9,31 @@ Every model tried on the motorway dataset, scored on **the same test windows**.
 
 | Model | Inputs | MAE | RMSE | MAPE | Train time |
 | --- | --- | --- | --- | --- | --- |
+| XGBoost - traffic + calendar (no weather) | 168 | **154.3** | 239.0 | 6.6% | 14s |
 | XGBoost - traffic + weather + calendar | 264 | **154.5** | 238.6 | 6.6% | 14s |
+| XGBoost - all 11 inputs, dropout 0.35 | 264 | **154.5** | 238.6 | 6.6% | 23s |
 | XGBoost - gap-guarded windows | 24 | **157.7** | 242.4 | 6.9% | 5s |
 | XGBoost - multi-horizon (+1h head) | 24 | **175.1** | 266.4 | 7.8% | 5s |
+| XGBoost - past traffic only, dropout 0.35 | 24 | **177.3** | 268.8 | 7.9% | 8s |
 | XGBoost - past traffic only | 24 | **177.3** | 268.8 | 7.9% | 10s |
+| LSTM - traffic + calendar (no weather) | 7 | **201.4** | 276.4 | 12.7% | 688s |
+| LSTM - all 11 inputs, dropout 0.35 | 11 | **206.0** | 294.9 | 11.7% | 723s |
 | LSTM - past traffic only | 1 | **228.8** | 326.2 | 11.4% | 1,072s |
+| LSTM - past traffic only, dropout 0.35 | 1 | **229.8** | 314.3 | 14.5% | 630s |
 | LSTM - gap-guarded windows | 1 | **240.6** | 332.8 | 11.6% | 369s |
 | LSTM - traffic + weather + calendar | 11 | **241.1** | 349.2 | 10.5% | 204s |
 | LSTM - multi-horizon (+1h head) | 1 | **244.5** | 346.5 | 11.0% | 834s |
 | Naive - last hour | - | **585.6** | - | - | - |
 | Naive - same hour yesterday | - | **594.3** | - | - | - |
 
-The best result on this dataset is **XGBoost - traffic + weather + calendar** at **154.5**.
+The best result on this dataset is **XGBoost - traffic + calendar (no weather)** at **154.3**.
 
 ## The uncomfortable result
 
 > Gradient boosting on the **same tensors** - the same windows, the same
-> split, the same scaler, just flattened - scores **155** against the
-> best LSTM's **229**. That is **32% more accurate**, trained
-> **75x faster**.
+> split, the same scaler, just flattened - scores **154** against the
+> best LSTM's **201**. That is **23% more accurate**, trained
+> **48x faster**.
 
 This is the single most useful thing in the project, and it should be said
 out loud rather than buried. It does not mean the LSTM was a mistake - it
@@ -56,7 +62,7 @@ command-line arguments changed.
 
 | Dataset | Best LSTM | Best XGBoost | Winner | Unit |
 | --- | --- | --- | --- | --- |
-| Motorway traffic (UCI Metro Interstate) | 228.8 | 154.5 | **XGBoost** by 32.5% | vehicles per hour |
+| Motorway traffic (UCI Metro Interstate) | 201.4 | 154.3 | **XGBoost** by 23.4% | vehicles per hour |
 | Bike rentals (UCI Bike Sharing) | 38.5 | 38.6 | **LSTM** by 0.3% | rentals per hour |
 
 **The verdict flips between the two datasets.** That is the single most

@@ -144,6 +144,32 @@ is real. `--drop-gapped-windows` discards those windows (21,185 training
 windows instead of 32,436); it is off by default so the documented run stays
 reproducible. Turning it on and retraining is the first thing to try.
 
+**A worse score is often the informative one.** Adding weather *and* calendar
+columns made the network worse (241.1 against the baseline's 228.8). The easy
+reading is "the extra columns are useless"; the training history said
+overfitting — validation loss bottomed out at epoch 7 of 12, then climbed. An
+ablation with a control settled it:
+
+| Inputs | Columns | Dropout | MAE |
+| --- | --- | --- | --- |
+| Past traffic only | 1 | 0.20 | 228.8 |
+| Past traffic only *(control)* | 1 | 0.35 | 229.8 |
+| Traffic + **calendar**, no weather | 7 | 0.20 | **201.4** |
+| Traffic + calendar + weather | 11 | 0.20 | 241.1 |
+| Traffic + calendar + weather | 11 | 0.35 | 206.0 |
+
+The control does not move, so none of it is about regularisation. Hour and
+weekday as sine/cosine pairs are worth 12%. The weather columns are noise that
+costs: `rain_1h` and `snow_1h` are zero for nearly every hour, adding
+parameters to overfit and no information to use. XGBoost scores 154.3 with
+calendar only and 154.5 with weather — the same number. **Both families gain
+from the calendar and neither uses the weather; gradient boosting just ignores
+the irrelevant column where the LSTM overfits it.**
+
+`evaluate.training_diagnosis()` now labels every run *capped*, *overfit* or
+*plateaued*, because those three look identical in a final metric and call for
+opposite fixes.
+
 **The baselines are not optional.** A MAE of ~300 vehicles is meaningless
 until you know that predicting *"the same hour yesterday"* scores worse. If
 the network had not beaten both naive rules, the honest conclusion would have

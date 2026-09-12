@@ -31,6 +31,9 @@ FRIENDLY = {
     "multivariate": "LSTM - traffic + weather + calendar",
     "gap_guarded": "LSTM - gap-guarded windows",
     "multi_horizon": "LSTM - multi-horizon (+1h head)",
+    "calendar_only": "LSTM - traffic + calendar (no weather)",
+    "multivariate_reg": "LSTM - all 11 inputs, dropout 0.35",
+    "baseline_reg": "LSTM - past traffic only, dropout 0.35",
     "bike_sharing": "LSTM - past rentals only",
     "bike_sharing_mv": "LSTM - rentals + weather + calendar",
 }

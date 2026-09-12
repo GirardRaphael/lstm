@@ -285,18 +285,49 @@ tool for this problem.
 | --- | --- | --- | --- |
 {ranking}
 
-Two results are worth stating plainly because they contradict the obvious
-expectation:
+### The ablation that explains the table
 
-- **Adding weather and calendar features helped the tree model and hurt the
-  network.** The same features that took XGBoost from {xgb_uni} to its best
-  score made the LSTM worse. The multivariate LSTM also early-stopped much
-  sooner, so it may be under-trained rather than badly fed - a longer patience
-  is the obvious follow-up.
-- **Discarding windows that span a gap in the series did not improve
-  accuracy.** {pct:.1f}% of the training windows silently contain a jump in
-  time. Removing them is more correct, but it costs a third of the training
-  data and the score did not improve, so the flaw is real but not material.
+The first multivariate run scored *worse* than the plain baseline (241.1
+against 228.8), which looked like the extra columns being useless. The
+training history said something more specific: validation loss bottomed out at
+**epoch 7 of 12** and then climbed 7%. That is overfitting, not
+under-training, and more patience cannot fix it - `restore_best_weights` hands
+back epoch 7 either way. So the follow-up was an ablation, with a control.
+
+| Run | Inputs | Dropout | MAE |
+| --- | --- | --- | --- |
+| Past traffic only | 1 | 0.20 | 228.8 |
+| Past traffic only *(control)* | 1 | 0.35 | 229.8 |
+| Traffic **+ calendar**, no weather | 7 | 0.20 | **201.4** |
+| Traffic + calendar + weather | 11 | 0.20 | 241.1 |
+| Traffic + calendar + weather | 11 | 0.35 | 206.0 |
+
+Read in order, the table settles three questions at once:
+
+1. **The control does not move** (228.8 to 229.8). Stronger dropout on its own
+   buys nothing, so none of the gains below are really about regularisation.
+2. **The calendar columns are the signal.** Hour and weekday, encoded as
+   sine/cosine pairs, take the network from 228.8 to 201.4 - a 12% gain at
+   unchanged dropout.
+3. **The weather columns are noise that costs.** Adding them to the calendar
+   features loses 40 points (201.4 to 241.1). `rain_1h` and `snow_1h` are zero
+   for the overwhelming majority of hours; they add parameters the network can
+   overfit and no information it can use. Heavier dropout repairs most of the
+   damage (206.0) but never recovers the calendar-only score.
+
+The tree model shows the mirror image: XGBoost scores 154.3 with calendar only
+and 154.5 with weather added - statistically the same number. **Both models
+gain from the calendar and neither uses the weather; the difference is that
+gradient boosting simply ignores an irrelevant column while the LSTM
+overfits it.** That robustness is a real, practical argument for tree
+ensembles that no amount of theory about sequences addresses.
+
+### One more result that contradicts the obvious expectation
+
+**Discarding windows that span a gap in the series did not improve accuracy.**
+{pct:.1f}% of the training windows silently contain a jump in time. Removing
+them is more correct, but it costs a third of the training data and the score
+did not improve, so the flaw is real and not material.
 {horizon}{bike}
 ## 9. Looking inside the network
 

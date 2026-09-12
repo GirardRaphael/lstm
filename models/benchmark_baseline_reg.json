@@ -1,0 +1,123 @@
+{
+  "xgboost": {
+    "model": "XGBoost 3.4.1",
+    "run_name": "baseline_reg",
+    "horizon": 1,
+    "n_features_flat": 24,
+    "trees_used": 464,
+    "training_seconds": 8.2,
+    "metrics": {
+      "mae": 177.2996667194572,
+      "rmse": 268.7613127632824,
+      "mape": 7.935454960708553,
+      "n": 8115
+    },
+    "naive_persistence": {
+      "mae": 585.5609362489708,
+      "rmse": 811.8081116310376,
+      "mape": 26.86905402616622,
+      "n": 8115
+    },
+    "naive_same_hour_yesterday": {
+      "mae": 594.3254455877393,
+      "rmse": 1053.3273131537267,
+      "mape": 26.685037246004818,
+      "n": 8115
+    },
+    "improvement_over_best_naive_pct": 69.72,
+    "top_features": [
+      {
+        "feature": "traffic_volume_t-1h",
+        "importance": 0.4956772029399872
+      },
+      {
+        "feature": "traffic_volume_t-2h",
+        "importance": 0.13024558126926422
+      },
+      {
+        "feature": "traffic_volume_t-7h",
+        "importance": 0.08837830275297165
+      },
+      {
+        "feature": "traffic_volume_t-5h",
+        "importance": 0.03936638683080673
+      },
+      {
+        "feature": "traffic_volume_t-24h",
+        "importance": 0.03619282320141792
+      },
+      {
+        "feature": "traffic_volume_t-3h",
+        "importance": 0.03487994149327278
+      },
+      {
+        "feature": "traffic_volume_t-6h",
+        "importance": 0.021792225539684296
+      },
+      {
+        "feature": "traffic_volume_t-8h",
+        "importance": 0.02032148465514183
+      },
+      {
+        "feature": "traffic_volume_t-4h",
+        "importance": 0.018815627321600914
+      },
+      {
+        "feature": "traffic_volume_t-18h",
+        "importance": 0.01838529296219349
+      },
+      {
+        "feature": "traffic_volume_t-14h",
+        "importance": 0.012468308210372925
+      },
+      {
+        "feature": "traffic_volume_t-13h",
+        "importance": 0.011279045604169369
+      },
+      {
+        "feature": "traffic_volume_t-9h",
+        "importance": 0.009970187209546566
+      },
+      {
+        "feature": "traffic_volume_t-23h",
+        "importance": 0.009396667592227459
+      },
+      {
+        "feature": "traffic_volume_t-11h",
+        "importance": 0.007491349242627621
+      }
+    ]
+  },
+  "comparison": {
+    "run_name": "baseline_reg",
+    "horizon": 1,
+    "lstm": {
+      "mae": 229.81946537524774,
+      "rmse": 314.2747765728501,
+      "mape": 14.487792820216367,
+      "n": 8115
+    },
+    "xgboost": {
+      "mae": 177.2996667194572,
+      "rmse": 268.7613127632824,
+      "mape": 7.935454960708553,
+      "n": 8115
+    },
+    "naive_same_hour_yesterday": {
+      "mae": 594.3254455877393,
+      "rmse": 1053.3273131537267,
+      "mape": 26.685037246004818,
+      "n": 8115
+    },
+    "naive_persistence": {
+      "mae": 585.5609362489708,
+      "rmse": 811.8081116310376,
+      "mape": 26.86905402616622,
+      "n": 8115
+    },
+    "lstm_training_seconds": 630.2,
+    "xgboost_training_seconds": 8.2,
+    "lstm_advantage_pct": -29.62,
+    "verdict": "XGBoost wins"
+  }
+}
