@@ -1,0 +1,123 @@
+{
+  "xgboost": {
+    "model": "XGBoost 3.4.1",
+    "run_name": "bike_sharing",
+    "horizon": 1,
+    "n_features_flat": 24,
+    "trees_used": 310,
+    "training_seconds": 4.2,
+    "metrics": {
+      "mae": 43.08193437704607,
+      "rmse": 72.49240441219214,
+      "mape": 29.152186060280183,
+      "n": 3476
+    },
+    "naive_persistence": {
+      "mae": 85.18210580774867,
+      "rmse": 129.65256623807414,
+      "mape": 52.880707471699615,
+      "n": 3476
+    },
+    "naive_same_hour_yesterday": {
+      "mae": 80.46029918658307,
+      "rmse": 134.75906554112424,
+      "mape": 76.05757172567785,
+      "n": 3476
+    },
+    "improvement_over_best_naive_pct": 46.46,
+    "top_features": [
+      {
+        "feature": "rentals_t-1h",
+        "importance": 0.4129757583141327
+      },
+      {
+        "feature": "rentals_t-24h",
+        "importance": 0.20888864994049072
+      },
+      {
+        "feature": "rentals_t-23h",
+        "importance": 0.055753789842128754
+      },
+      {
+        "feature": "rentals_t-3h",
+        "importance": 0.03859732300043106
+      },
+      {
+        "feature": "rentals_t-2h",
+        "importance": 0.038030654191970825
+      },
+      {
+        "feature": "rentals_t-9h",
+        "importance": 0.03018644079566002
+      },
+      {
+        "feature": "rentals_t-10h",
+        "importance": 0.029903020709753036
+      },
+      {
+        "feature": "rentals_t-4h",
+        "importance": 0.025079578161239624
+      },
+      {
+        "feature": "rentals_t-12h",
+        "importance": 0.018667474389076233
+      },
+      {
+        "feature": "rentals_t-6h",
+        "importance": 0.015356908552348614
+      },
+      {
+        "feature": "rentals_t-5h",
+        "importance": 0.01472546812146902
+      },
+      {
+        "feature": "rentals_t-13h",
+        "importance": 0.014064278453588486
+      },
+      {
+        "feature": "rentals_t-22h",
+        "importance": 0.013185050338506699
+      },
+      {
+        "feature": "rentals_t-11h",
+        "importance": 0.011273927055299282
+      },
+      {
+        "feature": "rentals_t-14h",
+        "importance": 0.011065883561968803
+      }
+    ]
+  },
+  "comparison": {
+    "run_name": "bike_sharing",
+    "horizon": 1,
+    "lstm": {
+      "mae": 41.33398787241487,
+      "rmse": 61.1184958627109,
+      "mape": 34.72210343847982,
+      "n": 3476
+    },
+    "xgboost": {
+      "mae": 43.08193437704607,
+      "rmse": 72.49240441219214,
+      "mape": 29.152186060280183,
+      "n": 3476
+    },
+    "naive_same_hour_yesterday": {
+      "mae": 80.46029918658307,
+      "rmse": 134.75906554112424,
+      "mape": 76.05757172567785,
+      "n": 3476
+    },
+    "naive_persistence": {
+      "mae": 85.18210580774867,
+      "rmse": 129.65256623807414,
+      "mape": 52.880707471699615,
+      "n": 3476
+    },
+    "lstm_training_seconds": 153.5,
+    "xgboost_training_seconds": 4.2,
+    "lstm_advantage_pct": 4.06,
+    "verdict": "the LSTM wins"
+  }
+}

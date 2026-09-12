@@ -1,0 +1,123 @@
+{
+  "xgboost": {
+    "model": "XGBoost 3.4.1",
+    "run_name": "multivariate",
+    "horizon": 1,
+    "n_features_flat": 264,
+    "trees_used": 574,
+    "training_seconds": 14.3,
+    "metrics": {
+      "mae": 154.50478245392304,
+      "rmse": 238.58592895667235,
+      "mape": 6.635456684547032,
+      "n": 8115
+    },
+    "naive_persistence": {
+      "mae": 585.5609362489708,
+      "rmse": 811.8081116310376,
+      "mape": 26.86905402616622,
+      "n": 8115
+    },
+    "naive_same_hour_yesterday": {
+      "mae": 594.3254455877393,
+      "rmse": 1053.3273131537267,
+      "mape": 26.685037246004818,
+      "n": 8115
+    },
+    "improvement_over_best_naive_pct": 73.61,
+    "top_features": [
+      {
+        "feature": "hour_sin_t-3h",
+        "importance": 0.2121586948633194
+      },
+      {
+        "feature": "traffic_volume_t-1h",
+        "importance": 0.1552933156490326
+      },
+      {
+        "feature": "is_weekend_t-1h",
+        "importance": 0.08624312281608582
+      },
+      {
+        "feature": "hour_sin_t-4h",
+        "importance": 0.06963582336902618
+      },
+      {
+        "feature": "hour_cos_t-1h",
+        "importance": 0.06136253476142883
+      },
+      {
+        "feature": "hour_sin_t-6h",
+        "importance": 0.050300225615501404
+      },
+      {
+        "feature": "is_weekend_t-3h",
+        "importance": 0.049970824271440506
+      },
+      {
+        "feature": "weekday_sin_t-1h",
+        "importance": 0.02298611029982567
+      },
+      {
+        "feature": "hour_cos_t-2h",
+        "importance": 0.019255878403782845
+      },
+      {
+        "feature": "is_holiday_t-4h",
+        "importance": 0.015776706859469414
+      },
+      {
+        "feature": "hour_sin_t-1h",
+        "importance": 0.014869635924696922
+      },
+      {
+        "feature": "is_holiday_t-2h",
+        "importance": 0.010745782405138016
+      },
+      {
+        "feature": "hour_sin_t-2h",
+        "importance": 0.010509523563086987
+      },
+      {
+        "feature": "is_weekend_t-2h",
+        "importance": 0.009794372133910656
+      },
+      {
+        "feature": "hour_cos_t-3h",
+        "importance": 0.009536775760352612
+      }
+    ]
+  },
+  "comparison": {
+    "run_name": "multivariate",
+    "horizon": 1,
+    "lstm": {
+      "mae": 241.09311569019812,
+      "rmse": 349.17286270502063,
+      "mape": 10.510768288237239,
+      "n": 8115
+    },
+    "xgboost": {
+      "mae": 154.50478245392304,
+      "rmse": 238.58592895667235,
+      "mape": 6.635456684547032,
+      "n": 8115
+    },
+    "naive_same_hour_yesterday": {
+      "mae": 594.3254455877393,
+      "rmse": 1053.3273131537267,
+      "mape": 26.685037246004818,
+      "n": 8115
+    },
+    "naive_persistence": {
+      "mae": 585.5609362489708,
+      "rmse": 811.8081116310376,
+      "mape": 26.86905402616622,
+      "n": 8115
+    },
+    "lstm_training_seconds": 204.5,
+    "xgboost_training_seconds": 14.3,
+    "lstm_advantage_pct": -56.04,
+    "verdict": "XGBoost wins"
+  }
+}

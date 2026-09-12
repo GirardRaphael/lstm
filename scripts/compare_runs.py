@@ -30,7 +30,25 @@ FRIENDLY = {
     "multivariate": "LSTM - traffic + weather + calendar",
     "gap_guarded": "LSTM - gap-guarded windows",
     "multi_horizon": "LSTM - multi-horizon (+1h head)",
+    "bike_sharing": "LSTM - past rentals only",
+    "bike_sharing_mv": "LSTM - rentals + weather + calendar",
 }
+
+# MAE is in the units of whatever is being predicted, so runs on different
+# datasets must never share a ranking or a chart. Everything below groups by
+# the source file first.
+DATASET_LABELS = {
+    "Metro_Interstate_Traffic_Volume": "Motorway traffic (UCI Metro Interstate)",
+    "bike_sharing_hourly": "Bike rentals (UCI Bike Sharing)",
+}
+DATASET_UNITS = {
+    "Metro_Interstate_Traffic_Volume": "vehicles per hour",
+    "bike_sharing_hourly": "rentals per hour",
+}
+
+
+def dataset_key(cfg) -> str:
+    return Path(cfg.data_path).stem
 
 
 def load_runs() -> list:
@@ -62,10 +80,12 @@ def build_table(runs, benchmarks) -> dict:
     naive_seen = {}
     for (cfg, artifacts), benchmark in zip(runs, benchmarks):
         horizon = cfg.horizons[0]
+        key = dataset_key(cfg)
         block = artifacts["results"]["h{}".format(horizon)]
         rows.append({
             "label": FRIENDLY.get(cfg.run_name, cfg.run_name),
             "run_name": cfg.run_name,
+            "dataset": key,
             "kind": "lstm",
             "mae": block["lstm"]["mae"],
             "rmse": block["lstm"]["rmse"],
@@ -75,14 +95,16 @@ def build_table(runs, benchmarks) -> dict:
             "seconds": artifacts["training_seconds"],
             "epochs": artifacts["epochs_run"],
         })
-        naive_seen["Naive - same hour yesterday"] = block["naive_same_hour_yesterday"]["mae"]
-        naive_seen["Naive - last hour"] = block["naive_persistence"]["mae"]
+        naive_seen[(key, "Naive - same hour yesterday")] = \
+            block["naive_same_hour_yesterday"]["mae"]
+        naive_seen[(key, "Naive - last hour")] = block["naive_persistence"]["mae"]
         if benchmark:
             xgb = benchmark["xgboost"]
             rows.append({
                 "label": "XGBoost - {}".format(
                     FRIENDLY.get(cfg.run_name, cfg.run_name).replace("LSTM - ", "")),
                 "run_name": cfg.run_name,
+                "dataset": key,
                 "kind": "xgboost",
                 "mae": xgb["metrics"]["mae"],
                 "rmse": xgb["metrics"]["rmse"],
@@ -92,12 +114,21 @@ def build_table(runs, benchmarks) -> dict:
                 "seconds": xgb["training_seconds"],
                 "epochs": xgb["trees_used"],
             })
-    for label, mae in naive_seen.items():
-        rows.append({"label": label, "run_name": "-", "kind": "naive", "mae": mae,
-                     "rmse": None, "mape": None, "features": 0,
+    for (key, label), mae in naive_seen.items():
+        rows.append({"label": label, "run_name": "-", "dataset": key, "kind": "naive",
+                     "mae": mae, "rmse": None, "mape": None, "features": 0,
                      "train_sequences": None, "seconds": 0, "epochs": 0})
-    rows.sort(key=lambda r: r["mae"])
+    rows.sort(key=lambda r: (r["dataset"], r["mae"]))
     return {"rows": rows}
+
+
+def group_by_dataset(rows) -> dict:
+    grouped = {}
+    for row in rows:
+        grouped.setdefault(row["dataset"], []).append(row)
+    for key in grouped:
+        grouped[key].sort(key=lambda r: r["mae"])
+    return grouped
 
 
 def horizon_curve(runs) -> tuple:
@@ -108,20 +139,72 @@ def horizon_curve(runs) -> tuple:
     return [], []
 
 
-def vault_note(table: dict, horizons, maes) -> str:
+def _cross_dataset_section(grouped: dict) -> str:
+    """Does the LSTM-vs-XGBoost verdict hold across datasets? Usually not."""
+    if len(grouped) < 2:
+        return ""
+    lines = []
+    flips = set()
+    for key, rows in grouped.items():
+        lstms = [r for r in rows if r["kind"] == "lstm"]
+        xgbs = [r for r in rows if r["kind"] == "xgboost"]
+        if not lstms or not xgbs:
+            continue
+        best_lstm, best_xgb = min(lstms, key=lambda r: r["mae"]), min(xgbs, key=lambda r: r["mae"])
+        winner = "LSTM" if best_lstm["mae"] < best_xgb["mae"] else "XGBoost"
+        flips.add(winner)
+        margin = abs(best_lstm["mae"] - best_xgb["mae"]) / max(
+            best_lstm["mae"], best_xgb["mae"]) * 100
+        lines.append("| {ds} | {lstm:,.1f} | {xgb:,.1f} | **{w}** by {m:.1f}% | {u} |".format(
+            ds=DATASET_LABELS.get(key, key), lstm=best_lstm["mae"], xgb=best_xgb["mae"],
+            w=winner, m=margin, u=DATASET_UNITS.get(key, "units per hour")))
+
+    verdict = (
+        "**The verdict flips between the two datasets.** That is the single most\n"
+        "useful thing this project found, and it is only visible because the same\n"
+        "pipeline was run on a second, unrelated series.\n\n"
+        "Anyone who concludes \"gradient boosting beats LSTMs on time series\" from\n"
+        "the traffic result alone would be wrong on the bike data, and vice versa.\n"
+        "The right conclusion is narrower and more useful: *this* comparison is\n"
+        "cheap to run, so run it on your data instead of inheriting someone else's\n"
+        "answer."
+        if len(flips) > 1 else
+        "The same family wins on both datasets, which is weak evidence that the\n"
+        "result is about the method rather than about one particular series.")
+
+    return """
+## Does the verdict hold on a second dataset?
+
+The same code, the same architecture, the same evaluation - pointed at hourly
+**bike rentals in Washington DC** instead of motorway traffic. Only two
+command-line arguments changed.
+
+| Dataset | Best LSTM | Best XGBoost | Winner | Unit |
+| --- | --- | --- | --- | --- |
+{rows}
+
+{verdict}
+
+*MAE is in the units of the target, so the two rows must never be compared to
+each other - only within a row.*
+
+""".format(rows="\n".join(lines), verdict=verdict)
+
+
+def vault_note(grouped: dict, primary: str, horizons, maes) -> str:
     header = ("| Model | Inputs | MAE | RMSE | MAPE | Train time |\n"
               "| --- | --- | --- | --- | --- | --- |\n")
     lines = []
-    for row in table["rows"]:
+    for row in grouped[primary]:
         lines.append("| {label} | {feat} | **{mae:,.1f}** | {rmse} | {mape} | {secs} |".format(
             label=row["label"], feat=row["features"] or "-", mae=row["mae"],
             rmse="{:,.1f}".format(row["rmse"]) if row["rmse"] else "-",
             mape="{:.1f}%".format(row["mape"]) if row["mape"] else "-",
             secs="{:,.0f}s".format(row["seconds"]) if row["seconds"] else "-"))
 
-    best = table["rows"][0]
-    lstms = [r for r in table["rows"] if r["kind"] == "lstm"]
-    xgbs = [r for r in table["rows"] if r["kind"] == "xgboost"]
+    best = grouped[primary][0]
+    lstms = [r for r in grouped[primary] if r["kind"] == "lstm"]
+    xgbs = [r for r in grouped[primary] if r["kind"] == "xgboost"]
     best_lstm = min(lstms, key=lambda r: r["mae"]) if lstms else None
     best_xgb = min(xgbs, key=lambda r: r["mae"]) if xgbs else None
 
@@ -175,15 +258,15 @@ tags: [results, comparison]
 ---
 # 09 Model Comparison
 
-Every model tried, scored on **the same test windows**.
+Every model tried on the motorway dataset, scored on **the same test windows**.
 
 ![[10_model_comparison.png]]
 
 {header}{rows}
 
-The best result overall is **{best_label}** at **{best_mae:,.1f}**.
+The best result on this dataset is **{best_label}** at **{best_mae:,.1f}**.
 
-{verdict}{horizon_section}## How the comparison is kept fair
+{verdict}{cross}{horizon_section}## How the comparison is kept fair
 
 The benchmark does not rebuild features. It takes the exact tensors the LSTM
 was trained on, shape `(n, timesteps, features)`, and flattens them to
@@ -193,7 +276,8 @@ cannot see the ordering of the timesteps except through column position.
 
 Related: [[05 Results]] - [[06 Limits and Next Steps]] - [[08 Exam Questions]]
 """.format(header=header, rows="\n".join(lines), best_label=best["label"],
-           best_mae=best["mae"], verdict=verdict, horizon_section=horizon_section)
+           best_mae=best["mae"], verdict=verdict, horizon_section=horizon_section,
+           cross=_cross_dataset_section(grouped))
 
 
 def main(argv=None) -> None:
@@ -208,9 +292,22 @@ def main(argv=None) -> None:
 
     benchmarks = [ensure_benchmark(cfg, args.skip_benchmarks) for cfg, _ in runs]
     table = build_table(runs, benchmarks)
+    grouped = group_by_dataset(table["rows"])
     horizons, maes = horizon_curve(runs)
 
-    plot_model_comparison([(r["label"], r["mae"], r["kind"]) for r in table["rows"]])
+    # The primary dataset is whichever the vault was built from.
+    primary = ("Metro_Interstate_Traffic_Volume"
+               if "Metro_Interstate_Traffic_Volume" in grouped else next(iter(grouped)))
+
+    figure_names = {}
+    for key, rows in grouped.items():
+        suffix = "" if key == primary else "_" + key.split("_")[0]
+        name = "10_model_comparison{}.png".format(suffix)
+        plot_model_comparison(
+            [(r["label"], r["mae"], r["kind"]) for r in rows], filename=name,
+            unit=DATASET_UNITS.get(key, "units per hour"),
+            title="{} - same test windows".format(DATASET_LABELS.get(key, key)))
+        figure_names[key] = name
     if horizons:
         plot_horizon_degradation(horizons, maes)
 
@@ -220,24 +317,27 @@ def main(argv=None) -> None:
 
     vault = Path(VAULT_DIR)
     if vault.exists():
-        note = vault_note(table, horizons, maes)
-        (vault / "09 Model Comparison.md").write_text(note, encoding="utf-8")
+        (vault / "09 Model Comparison.md").write_text(
+            vault_note(grouped, primary, horizons, maes), encoding="utf-8")
         figures = vault / "Figures"
         figures.mkdir(parents=True, exist_ok=True)
         import shutil
-        for name in ("10_model_comparison.png", "11_horizons.png"):
+        for name in list(figure_names.values()) + ["11_horizons.png"]:
             source = REPORT_DIR / "figures" / name
             if source.exists():
                 shutil.copy2(source, figures / name)
         print("  vault note: {}".format(vault / "09 Model Comparison.md"))
 
-    print("\n{:<46} {:>10} {:>10} {:>9}".format("MODEL", "MAE", "RMSE", "TIME"))
-    print("-" * 78)
-    for row in table["rows"]:
-        print("{:<46} {:>10,.1f} {:>10} {:>9}".format(
-            row["label"][:46], row["mae"],
-            "{:,.1f}".format(row["rmse"]) if row["rmse"] else "-",
-            "{:,.0f}s".format(row["seconds"]) if row["seconds"] else "-"))
+    for key, rows in grouped.items():
+        print("\n{}  (MAE in {})".format(
+            DATASET_LABELS.get(key, key), DATASET_UNITS.get(key, "units")))
+        print("{:<46} {:>10} {:>10} {:>9}".format("MODEL", "MAE", "RMSE", "TIME"))
+        print("-" * 78)
+        for row in rows:
+            print("{:<46} {:>10,.1f} {:>10} {:>9}".format(
+                row["label"][:46], row["mae"],
+                "{:,.1f}".format(row["rmse"]) if row["rmse"] else "-",
+                "{:,.0f}s".format(row["seconds"]) if row["seconds"] else "-"))
 
 
 if __name__ == "__main__":

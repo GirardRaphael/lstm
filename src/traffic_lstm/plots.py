@@ -178,11 +178,16 @@ def plot_baseline_comparison(comparison: dict, filename: str = "09_baselines.png
     return _finish(fig, filename)
 
 
-def plot_model_comparison(rows, filename: str = "10_model_comparison.png") -> Path:
+def plot_model_comparison(rows, filename: str = "10_model_comparison.png",
+                          unit: str = "vehicles per hour",
+                          title: str = "Every model tried, on the same test windows") -> Path:
     """Every trained variant and every baseline, ranked by MAE.
 
     `rows` is a list of (label, mae, kind) where kind is one of
     "lstm", "xgboost" or "naive" - the colour carries the family.
+
+    One chart per dataset, always: MAE is in the units of whatever is being
+    predicted, so putting two datasets on one axis would be meaningless.
     """
     rows = sorted(rows, key=lambda r: r[1])
     labels = [r[0] for r in rows]
@@ -196,13 +201,15 @@ def plot_model_comparison(rows, filename: str = "10_model_comparison.png") -> Pa
         ax.text(value, bar.get_y() + bar.get_height() / 2, f" {value:,.0f}",
                 va="center", fontweight="bold")
     ax.invert_yaxis()
-    ax.set_xlabel("MAE (vehicles per hour) - lower is better")
-    ax.set_title("Every model tried, on the same test windows")
+    ax.set_xlabel(f"MAE ({unit}) - lower is better")
+    ax.set_title(title)
     ax.set_xlim(0, max(values) * 1.15)
     ax.grid(axis="x", color=PALETTE["grid"])
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in
                (colours["lstm"], colours["xgboost"], colours["naive"])]
-    ax.legend(handles, ["LSTM", "XGBoost", "Naive baseline"], loc="lower right")
+    # Bars are sorted shortest-first, so the top-right corner is the empty one.
+    ax.legend(handles, ["LSTM", "XGBoost", "Naive baseline"], loc="upper right",
+              framealpha=0.95)
     return _finish(fig, filename)
 
 

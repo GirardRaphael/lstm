@@ -188,6 +188,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-figures", action="store_true")
     p.add_argument("--export-vault", action="store_true",
                    help="Also regenerate the Obsidian vault from the trained model.")
+    p.add_argument("--vault-dir", type=Path, default=None,
+                   help="Write the vault somewhere other than the default, so a "
+                        "second dataset does not overwrite the first one's vault.")
     return p
 
 
@@ -213,10 +216,11 @@ def main(argv: list | None = None) -> None:
         for path in make_figures(cfg, outcome):
             print(f"  figure: {path}")
     if args.export_vault:
+        from .config import VAULT_DIR
         from .obsidian_export import export_vault
 
-        vault = export_vault(cfg, outcome["model"], outcome["bundle"], outcome["artifacts"])
-        print(f"  vault:  {vault}")
+        export_vault(cfg, outcome["model"], outcome["bundle"], outcome["artifacts"],
+                     vault_dir=args.vault_dir or VAULT_DIR)
 
 
 if __name__ == "__main__":
