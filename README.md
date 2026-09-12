@@ -70,11 +70,25 @@ Or without the wrappers:
 
 ```powershell
 $env:PYTHONPATH = "src"
+
+# train
 python -m traffic_lstm.train --export-vault
 python -m traffic_lstm.train --data data/raw/my_file.csv --target my_column --epochs 30
-python -m traffic_lstm.train --horizons 1 3 6 --run-name multi_horizon
+
+# the variants
+python -m traffic_lstm.train --run-name multivariate --calendar `
+       --exogenous temp rain_1h snow_1h clouds_all
+python -m traffic_lstm.train --run-name gap_guarded --drop-gapped-windows
+python -m traffic_lstm.train --run-name multi_horizon --horizons 1 3 6
+
+# is the LSTM worth it? measure, do not argue
+python -m traffic_lstm.benchmark --run-name baseline_univariate
+python scripts/compare_runs.py          # ranks every model, writes the vault note
+
+# use it
 python -m traffic_lstm.predict --last-hours
 streamlit run app/streamlit_app.py
+python scripts/rebuild_vault.py         # regenerate the vault without retraining
 ```
 
 ---
@@ -100,6 +114,8 @@ averaging, and never interpolates missing periods.
 | --- | --- |
 | `config.py` | every hyper-parameter in one dataclass, with the reasoning attached |
 | `data.py` | CSV → cleaned series → chronological split → scaling → sequences |
+| `features.py` | weather + cyclical calendar features; the target stays column 0 |
+| `benchmark.py` | XGBoost on the **same tensors**, flattened — the honest comparison |
 | `model.py` | the stacked LSTM, the optimiser, the callbacks |
 | `train.py` | orchestration, artifacts, the CLI |
 | `evaluate.py` | MAE / RMSE / MAPE **and** the two naive baselines |
