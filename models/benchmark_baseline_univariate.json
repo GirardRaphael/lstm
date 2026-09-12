@@ -4,12 +4,12 @@
     "run_name": "baseline_univariate",
     "horizon": 1,
     "n_features_flat": 24,
-    "trees_used": 464,
-    "training_seconds": 9.5,
+    "trees_used": 899,
+    "training_seconds": 2.4,
     "metrics": {
-      "mae": 177.2996667194572,
-      "rmse": 268.7613127632824,
-      "mape": 7.935454960708553,
+      "mae": 173.54349756584224,
+      "rmse": 264.0123092983894,
+      "mape": 7.694238471127248,
       "n": 8115
     },
     "naive_persistence": {
@@ -24,67 +24,67 @@
       "mape": 26.685037246004818,
       "n": 8115
     },
-    "improvement_over_best_naive_pct": 69.72,
+    "improvement_over_best_naive_pct": 70.36,
     "top_features": [
       {
         "feature": "traffic_volume_t-1h",
-        "importance": 0.4956772029399872
+        "importance": 0.5755634903907776
       },
       {
         "feature": "traffic_volume_t-2h",
-        "importance": 0.13024558126926422
+        "importance": 0.09324663132429123
       },
       {
         "feature": "traffic_volume_t-7h",
-        "importance": 0.08837830275297165
+        "importance": 0.05198613181710243
       },
       {
         "feature": "traffic_volume_t-5h",
-        "importance": 0.03936638683080673
-      },
-      {
-        "feature": "traffic_volume_t-24h",
-        "importance": 0.03619282320141792
-      },
-      {
-        "feature": "traffic_volume_t-3h",
-        "importance": 0.03487994149327278
+        "importance": 0.043721314519643784
       },
       {
         "feature": "traffic_volume_t-6h",
-        "importance": 0.021792225539684296
+        "importance": 0.03960970789194107
+      },
+      {
+        "feature": "traffic_volume_t-24h",
+        "importance": 0.03726061433553696
+      },
+      {
+        "feature": "traffic_volume_t-3h",
+        "importance": 0.034205373376607895
       },
       {
         "feature": "traffic_volume_t-8h",
-        "importance": 0.02032148465514183
+        "importance": 0.017154227942228317
       },
       {
         "feature": "traffic_volume_t-4h",
-        "importance": 0.018815627321600914
+        "importance": 0.01091044396162033
       },
       {
         "feature": "traffic_volume_t-18h",
-        "importance": 0.01838529296219349
+        "importance": 0.010086830705404282
       },
       {
         "feature": "traffic_volume_t-14h",
-        "importance": 0.012468308210372925
-      },
-      {
-        "feature": "traffic_volume_t-13h",
-        "importance": 0.011279045604169369
+        "importance": 0.009291141293942928
       },
       {
         "feature": "traffic_volume_t-9h",
-        "importance": 0.009970187209546566
+        "importance": 0.00871238112449646
       },
       {
         "feature": "traffic_volume_t-23h",
-        "importance": 0.009396667592227459
+        "importance": 0.008170675486326218
       },
       {
         "feature": "traffic_volume_t-11h",
-        "importance": 0.007491349242627621
+        "importance": 0.007926899008452892
+      },
+      {
+        "feature": "traffic_volume_t-12h",
+        "importance": 0.007356938440352678
       }
     ]
   },
@@ -98,9 +98,9 @@
       "n": 8115
     },
     "xgboost": {
-      "mae": 177.2996667194572,
-      "rmse": 268.7613127632824,
-      "mape": 7.935454960708553,
+      "mae": 173.54349756584224,
+      "rmse": 264.0123092983894,
+      "mape": 7.694238471127248,
       "n": 8115
     },
     "naive_same_hour_yesterday": {
@@ -116,8 +116,8 @@
       "n": 8115
     },
     "lstm_training_seconds": 1072.1,
-    "xgboost_training_seconds": 9.5,
-    "lstm_advantage_pct": -29.02,
+    "xgboost_training_seconds": 2.4,
+    "lstm_advantage_pct": -31.82,
     "verdict": "XGBoost wins"
   }
 }
