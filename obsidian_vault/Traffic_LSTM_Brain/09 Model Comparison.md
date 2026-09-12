@@ -11,8 +11,8 @@ Every model tried on the motorway dataset, scored on **the same test windows**.
 | --- | --- | --- | --- | --- | --- |
 | XGBoost - traffic + weather + calendar | 264 | **154.5** | 238.6 | 6.6% | 14s |
 | XGBoost - gap-guarded windows | 24 | **157.7** | 242.4 | 6.9% | 5s |
+| XGBoost - past traffic only | 24 | **173.5** | 264.0 | 7.7% | 2s |
 | XGBoost - multi-horizon (+1h head) | 24 | **175.1** | 266.4 | 7.8% | 5s |
-| XGBoost - past traffic only | 24 | **177.3** | 268.8 | 7.9% | 10s |
 | LSTM - past traffic only | 1 | **228.8** | 326.2 | 11.4% | 1,072s |
 | LSTM - gap-guarded windows | 1 | **240.6** | 332.8 | 11.6% | 369s |
 | LSTM - traffic + weather + calendar | 11 | **241.1** | 349.2 | 10.5% | 204s |

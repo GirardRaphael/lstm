@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Sequence
 
 # Project layout -------------------------------------------------------------
@@ -21,6 +21,31 @@ FIGURE_DIR = REPORT_DIR / "figures"
 VAULT_DIR = PROJECT_ROOT / "obsidian_vault" / "Traffic_LSTM_Brain"
 
 DEFAULT_DATASET = RAW_DATA_DIR / "Metro_Interstate_Traffic_Volume.csv"
+
+
+def resolve_data_path(path: str | Path) -> Path:
+    """Resolve dataset paths stored on another machine.
+
+    Older run artifacts captured an absolute Windows path.  That made a clone
+    fail on every other computer even though the same dataset was committed to
+    this repository.  Prefer an existing path, then a project-relative path,
+    and finally a bundled file with the same name.
+    """
+    raw = str(path)
+    portable = Path(raw.replace("\\", "/"))
+    filename = PureWindowsPath(raw).name if "\\" in raw else portable.name
+
+    candidates = [Path(raw), portable]
+    if not portable.is_absolute():
+        candidates.append(PROJECT_ROOT / portable)
+    candidates.extend((RAW_DATA_DIR / filename, DATA_DIR / "samples" / filename))
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+
+    # Keep a missing path meaningful so callers still report the user's path.
+    return (PROJECT_ROOT / portable if not portable.is_absolute() else portable)
 
 
 @dataclass
@@ -84,12 +109,22 @@ class TrainingConfig:
     run_name: str = "baseline_univariate"
 
     def __post_init__(self) -> None:
-        self.data_path = Path(self.data_path)
+        self.data_path = resolve_data_path(self.data_path)
         self.horizons = tuple(int(h) for h in self.horizons)
         self.lstm_units = tuple(int(u) for u in self.lstm_units)
         self.exogenous_columns = tuple(self.exogenous_columns)
         if min(self.horizons) < 1:
             raise ValueError("horizons must be >= 1")
+        if self.sequence_length < 1:
+            raise ValueError("sequence_length must be >= 1")
+        if not self.lstm_units or min(self.lstm_units) < 1:
+            raise ValueError("lstm_units must contain positive integers")
+        if self.dense_units < 1:
+            raise ValueError("dense_units must be >= 1")
+        if not 0 <= self.dropout < 1:
+            raise ValueError("dropout must be in [0, 1)")
+        if not 0 < self.validation_split < 0.5:
+            raise ValueError("validation_split must be in (0, 0.5)")
         if not 0.5 <= self.train_ratio < 1.0:
             raise ValueError("train_ratio must be in [0.5, 1.0)")
 
@@ -112,7 +147,10 @@ class TrainingConfig:
 
     def to_dict(self) -> dict:
         d = asdict(self)
-        d["data_path"] = str(self.data_path)
+        try:
+            d["data_path"] = str(self.data_path.resolve().relative_to(PROJECT_ROOT))
+        except ValueError:
+            d["data_path"] = str(self.data_path)
         d["horizons"] = list(self.horizons)
         d["lstm_units"] = list(self.lstm_units)
         d["exogenous_columns"] = list(self.exogenous_columns)

@@ -1,4 +1,10 @@
 # Open the presentation notebook.
-$venv = "$env:USERPROFILE\.venvs\traffic_lstm\Scripts"
+$pythonExe = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+$legacyPython = Join-Path $env:USERPROFILE ".venvs\traffic_lstm\Scripts\python.exe"
+if (-not (Test-Path $pythonExe)) { $pythonExe = $legacyPython }
+if (-not (Test-Path $pythonExe)) {
+    throw "Python environment not found. Run: py -3.12 -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements.txt"
+}
 $env:PYTHONPATH = "$PSScriptRoot\src"
-& "$venv\python.exe" -m jupyterlab "$PSScriptRoot\notebooks"
+& $pythonExe -m jupyterlab "$PSScriptRoot\notebooks"
+exit $LASTEXITCODE
