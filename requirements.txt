@@ -4,6 +4,7 @@ pandas
 matplotlib
 scikit-learn
 tensorflow-cpu>=2.16   # use `tensorflow` instead if you have a CUDA GPU on Linux
+xgboost>=2.0
 streamlit
 plotly
 jupyterlab

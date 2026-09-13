@@ -1,3 +1,9 @@
 # Launch the interactive workbench.
-$venv = "$env:USERPROFILE\.venvs\traffic_lstm\Scripts"
-& "$venv\python.exe" -m streamlit run "$PSScriptRoot\app\streamlit_app.py"
+$pythonExe = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+$legacyPython = Join-Path $env:USERPROFILE ".venvs\traffic_lstm\Scripts\python.exe"
+if (-not (Test-Path $pythonExe)) { $pythonExe = $legacyPython }
+if (-not (Test-Path $pythonExe)) {
+    throw "Python environment not found. Run: py -3.12 -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements.txt"
+}
+& $pythonExe -m streamlit run "$PSScriptRoot\app\streamlit_app.py"
+exit $LASTEXITCODE

@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import numpy as np
 import pandas as pd
 
-from traffic_lstm.config import TrainingConfig
+from traffic_lstm.config import DEFAULT_DATASET, TrainingConfig
 from traffic_lstm.data import build_datasets, clean_series, create_sequences
 from traffic_lstm.evaluate import naive_persistence, naive_seasonal, regression_metrics
 
@@ -56,6 +56,28 @@ BUNDLE = build_datasets(CFG, df=FRAME)
 
 
 # --------------------------------------------------------------------------
+@check("config: saved Windows dataset paths remain portable")
+def _():
+    old_path = r"C:\Users\student\Desktop\Traffic_LSTM_Project\data\raw\Metro_Interstate_Traffic_Volume.csv"
+    cfg = TrainingConfig(data_path=old_path)
+    assert cfg.data_path == DEFAULT_DATASET.resolve(), cfg.data_path
+    assert cfg.to_dict()["data_path"] == "data/raw/Metro_Interstate_Traffic_Volume.csv"
+
+
+@check("config: invalid hyperparameters fail early")
+def _():
+    invalid = (
+        {"sequence_length": 0}, {"lstm_units": ()}, {"lstm_units": (8, 0)},
+        {"dense_units": 0}, {"dropout": 1.0}, {"validation_split": 0.0},
+    )
+    for kwargs in invalid:
+        try:
+            TrainingConfig(**kwargs)
+        except ValueError:
+            continue
+        raise AssertionError("accepted invalid config: {}".format(kwargs))
+
+
 @check("sequences: X is the 24 hours immediately before y")
 def _():
     data = np.arange(200, dtype="float64").reshape(-1, 1)

@@ -47,12 +47,14 @@ class TrafficForecaster:
         if expected_features != 1:
             raise ValueError(
                 "Run '{}' was trained on {} input features ({}). This CLI only "
-                "feeds past traffic, so it cannot drive that model — use the "
-                "Streamlit app, which has the full feature matrix.".format(
+                "feeds past traffic, so it cannot drive that model. Multivariate "
+                "inference requires the original feature order and feature scaler.".format(
                     self.cfg.run_name, expected_features,
                     ", ".join(self.cfg.exogenous_columns) or "see config"))
 
-        values = np.asarray(last_hours, dtype="float64").ravel()
+        values = np.asarray(last_hours, dtype="float64")
+        if values.ndim != 1 or not np.isfinite(values).all():
+            raise ValueError("Supply a one-dimensional sequence of finite numeric values.")
         if len(values) != self.cfg.sequence_length:
             raise ValueError(
                 "Expected exactly {} values, got {}.".format(
@@ -63,6 +65,8 @@ class TrafficForecaster:
         predicted_scaled = self.model.predict(window, verbose=0)[0]
         predicted = self.scaler.inverse_transform(
             np.asarray(predicted_scaled).reshape(-1, 1)).ravel()
+        if len(predicted) != self.cfg.n_outputs or not np.isfinite(predicted).all():
+            raise ValueError("Model produced invalid predictions; no forecast is available.")
 
         forecasts = []
         for horizon, value in zip(self.cfg.horizons, predicted):

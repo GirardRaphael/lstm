@@ -51,8 +51,12 @@ def naive_seasonal(series: np.ndarray, sequence_length: int, horizon: int,
     series = np.asarray(series, dtype="float64").ravel()
     ends = _window_ends(len(series), sequence_length, horizon, indices)
     targets = ends + horizon - 1
-    # Fall back to persistence for the first day, where yesterday is unknown.
-    return np.where(targets - 24 >= 0, series[np.maximum(targets - 24, 0)], series[ends - 1])
+    # Repeat the latest observed daily cycle even for horizons longer than a
+    # day. A simple target-24 lookup leaks unseen targets when horizon > 24.
+    lag = 24 * ((horizon + 23) // 24)
+    seasonal_index = targets - lag
+    return np.where(seasonal_index >= 0,
+                    series[np.maximum(seasonal_index, 0)], series[ends - 1])
 
 
 def compare_against_baselines(
@@ -125,9 +129,11 @@ def training_diagnosis(history: dict, patience: int = 5) -> dict:
 
 
 def traffic_level(volume: float, low: int = 2000, high: int = 4000) -> tuple[str, str]:
-    """Turn a number of vehicles into something a dispatcher can act on."""
+    """Illustrative volume bands, NOT a measurement of congestion or safety."""
+    if not np.isfinite(volume) or not np.isfinite([low, high]).all() or low >= high:
+        raise ValueError("Volume and ordered thresholds must be finite")
     if volume < low:
-        return "LOW", "Free flow"
+        return "LOW", "Low volume; congestion is not assessed"
     if volume < high:
-        return "MODERATE", "Steady traffic"
-    return "HIGH", "Congestion risk"
+        return "MODERATE", "Moderate volume; congestion is not assessed"
+    return "HIGH", "High volume; congestion is not assessed"

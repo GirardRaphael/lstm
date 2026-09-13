@@ -1,4 +1,10 @@
 # Retrain the model, rebuild the figures and regenerate the Obsidian vault.
-$venv = "$env:USERPROFILE\.venvs\traffic_lstm\Scripts"
+$pythonExe = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+$legacyPython = Join-Path $env:USERPROFILE ".venvs\traffic_lstm\Scripts\python.exe"
+if (-not (Test-Path $pythonExe)) { $pythonExe = $legacyPython }
+if (-not (Test-Path $pythonExe)) {
+    throw "Python environment not found. Run: py -3.12 -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements.txt"
+}
 $env:PYTHONPATH = "$PSScriptRoot\src"
-& "$venv\python.exe" -m traffic_lstm.train --export-vault @args
+& $pythonExe -m traffic_lstm.train --export-vault @args
+exit $LASTEXITCODE

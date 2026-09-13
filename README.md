@@ -1,5 +1,10 @@
 # Traffic LSTM
 
+> Research workbench, not a deployed street-control product. See
+> [ROAD_PRODUCT_PLAN.md](ROAD_PRODUCT_PLAN.md) for the new read-only street-data
+> checks, implementation roadmap and unresolved temporal-preprocessing findings.
+> The earlier smoke-test audit does not establish production readiness.
+
 Forecast the next hour of motorway traffic from the last 24 — and then open the
 network up and look at what every neuron actually did.
 
@@ -49,9 +54,9 @@ py -3.12 -m venv .venv
 pip install -r requirements.txt
 ```
 
-The bundled venv for this machine already lives at `~\.venvs\traffic_lstm`
-(kept outside OneDrive so 1.5 GB of TensorFlow is not synced to the cloud).
-The `.ps1` scripts below use it directly.
+The `.ps1` scripts use the project-local `.venv` created above. For backward
+compatibility, they also recognize an older environment at
+`~\.venvs\traffic_lstm`.
 
 ## Run
 
@@ -62,10 +67,11 @@ The `.ps1` scripts below use it directly.
 .\test.ps1               # verify the claims made below
 ```
 
-`test.ps1` checks the three things this project asserts about itself: that the
-scaler never sees the test set, that every `(X, y)` pair lines up with the
-timestamps it claims, and that the NumPy replay of the LSTM cell reproduces
-Keras exactly. If anyone challenges the no-leakage claim, that is the answer.
+`test.ps1` checks the core pipeline: the scaler never sees the test set, every
+`(X, y)` pair lines up with the timestamps it claims, and the NumPy replay of
+the LSTM cell reproduces Keras exactly. GitHub Actions additionally loads every
+committed model and smoke-tests the Streamlit interface on each push and pull
+request.
 
 Or without the wrappers:
 
@@ -235,12 +241,15 @@ specialised.
 
 ## Next steps
 
-1. Add `temp`, `rain_1h`, `snow_1h`, `holiday`, plus hour-of-day and
-   day-of-week as sine/cosine pairs. Input becomes `(24, 8)`; nothing else in
-   the pipeline changes.
-2. Benchmark against XGBoost on the same chronological split.
-3. Multi-horizon is already supported: `--horizons 1 3 6`.
-4. Feed the forecast to a signal-timing optimiser.
+1. Use rolling-origin cross-validation instead of relying on one chronological
+   holdout period.
+2. Tune the LSTM against the already-supported multivariate and XGBoost runs;
+   on the current motorway data, XGBoost is both faster and more accurate.
+3. Add prediction intervals so the forecast communicates uncertainty.
+4. Test longer seasonal windows (48, 72 and 168 hours) and direct multi-horizon
+   forecasts with `--horizons 1 3 6`.
+5. Feed the forecast to a signal-timing optimiser only after monitoring drift
+   and defining a safety fallback.
 
 **To be precise about the claim:** this model does not control traffic lights.
 It produces a forecast that a control system could consume.
