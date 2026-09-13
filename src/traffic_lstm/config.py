@@ -148,7 +148,10 @@ class TrainingConfig:
     def to_dict(self) -> dict:
         d = asdict(self)
         try:
-            d["data_path"] = str(self.data_path.resolve().relative_to(PROJECT_ROOT))
+            # POSIX separators keep the repo-relative path portable: a Windows
+            # backslash path fails the readiness portability check and is
+            # awkward to consume from non-Windows tooling.
+            d["data_path"] = self.data_path.resolve().relative_to(PROJECT_ROOT).as_posix()
         except ValueError:
             d["data_path"] = str(self.data_path)
         d["horizons"] = list(self.horizons)
