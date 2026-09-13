@@ -228,3 +228,38 @@ def plot_horizon_degradation(horizons, maes, filename: str = "11_horizons.png") 
     ax.set_ylim(0, max(maes) * 1.25)
     ax.grid(color=PALETTE["grid"])
     return _finish(fig, filename)
+
+
+def plot_window_sweep(lengths, lstm_maes, xgb_maes, filename: str = "12_window_sweep.png",
+                      unit: str = "vehicles per hour") -> Path:
+    """MAE against input-window length, for both model families.
+
+    The point of the chart is whether the two curves cross. A tree ensemble
+    gets one column per (timestep x feature), so a longer window dilutes it
+    with mostly redundant columns; an LSTM folds the same window through one
+    recurrence. If the LSTM's advantage is real, it shows up here as the
+    window grows - and if the curves never cross, that is an answer too.
+    """
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    ax.plot(lengths, lstm_maes, marker="o", markersize=9, linewidth=2.5,
+            color=PALETTE["predicted"], label="LSTM")
+    ax.plot(lengths, xgb_maes, marker="s", markersize=8, linewidth=2.5,
+            color="#2ca02c", label="XGBoost")
+    for x, y in zip(lengths, lstm_maes):
+        ax.annotate(f"{y:,.0f}", (x, y), textcoords="offset points", xytext=(0, 11),
+                    ha="center", fontweight="bold", color=PALETTE["predicted"])
+    for x, y in zip(lengths, xgb_maes):
+        ax.annotate(f"{y:,.0f}", (x, y), textcoords="offset points", xytext=(0, -17),
+                    ha="center", fontweight="bold", color="#2ca02c")
+    ax.set_xlabel("Input window (hours)")
+    ax.set_ylabel(f"MAE ({unit}) - lower is better")
+    ax.set_title("Does a longer window favour the recurrence?")
+    ax.set_xticks(list(lengths))
+    ax.set_xscale("log")
+    ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    lo = min(min(lstm_maes), min(xgb_maes))
+    hi = max(max(lstm_maes), max(xgb_maes))
+    ax.set_ylim(lo - (hi - lo) * .25, hi + (hi - lo) * .25)
+    ax.legend()
+    ax.grid(color=PALETTE["grid"])
+    return _finish(fig, filename)
