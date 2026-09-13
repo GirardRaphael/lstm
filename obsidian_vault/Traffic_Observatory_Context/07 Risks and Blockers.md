@@ -4,20 +4,22 @@ type: risks
 status: active
 owner: principal
 updated_utc: 2026-09-13T14:10:00Z
-verified_commit: a652a04fbaee8579fdf20fbe4efe162d66155373
+verified_commit: e50455d1c749e425fe984278e9c2153080a61120
 ---
 
 # Risks and Blockers
 
-## BLOCKER-01 — Missing `codex/temporal-pipeline-v2`
+## BLOCKER-01 — Missing `codex/temporal-pipeline-v2` (resolved by decision)
 
-**Impact:** M1 cannot honestly claim continuity with the 2026-09-13 temporal-pipeline work.
+**Status:** resolved-by-decision via [[Decisions/DEC-2026-09-13-v2-clean-room-rebuild]].
+
+**Current impact:** M1 is unblocked for a fresh implementation, but no work may claim continuity with or recovery of missing commit `646d3a7`.
 
 **Searched:** local `Traffic_LSTM_Project` branches, `origin` heads, agent store, session transcripts, `/workspace/scratch/...` path (environment-specific; not this Windows host).
 
 **Missing artifacts:** commit `646d3a7`, `tests/test_temporal.py`, pipeline_version=v2 training path, beijing observed CSV sidecar experiment results.
 
-**Ask of user:** provide one of: git bundle, patch series, zip of the worktree, or another machine path containing that branch. Do not authorize silent recreation from the handoff prose alone.
+**Resolution:** user authorized a clean-room rebuild ("rebuild it now", 2026-09-13 around 14:06Z). The original branch remains lost and must stay recorded as unfound. If the original bundle ever surfaces, compare it against the fresh `observatory/pipeline-v2` implementation before merging or changing claims.
 
 ## RISK-02 — Main advanced past readiness PRs
 
@@ -37,4 +39,4 @@ Documented in ROAD_PRODUCT_PLAN: weather look-ahead via full-frame median / bfil
 
 ## RISK-05 — Publication authorization
 
-Prior HTML report MCP upload was user-rejected. Do not push/publish without fresh explicit approval.
+Prior HTML report MCP upload was user-rejected. Only `origin/observatory/m0-recover` was authorized and pushed in this session; do not push/publish other branches without fresh explicit approval.

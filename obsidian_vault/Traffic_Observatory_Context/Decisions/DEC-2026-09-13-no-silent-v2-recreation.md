@@ -1,10 +1,10 @@
 ---
 id: dec-2026-09-13-no-silent-v2
 type: decision
-status: accepted
+status: superseded
 owner: principal
 updated_utc: 2026-09-13T14:10:00Z
-verified_commit: a652a04fbaee8579fdf20fbe4efe162d66155373
+verified_commit: e50455d1c749e425fe984278e9c2153080a61120
 ---
 
 # Decision: Do not silently recreate pipeline v2
@@ -26,6 +26,8 @@ Branch/commit search failed; no `test_temporal.py`; `TrainingConfig` on `a652a04
 ## Choice
 
 **(2)** now; **(3)** only if the user explicitly authorizes reconstruction and accepts that it is not bit-for-bit continuity with the missing branch. Reject **(1)**.
+
+Superseded on 2026-09-13 around 14:06Z when the user explicitly authorized option **(3)** as a clean-room rebuild; see [[DEC-2026-09-13-v2-clean-room-rebuild]].
 
 ## Consequences
 

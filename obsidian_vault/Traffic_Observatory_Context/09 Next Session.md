@@ -4,7 +4,7 @@ type: next-session
 status: active
 owner: principal
 updated_utc: 2026-09-13T14:10:00Z
-verified_commit: a652a04fbaee8579fdf20fbe4efe162d66155373
+verified_commit: e50455d1c749e425fe984278e9c2153080a61120
 ---
 
 # Next Session
@@ -20,7 +20,7 @@ verified_commit: a652a04fbaee8579fdf20fbe4efe162d66155373
 ```powershell
 cd C:\Users\azulr\OneDrive\Desktop\Traffic_LSTM_Project
 git fetch --all --prune
-git checkout observatory/m0-recover   # M0 checkpoint: 4ce771d (local only)
+git checkout observatory/m0-recover   # M0 checkpoint: e50455d (pushed)
 git status
 $env:PYTHONPATH = "src"
 C:\Users\azulr\.venvs\traffic_lstm\Scripts\python.exe tests/test_pipeline.py
@@ -32,9 +32,10 @@ readiness verification or remove with `git worktree remove` once integration lan
 
 ## Unfinished task IDs
 
-- **M0-05** — obtain unpublished `codex/temporal-pipeline-v2` (BLOCKED)
-- **M0-06** — resume-check by a second reader
-- **M1-01** — integrate v2 once recovered (do not invent from prose)
+- **M1-00** — integrate readiness branch on `observatory/readiness-integration`; include the Windows path fix for `TrainingConfig.to_dict()` (`data_path` repo-relative with `.as_posix()`)
+- **M1-01** — continue fresh pipeline v2 build on `observatory/pipeline-v2`; keep it explicitly clean-room and not a recovery of `646d3a7`
+- **WEB-01** — browser-verify the `observatory/web-demo` page: LSTM neuron/gate visualization, CSV import/explorer, Three.js read-only intersection, 4+ scenario presets
+- **M1 phase 2** — wire `pipeline_version` into `TrainingConfig` and CLI after the fresh module/tests phase is ready
 
 ## Current failure / gap reproduction
 
@@ -47,10 +48,13 @@ git cat-file -t 646d3a7
 
 ## Next bounded task (when unblocked)
 
-If user supplies the v2 branch/bundle: verify its tip, run its temporal + pipeline + readiness suites, compare to `a652a04`, then open an integration branch. If user authorizes reconstruction instead: write Decision note with missing evidence, implement v2 behind explicit `pipeline_version="v2"`, keep v1 default for archived JSON, add `tests/test_temporal.py` before any product UI work.
+Integrate the active branches in a bounded order: readiness integration first, then the fresh pipeline-v2 branch, then web-demo verification. Keep `pipeline_version` wiring into `TrainingConfig`/CLI as phase 2 after the module and temporal tests are stable.
+
+If the original v2 bundle ever surfaces, verify its tip, run its temporal + pipeline + readiness suites, and diff it against the fresh implementation before changing provenance claims.
 
 ## Do not do next
 
 - Another architecture / dropout / calendar ablation under v1
 - Push/PR/publish without explicit authorization
 - Merge readiness PRs blindly onto main without resolving window-sweep divergence
+- Describe the fresh v2 implementation as recovery of commit `646d3a7`

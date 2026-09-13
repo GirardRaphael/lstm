@@ -3,8 +3,8 @@ id: toc-01-current-state
 type: current-state
 status: active
 owner: principal
-updated_utc: 2026-09-13T14:05:00Z
-verified_commit: a652a04fbaee8579fdf20fbe4efe162d66155373
+updated_utc: 2026-09-13T14:10:00Z
+verified_commit: e50455d1c749e425fe984278e9c2153080a61120
 ---
 
 # Current State
@@ -16,9 +16,9 @@ verified_commit: a652a04fbaee8579fdf20fbe4efe162d66155373
 | Workspace (after move) | `C:\Users\azulr\OneDrive\Desktop\Traffic_LSTM_Project` |
 | Wrong empty Cursor folder | `...\Documents\GitHub\LSTM` → remote `LSTM_TrafficLightControl`, only `.gitattributes` |
 | Remote | `https://github.com/GirardRaphael/lstm.git` |
-| Branch | `observatory/m0-recover` @ `4ce771d` (M0 checkpoint, local only — not pushed) |
+| Branch | `observatory/m0-recover` @ `e50455d` (M0 checkpoint, pushed to origin) |
 | Base | `main` = `origin/main` = `a652a04` |
-| Working tree before M0 edits | clean, up to date with `origin/main` |
+| Push verification | Local `observatory/m0-recover` and `origin/observatory/m0-recover` both `e50455d1c749e425fe984278e9c2153080a61120`; see [[Evidence/EV-2026-09-13-push-m0]] |
 | Python | 3.12.10 via `C:\Users\azulr\.venvs\traffic_lstm` |
 | TF / Keras / NumPy / pandas / sklearn / Streamlit / XGB | 2.21.0 / 3.15.1 / 2.5.3 / 3.0.5 / 1.9.1 / 1.63.0 / 3.4.1 |
 
@@ -30,6 +30,10 @@ verified_commit: a652a04fbaee8579fdf20fbe4efe162d66155373
 | `codex/lstm-reliability-fixes` | `f1ca0a0` | behind main; merge-base `b700b69` |
 | `codex/street-shadow-readiness` | `c3913ff` | stacks on reliability; adds street preflight, AUDIT, ROAD plan, readiness tests |
 | `codex/temporal-pipeline-v2` | **absent** | **blocked** — not local, not on GitHub, not in agent stores/transcripts |
+| `observatory/m0-recover` | `e50455d` | pushed M0 context vault checkpoint |
+| `observatory/readiness-integration` | `a652a04` + merge of `c3913ff` in progress | integrates readiness branch; known fix required: `TrainingConfig.to_dict()` must serialize `data_path` repo-relative with `.as_posix()` |
+| `observatory/pipeline-v2` | in progress | fresh v2 module work: `src/traffic_lstm/pipeline_v2.py` + `tests/test_temporal.py` only this phase |
+| `observatory/web-demo` | in progress | browser demo branch: LSTM neuron/gate visualization, CSV import/explorer, Three.js read-only 3D intersection, 4+ scenario presets |
 
 ## What is implemented on `main` @ `a652a04` (code present)
 
@@ -37,9 +41,11 @@ Educational LSTM workbench: train/evaluate/introspect, Streamlit multi-page app,
 
 Pipeline behaviour is the **legacy v1** contract: scaler fit on full pre-test slice, optional gap dropping, weather/calendar feature path with documented look-ahead risks in ROAD plan. **No** `pipeline_version` field in `TrainingConfig`.
 
-## Labels for claimed v2 work (historical / blocked)
+## Labels for claimed v2 work (historical evidence)
 
 The 2026-09-13 continuity note claimed local branch `codex/temporal-pipeline-v2` with continuity commit `646d3a7`, 12 temporal checks, fit-only scaling, explicit chronological validation, etc. **None of that code is recoverable from this machine or from GitHub today.** Treat those claims as **historical evidence**, not **verified now**. Do not silently recreate them.
+
+User explicitly authorized a clean-room pipeline v2 rebuild with "rebuild it now" on 2026-09-13 around 14:06Z. The new `observatory/pipeline-v2` work is a **fresh implementation from documented requirements** (`ROAD_PRODUCT_PLAN.md` critical findings + `MASTER_BUILD_PROMPT.md` section 7), not recovery of or identity with missing commit `646d3a7`; see [[Decisions/DEC-2026-09-13-v2-clean-room-rebuild]].
 
 ## Verification this session
 
@@ -47,6 +53,7 @@ The 2026-09-13 continuity note claimed local branch `codex/temporal-pipeline-v2`
 | --- | --- | --- |
 | `tests/test_pipeline.py` on main | **16/16 pass** on `a652a04` | verified now |
 | Readiness tip `c3913ff` in isolated worktree | pipeline **17/18** (1 fail: `to_dict` path separators on Windows — [[Tasks/FINDING-readiness-path-separator]]), saved-models **6/6**, readiness **21/21** | verified now |
+| M0 branch push | `observatory/m0-recover` local and remote both `e50455d1c749e425fe984278e9c2153080a61120` | verified now — [[Evidence/EV-2026-09-13-push-m0]] |
 | `tests/test_temporal.py` (12 checks) | file exists nowhere reachable | historical evidence — **blocked** |
 | Prior session: nine models, seven app pages | not re-run here | historical evidence |
 
@@ -54,7 +61,7 @@ The 2026-09-13 continuity note claimed local branch `codex/temporal-pipeline-v2`
 
 | Capability | Status |
 | --- | --- |
-| Causal pipeline v2 | **blocked** (missing branch) |
+| Causal pipeline v2 | **in progress** (fresh implementation, authorized; not recovery of `646d3a7`) |
 | Durable jobs / auth / registry / monitoring product UI | **planned** |
 | Multivariate portable inference | incomplete (known on readiness notes) |
 | Dependency lock / CI on main | CI exists on readiness branch only |
@@ -62,4 +69,4 @@ The 2026-09-13 continuity note claimed local branch `codex/temporal-pipeline-v2`
 
 ## Publication
 
-No push of M0 work yet. Historical HTML report upload rejection remains unresolved; do not republish without explicit authorization.
+M0 work was pushed only to `origin/observatory/m0-recover` with explicit authorization. Historical HTML report upload rejection remains unresolved; do not republish or push other branches without explicit authorization.
