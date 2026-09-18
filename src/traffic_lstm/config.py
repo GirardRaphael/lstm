@@ -22,6 +22,14 @@ VAULT_DIR = PROJECT_ROOT / "obsidian_vault" / "Traffic_LSTM_Brain"
 
 DEFAULT_DATASET = RAW_DATA_DIR / "Metro_Interstate_Traffic_Volume.csv"
 
+# Training-pipeline versions this codebase knows how to produce and read.
+# "v1" is the legacy pipeline (data.py / train.py); "v2" is the causal
+# split-before-fit pipeline (pipeline_v2.py, which owns the "v2" literal).
+# Archived artifact JSONs predate the pipeline_version field, so the default
+# below MUST stay "v1": an artifact without the field keeps its original
+# meaning.
+PIPELINE_VERSIONS = ("v1", "v2")
+
 
 def resolve_data_path(path: str | Path) -> Path:
     """Resolve dataset paths stored on another machine.
@@ -108,8 +116,17 @@ class TrainingConfig:
 
     run_name: str = "baseline_univariate"
 
+    # Which pipeline produced (or will produce) this run's artifacts. Never
+    # change the default: archived artifacts carry no such key and are v1.
+    pipeline_version: str = "v1"
+
     def __post_init__(self) -> None:
         self.data_path = resolve_data_path(self.data_path)
+        if self.pipeline_version not in PIPELINE_VERSIONS:
+            raise ValueError(
+                f"Unknown pipeline_version {self.pipeline_version!r}; known "
+                f"versions: {', '.join(PIPELINE_VERSIONS)}. Archived artifacts "
+                "without the field are v1.")
         self.horizons = tuple(int(h) for h in self.horizons)
         self.lstm_units = tuple(int(u) for u in self.lstm_units)
         self.exogenous_columns = tuple(self.exogenous_columns)

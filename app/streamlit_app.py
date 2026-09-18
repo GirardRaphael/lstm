@@ -50,6 +50,18 @@ def state(key, default=None):
     return st.session_state.get(key, default)
 
 
+def warn_no_v1_model():
+    """The interactive pages replay v1 runs; say so honestly after a v2 run."""
+    v2_outcome = state("v2_outcome")
+    if v2_outcome is not None:
+        st.info("The latest run used pipeline **v2** (causal split-before-fit). Its "
+                "hash-verified package is at `{}`. The interactive pages replay v1 "
+                "runs — train with pipeline v1 to use them."
+                .format(v2_outcome["package_dir"]))
+    else:
+        st.warning("Train a model first.")
+
+
 def metric_row(items):
     cols = st.columns(len(items))
     for col, (label, value, help_text) in zip(cols, items):
@@ -183,9 +195,22 @@ def page_train():
         epochs = c5.number_input("Max epochs", 1, 200, 30, step=1)
         batch_size = c6.selectbox("Batch size", [16, 32, 64, 128], index=1)
         patience = c7.number_input("EarlyStopping patience", 1, 30, 5, step=1)
-        train_ratio = c8.slider("Train share", 0.5, 0.95, 0.8, 0.05)
+        train_ratio = c8.slider("Train share", 0.5, 0.95, 0.8, 0.05,
+                                help="v1 only — v2 uses its own 70/15/15 chronological split.")
         horizons = st.multiselect("Forecast horizons (hours ahead)", [1, 2, 3, 6, 12, 24],
                                   default=[1])
+        pipeline = st.selectbox("Training pipeline", ["v2", "v1"], index=0)
+        st.caption("**v1** = legacy archived behavior · **v2** = causal split-before-fit "
+                   "(scalers fitted on fit rows only, gapped windows excluded, "
+                   "hash-verified package).")
+        c9, c10 = st.columns(2)
+        target_units = c9.text_input(
+            "Units of the predicted column (v2 only)",
+            value="vehicles/hour" if state("target_column") == "traffic_volume" else "",
+            help="v2 never assumes units — a column named temp is not assumed kelvin.")
+        site_scope = c10.text_input(
+            "Site scope (v2 only)", value="metro-interstate-mn",
+            help="Name of the site/corridor the v2 model is allowed to serve.")
         submitted = st.form_submit_button("Train the network", type="primary")
 
     if not submitted:
@@ -194,6 +219,11 @@ def page_train():
         return
     if not horizons:
         st.error("Pick at least one horizon.")
+        return
+
+    if pipeline == "v2":
+        train_page_v2(sequence_length, horizons, units_1, units_2, dropout,
+                      epochs, batch_size, patience, target_units, site_scope)
         return
 
     cfg = TrainingConfig(
@@ -228,11 +258,53 @@ def page_train():
         outcome["artifacts"]["training_seconds"]))
 
 
+def train_page_v2(sequence_length, horizons, units_1, units_2, dropout,
+                  epochs, batch_size, patience, target_units, site_scope):
+    """Train via the causal v2 pipeline and write a hash-verified package."""
+    if not target_units.strip():
+        st.error("Pipeline v2 requires a units declaration for the predicted column "
+                 "— it never assumes units from a column name.")
+        return
+    from traffic_lstm.pipeline_v2 import PipelineV2Error, V2Config, train_v2
+
+    cfg = V2Config(
+        datetime_column=state("datetime_column"), target_column=state("target_column"),
+        units={state("target_column"): target_units.strip()},
+        site_scope=site_scope.strip() or "interactive-workbench",
+        sequence_length=int(sequence_length), horizons=tuple(sorted(horizons)),
+        lstm_units=(int(units_1), int(units_2)), dropout=float(dropout),
+        epochs=int(epochs), batch_size=int(batch_size), patience=int(patience),
+        run_name="streamlit_v2_" + uuid4().hex[:12])
+    st.caption("v2 trains without the live curve — the causal pipeline owns its "
+               "callbacks — and also fits an XGBoost comparator on the same windows.")
+    try:
+        with st.spinner("Training causally (LSTM + XGBoost comparator)…"):
+            outcome = train_v2(cfg, df=state("raw"), verbose=0)
+    except (PipelineV2Error, ValueError, OSError) as exc:
+        st.error("v2 training failed: {}".format(exc))
+        return
+
+    st.session_state.update(v2_cfg=cfg, v2_outcome=outcome)
+    st.success("Trained a causal v2 package: `{}`".format(outcome["package_dir"]))
+    first = outcome["manifest"]["evaluation"]["test"]["h{}".format(cfg.horizons[0])]
+    metric_row([
+        ("LSTM MAE (test)", "{:,.1f}".format(first["lstm"]["mae"]),
+         "Average error on the held-out test partition"),
+        ("XGBoost MAE (test)", "{:,.1f}".format(first["xgboost"]["mae"]),
+         "Comparator trained on the same eligible windows"),
+        ("Best naive MAE", "{:,.1f}".format(min(
+            first["naive_persistence"]["mae"], first["naive_seasonal"]["mae"])),
+         "Timestamp-true persistence / seasonal baselines"),
+    ])
+    st.caption("The interactive Results / Forecast pages replay v1 runs; the v2 "
+               "package on disk is hash-verified and self-describing.")
+
+
 def page_results():
     st.header("3 · Results")
     outcome = state("outcome")
     if not outcome:
-        st.warning("Train a model first.")
+        warn_no_v1_model()
         return
     cfg, artifacts = state("cfg"), outcome["artifacts"]
 
@@ -298,7 +370,7 @@ def page_neurons():
     st.header("4 · Inside the network")
     outcome = state("outcome")
     if not outcome:
-        st.warning("Train a model first.")
+        warn_no_v1_model()
         return
     cfg, bundle, model = state("cfg"), outcome["bundle"], outcome["model"]
 
@@ -437,7 +509,7 @@ def page_predict():
     st.header("5 · Forecast")
     outcome = state("outcome")
     if not outcome:
-        st.warning("Train a model first.")
+        warn_no_v1_model()
         return
     cfg, bundle, model = state("cfg"), outcome["bundle"], outcome["model"]
     series, target = bundle.series, cfg.target_column
@@ -499,7 +571,7 @@ def page_vault():
         "Regenerate the vault from the **currently trained model**: canvases with the real "
         "activations, one note per neuron, the gate notes, and the hour-by-hour timeline.")
     if not outcome:
-        st.warning("Train a model first.")
+        warn_no_v1_model()
         return
     include_timeline = st.checkbox("Include the hour-by-hour timeline canvases", value=True)
     if st.button("Regenerate vault", type="primary"):
