@@ -79,9 +79,12 @@ const MIN_GREEN = 4
 const MAX_GREEN = 16
 const MIN_LEFT_GREEN = 3
 const MAX_LEFT_GREEN = 8
-const PEDESTRIAN_TIME = 5
-/** Seconds a waiting pedestrian stands at the curb before auto-pressing. */
-const PED_AUTO_PRESS_WAIT = 4.5
+const PEDESTRIAN_TIME = 6
+/** Seconds a waiting pedestrian stands at the curb before auto-pressing.
+ *  Long enough that a spawned crowd is visible before the exclusive walk. */
+const PED_AUTO_PRESS_WAIT = 12
+/** Don't auto-request walk until this many people are waiting, so corners pile up. */
+const PED_AUTO_PRESS_MIN = 6
 /** Hard barrier at the stop line for vehicles that may not enter the box. */
 export const STOP_LINE = 0.97
 /** Progress range that occupies the intersection box (after the stop line, before the exit). */
@@ -167,7 +170,7 @@ export function randomSpawnCounts(rng: () => number = Math.random): SpawnConfig 
   return {
     cars: 10 + Math.floor(rng() * 8),
     trucks: 2 + Math.floor(rng() * 4),
-    pedestrians: 8 + Math.floor(rng() * 8),
+    pedestrians: 16 + Math.floor(rng() * 12),
   }
 }
 
@@ -553,13 +556,18 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     // opening frame shows a cluster rather than an instant walk.
     if (p.waiting) {
       p.waitTime = (p.waitTime ?? 0) + dt
-      if (state.tick > 0 && p.waitTime >= PED_AUTO_PRESS_WAIT) {
-        if (p.approach === 'north' || p.approach === 'south') autoRequestEW = true
-        else autoRequestNS = true
-      }
     }
     if (!p.done || p.progress < 1.2) {
       pedestrians.push(p)
+    }
+  }
+  const waitingCount = pedestrians.filter((p) => p.waiting).length
+  if (state.tick > 0 && waitingCount >= PED_AUTO_PRESS_MIN) {
+    for (const p of pedestrians) {
+      if (p.waiting && (p.waitTime ?? 0) >= PED_AUTO_PRESS_WAIT) {
+        if (p.approach === 'north' || p.approach === 'south') autoRequestEW = true
+        else autoRequestNS = true
+      }
     }
   }
   if (autoRequestNS) crosswalkRequest = { ...crosswalkRequest, ns: true }
@@ -605,7 +613,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
 
   // Ambient arrivals high enough that a waiting cluster rebuilds between walks.
   // Round-robin corners so the pile doesn't collapse onto one sidewalk.
-  if (rng() < 0.012 * dt * 60) {
+  if (rng() < 0.035 * dt * 60) {
     const approach = APPROACHES[nextPedApproach % APPROACHES.length]
     nextPedApproach += 1
     pedestrians.push({

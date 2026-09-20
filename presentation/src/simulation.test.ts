@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  spawnAgents,
   createInitialState,
   lightColor,
   pedestrianInCrosswalk,
@@ -344,6 +345,16 @@ describe('exclusive pedestrian crossing', () => {
       }
       state = stepSimulation(state, 0.05, () => 0.99)
       expect(state.pedestrians.every((p) => p.waiting && !p.crossing), phase).toBe(true)
+    }
+  })
+
+  it('holds a spawned crowd at the curb for several seconds so the cluster is visible', () => {
+    let state = spawnAgents(createInitialState(false), { cars: 0, trucks: 0, pedestrians: 16 }, () => 0.5)
+    expect(state.pedestrians.filter((p) => p.waiting).length).toBe(16)
+    for (let i = 0; i < 80; i += 1) {
+      state = stepSimulation(state, 0.05, () => 0.99)
+      expect(state.phase).not.toBe('pedestrian-crossing')
+      expect(state.pedestrians.filter((p) => p.waiting).length).toBeGreaterThanOrEqual(16)
     }
   })
 })

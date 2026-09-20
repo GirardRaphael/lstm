@@ -51,15 +51,16 @@ function drawRoad(ctx: CanvasRenderingContext2D) {
     [SIZE - half, SIZE - half],
   ]
   for (const [cx, cy] of corners) {
-    // sidewalk
-    ctx.fillStyle = '#232b33'
+    // sidewalk — wide enough for a waiting crowd at the inner corner
+    ctx.fillStyle = '#2c353e'
     ctx.fillRect(cx, cy, half, half)
     // grass inset
     const g = ctx.createLinearGradient(cx, cy, cx + half, cy + half)
     g.addColorStop(0, '#163026')
     g.addColorStop(1, '#0e1f19')
     ctx.fillStyle = g
-    ctx.fillRect(cx + 10, cy + 10, half - 20, half - 20)
+    const inset = 42
+    ctx.fillRect(cx + inset, cy + inset, half - inset * 2, half - inset * 2)
     // sidewalk seam lines
     ctx.strokeStyle = 'rgba(244,239,230,0.05)'
     ctx.lineWidth = 1
@@ -399,10 +400,10 @@ function drawLights(ctx: CanvasRenderingContext2D, state: SimState) {
   // Walk is exclusive to the dedicated all-red pedestrian phase.
   const nsPed = pedestrianSignal(phase, 'ns')
   const ewPed = pedestrianSignal(phase, 'ew')
-  drawPedestrianSignal(ctx, half - 40, half - 40, ewPed, crosswalkRequest.ew)
-  drawPedestrianSignal(ctx, half + ROAD + 40, half + ROAD + 40, ewPed, crosswalkRequest.ew)
-  drawPedestrianSignal(ctx, half + ROAD + 40, half - 40, nsPed, crosswalkRequest.ns)
-  drawPedestrianSignal(ctx, half - 40, half + ROAD + 40, nsPed, crosswalkRequest.ns)
+  drawPedestrianSignal(ctx, half - 72, half - 72, ewPed, crosswalkRequest.ew)
+  drawPedestrianSignal(ctx, half + ROAD + 72, half + ROAD + 72, ewPed, crosswalkRequest.ew)
+  drawPedestrianSignal(ctx, half + ROAD + 72, half - 72, nsPed, crosswalkRequest.ns)
+  drawPedestrianSignal(ctx, half - 72, half + ROAD + 72, nsPed, crosswalkRequest.ns)
 }
 
 function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
@@ -473,88 +474,99 @@ function shadeColor(hex: string, percent: number): string {
   return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`
 }
 
+const PED_CLOTHES = ['#e74c3c', '#3498db', '#f1c40f', '#ecf0f1', '#9b59b6', '#1abc9c', '#e67e22', '#2ecc71']
+
+function waitingCrowdPose(approach: Approach, slot: number, jx: number, jy: number): { x: number; y: number } {
+  const half = (SIZE - ROAD) / 2
+  // 3-wide × n-deep grid on the inner sidewalk corner, hugging the curb so
+  // a spawned crowd is obvious against the pavement (not lost in the grass).
+  const col = slot % 3
+  const row = Math.floor(slot / 3)
+  const along = 14
+  const back = 16
+  const curb = 14
+  switch (approach) {
+    case 'north': // NW corner
+      return { x: half - curb - col * along + jx, y: half - curb - row * back + jy }
+    case 'south': // SE corner
+      return { x: half + ROAD + curb + col * along + jx, y: half + ROAD + curb + row * back + jy }
+    case 'west': // SW corner
+      return { x: half - curb - col * along + jx, y: half + ROAD + curb + row * back + jy }
+    case 'east': // NE corner
+      return { x: half + ROAD + curb + col * along + jx, y: half - curb - row * back + jy }
+  }
+}
+
 function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian, slot: number) {
   const half = (SIZE - ROAD) / 2
   let x = 0
   let y = 0
-  const col = slot % 4
-  const row = Math.floor(slot / 4)
-  const dx = 20
-  const dy = 18
-  const curb = 22
-  const zebraLane = ((slot % 3) - 1) * 4
-  // Tiny per-person jitter so a corner queue reads as a crowd, not a grid.
-  const jx = ((p.id * 13) % 5) - 2
-  const jy = ((p.id * 29) % 5) - 2
+  const zebraLane = ((slot % 3) - 1) * 7
+  const jx = ((p.id * 13) % 7) - 3
+  const jy = ((p.id * 29) % 7) - 3
 
   if (p.crossing) {
-    // Walk the painted zebra from the waiting curb to the far curb — never
-    // through the centre of the box.
     const t = Math.min(Math.max(p.progress, 0), 1)
     switch (p.approach) {
-      case 'north': // NW → east along the north zebra
+      case 'north':
         x = half + 12 + t * (ROAD - 24)
-        y = half + 10 + zebraLane
+        y = half + 12 + zebraLane
         break
-      case 'south': // SE → west along the south zebra
+      case 'south':
         x = half + ROAD - 12 - t * (ROAD - 24)
-        y = half + ROAD - 10 + zebraLane
+        y = half + ROAD - 12 + zebraLane
         break
-      case 'west': // SW → north along the west zebra
-        x = half + 10 + zebraLane
+      case 'west':
+        x = half + 12 + zebraLane
         y = half + ROAD - 12 - t * (ROAD - 24)
         break
-      case 'east': // NE → south along the east zebra
-        x = half + ROAD - 10 + zebraLane
+      case 'east':
+        x = half + ROAD - 12 + zebraLane
         y = half + 12 + t * (ROAD - 24)
         break
     }
   } else {
-    // Waiting on the sidewalk at the inner corner, stacked in a 4-wide grid
-    // so a group of 4–8 reads as a cluster instead of a single blob.
-    switch (p.approach) {
-      case 'north': // NW sidewalk
-        x = half - curb - col * dx + jx
-        y = half - curb - row * dy + jy
-        break
-      case 'south': // SE sidewalk
-        x = half + ROAD + curb + col * dx + jx
-        y = half + ROAD + curb + row * dy + jy
-        break
-      case 'west': // SW sidewalk
-        x = half - curb - col * dx + jx
-        y = half + ROAD + curb + row * dy + jy
-        break
-      case 'east': // NE sidewalk
-        x = half + ROAD + curb + col * dx + jx
-        y = half - curb - row * dy + jy
-        break
-    }
+    const pose = waitingCrowdPose(p.approach, slot, jx, jy)
+    x = pose.x
+    y = pose.y
   }
 
-  ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.3)'
-  ctx.shadowBlur = 4
-  ctx.shadowOffsetY = 2
+  const shirt = PED_CLOTHES[p.id % PED_CLOTHES.length]
+  const skin = p.crossing ? '#f3e0c8' : '#e8d4b0'
 
-  const grad = ctx.createRadialGradient(x - 1, y - 1, 0.5, x, y, 6)
-  grad.addColorStop(0, p.crossing ? '#fff' : '#f4efe6')
-  grad.addColorStop(1, p.crossing ? '#d9d0b4' : '#b8ae9a')
-  ctx.fillStyle = grad
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'
+  ctx.shadowBlur = 5
+  ctx.shadowOffsetY = 3
+
+  // legs
+  ctx.strokeStyle = '#1a2430'
+  ctx.lineWidth = 2.5
+  ctx.lineCap = 'round'
   ctx.beginPath()
-  ctx.arc(x, y, 6, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)'
-  ctx.lineWidth = 1
+  ctx.moveTo(x - 3, y + 5)
+  ctx.lineTo(x - 4, y + 11)
+  ctx.moveTo(x + 3, y + 5)
+  ctx.lineTo(x + 4, y + 11)
   ctx.stroke()
+
+  // torso
+  ctx.fillStyle = shirt
+  roundRect(ctx, x - 5, y - 2, 10, 9, 2)
+  ctx.fill()
+
+  // head
+  ctx.fillStyle = skin
+  ctx.beginPath()
+  ctx.arc(x, y - 6, 4.2, 0, Math.PI * 2)
+  ctx.fill()
   ctx.restore()
 
-  // Waiting indicator
   if (p.waiting) {
     ctx.beginPath()
-    ctx.strokeStyle = 'rgba(240,162,2,0.6)'
+    ctx.strokeStyle = 'rgba(240,162,2,0.85)'
     ctx.lineWidth = 2
-    ctx.arc(x, y, 8, 0, Math.PI * 2)
+    ctx.arc(x, y - 1, 12, 0, Math.PI * 2)
     ctx.stroke()
   }
 }
