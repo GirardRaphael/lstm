@@ -586,6 +586,36 @@ def _():
 
 
 # ------------------------------------------------------------------ legacy ---
+@check("legacy: Windows model_path resolves beside the JSON on POSIX hosts")
+def _():
+    """Archived absolute Windows paths must not look metrics-only on Linux."""
+    models_dir = ROOT / "models"
+    if not (models_dir / "baseline_univariate_artifacts.json").exists():
+        return
+    # Synthetic record with a Windows absolute path; the sibling .keras exists.
+    fake = TMP / "portable_windows_artifacts.json"
+    fake.write_text(json.dumps({
+        "run_name": "baseline_univariate",
+        "model_path": r"C:\Users\azulr\OneDrive\Desktop\Traffic_LSTM_Project\models\baseline_univariate.keras",
+        "scaler": {"data_min": [0.0], "data_max": [1.0]},
+        "config": {"sequence_length": 24},
+        "results": {"h1": {"lstm": {"mae": 1.0}}},
+    }), encoding="utf-8")
+    # Point the reader at models/ by rewriting through a copy next to real weights.
+    sibling = models_dir / "_tmp_portable_windows_artifacts.json"
+    try:
+        sibling.write_text(fake.read_text(encoding="utf-8"), encoding="utf-8")
+        info = v2.read_legacy_artifact(sibling)
+        assert info["metrics_only"] is False, info
+        assert info["weights_path"] is not None
+        assert info["weights_path"].name == "baseline_univariate.keras"
+        assert v2._artifact_basename(
+            r"C:\Users\x\models\foo.keras") == "foo.keras"
+    finally:
+        if sibling.exists():
+            sibling.unlink()
+
+
 @check("legacy: nine archived v1 artifacts parse; window_* are metrics-only")
 def _():
     models_dir = ROOT / "models"

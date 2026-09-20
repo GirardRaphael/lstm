@@ -62,7 +62,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Mapping, Sequence
 
 import numpy as np
@@ -70,6 +70,21 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
 from .config import DEFAULT_DATASET, MODEL_DIR
+
+
+def _artifact_basename(stored_path: str | Path) -> str:
+    """Filename from a path that may have been written on another OS.
+
+    Archived v1 artifacts store absolute Windows paths such as
+    ``C:\\Users\\...\\models\\baseline_univariate.keras``. On POSIX hosts,
+    ``Path(...).name`` treats the whole string as a single name because
+    backslash is not a separator, so the sibling ``.keras`` next to the JSON
+    would be missed and every retained model would look metrics-only.
+    """
+    raw = str(stored_path)
+    if "\\" in raw:
+        return PureWindowsPath(raw).name
+    return Path(raw.replace("\\", "/")).name
 
 PIPELINE_VERSION = "v2"
 PREPROCESSING_VERSION = "v2-causal-1"
@@ -1197,7 +1212,8 @@ def read_legacy_artifact(path: str | Path) -> dict:
     if model_path:
         # The artifact's own directory first: archived absolute paths point at
         # the training machine and must never be silently substituted.
-        candidates = [path.parent / Path(model_path).name, Path(model_path)]
+        basename = _artifact_basename(model_path)
+        candidates = [path.parent / basename, Path(str(model_path))]
         weights = next((c for c in candidates if c.exists()), None)
     return {
         "pipeline_version": PIPELINE_VERSION_LEGACY,
