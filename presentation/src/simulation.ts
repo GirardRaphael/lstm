@@ -413,8 +413,10 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     const turnSlowdown = v.intent === 'left' && v.progress > 1 ? 0.7 : 1
     let newProgress = v.progress + v.speed * dt * turnSlowdown
 
-    // Red light: the stop line is a hard barrier until the phase allows this movement
-    if (!v.crossed && !canProceed && v.progress < 1.0 && newProgress > STOP_LINE) {
+    // Red light: the stop line is a hard barrier until the phase allows this
+    // movement. Vehicles already past the line keep clearing the box — never
+    // clamp them backward onto the queue behind.
+    if (!v.crossed && !canProceed && v.progress <= STOP_LINE && newProgress > STOP_LINE) {
       newProgress = STOP_LINE
     }
 
