@@ -1,32 +1,18 @@
-# React + TypeScript + Vite
+# Traffic LSTM — Presentation Deck
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Slideshow of the Traffic LSTM / Observatory findings, plus a live **2D intersection** simulator for demos.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cd presentation
+npm install
+npm run dev -- --host 0.0.0.0 --port 43125
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Open [http://127.0.0.1:43125](http://127.0.0.1:43125).
+
+- **Slideshow** — arrow keys or on-screen Previous / Next
+- **Live intersection** — spawn cars / trucks / pedestrians, create a traffic jam, toggle adaptive green
+
+This simulator is read-only theatre: queue pressure stretches green time in the browser. It is not connected to city sensors or signal hardware.
