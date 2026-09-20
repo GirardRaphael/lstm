@@ -374,20 +374,46 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     crosswalkRequest = nxt.crosswalkRequest
   }
 
-  // Move vehicles
+  // Move vehicles — hard stop line on red, queue behind the car ahead
+  const STOP_LINE = 0.97
   const vehicles: Vehicle[] = []
   for (const raw of state.vehicles) {
     const v = { ...raw }
     const canProceed = canVehicleProceed(phase, v)
-    const atStop = v.progress >= 0.95 && v.progress < 1.02
 
-    if (!v.crossed && atStop && !canProceed) {
-      v.waiting = true
-    } else {
-      v.waiting = false
-      const speedMult = v.intent === 'left' && v.progress > 1 ? 0.7 : 1
-      v.progress += v.speed * dt * speedMult
+    // Vehicle directly ahead in the same approach + lane
+    let aheadProgress = Infinity
+    for (const other of state.vehicles) {
+      if (
+        other.id !== v.id &&
+        other.approach === v.approach &&
+        other.lane === v.lane &&
+        other.progress > v.progress &&
+        other.progress < aheadProgress
+      ) {
+        aheadProgress = other.progress
+      }
     }
+
+    const turnSlowdown = v.intent === 'left' && v.progress > 1 ? 0.7 : 1
+    let newProgress = v.progress + v.speed * dt * turnSlowdown
+
+    // Red light: the stop line is a hard barrier until the phase allows this movement
+    if (!v.crossed && !canProceed && v.progress < 1.0 && newProgress > STOP_LINE) {
+      newProgress = STOP_LINE
+    }
+
+    // Car following: never close past the bumper of the vehicle ahead
+    if (aheadProgress < Infinity) {
+      const minGap = v.kind === 'truck' ? 0.08 : 0.062
+      const maxAllowed = aheadProgress - minGap
+      if (newProgress > maxAllowed) {
+        newProgress = Math.max(v.progress, maxAllowed)
+      }
+    }
+
+    v.waiting = !v.crossed && newProgress - v.progress < v.speed * dt * 0.25
+    v.progress = newProgress
 
     if (v.progress >= 1.05 && !v.crossed) {
       v.crossed = true
