@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import {
   type Approach,
   type Pedestrian,
@@ -566,14 +566,12 @@ function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
   ctx.translate(x, y)
   ctx.rotate(angle)
 
-  // Shadow
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.45)'
   ctx.shadowBlur = 6
   ctx.shadowOffsetY = 3
 
   if (v.kind === 'truck') {
-    // Truck body
     const grad = ctx.createLinearGradient(-20, -11, 20, 11)
     grad.addColorStop(0, v.waiting ? '#b45309' : '#f59e0b')
     grad.addColorStop(1, v.waiting ? '#7c2d12' : '#d97706')
@@ -584,17 +582,14 @@ function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
     ctx.lineWidth = 1.2
     ctx.stroke()
     ctx.restore()
-    ctx.save()
-    // Cab
+
     ctx.fillStyle = '#1f2937'
     roundRect(ctx, 10, -9, 10, 18, 2)
     ctx.fill()
-    // Windshield
     ctx.fillStyle = 'rgba(147,197,253,0.4)'
     roundRect(ctx, 12, -7, 6, 14, 1)
     ctx.fill()
   } else {
-    // Car body
     const grad = ctx.createLinearGradient(-14, -8, 14, 8)
     grad.addColorStop(0, v.color)
     grad.addColorStop(1, shadeColor(v.color, -20))
@@ -605,18 +600,15 @@ function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
     ctx.lineWidth = 1.1
     ctx.stroke()
     ctx.restore()
-    ctx.save()
-    // Roof
+
     ctx.fillStyle = shadeColor(v.color, -30)
     roundRect(ctx, -6, -6, 12, 12, 3)
     ctx.fill()
-    // Windshield
     ctx.fillStyle = 'rgba(147,197,253,0.35)'
     roundRect(ctx, 4, -5, 5, 10, 1)
     ctx.fill()
   }
 
-  // Turn signal indicator
   if (v.waiting && v.intent !== 'straight') {
     ctx.fillStyle = v.intent === 'left' ? '#f0a202' : '#2ec4b6'
     ctx.beginPath()
@@ -717,6 +709,8 @@ function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian) {
 }
 
 function paint(ctx: CanvasRenderingContext2D, state: SimState) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.globalAlpha = 1
   drawRoad(ctx)
   drawLights(ctx, state)
 
@@ -772,7 +766,7 @@ type Props = {
 export function IntersectionCanvas({ state }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = ref.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
@@ -781,12 +775,14 @@ export function IntersectionCanvas({ state }: Props) {
   }, [state])
 
   return (
-    <canvas
-      ref={ref}
-      width={SIZE}
-      height={SIZE}
-      className="intersection-canvas"
-      aria-label="Two-dimensional traffic intersection simulation"
-    />
+    <div className="intersection-frame">
+      <canvas
+        ref={ref}
+        width={SIZE}
+        height={SIZE}
+        className="intersection-canvas"
+        aria-label="Two-dimensional traffic intersection simulation"
+      />
+    </div>
   )
 }

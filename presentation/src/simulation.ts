@@ -537,7 +537,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     }
     // A waiting pedestrian eventually presses the button — kept rare so the
     // all-walk phase stays an event rather than running every cycle.
-    if (p.waiting && state.tick % 600 === 0) {
+    if (p.waiting && state.tick > 0 && state.tick % 600 === 0) {
       if (p.approach === 'north' || p.approach === 'south') autoRequestEW = true
       else autoRequestNS = true
     }
