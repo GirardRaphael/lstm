@@ -69,6 +69,18 @@ function speedFor(kind: VehicleKind, rng: () => number): number {
   return 0.028 + rng() * 0.015
 }
 
+export function randomSpawnCounts(rng: () => number = Math.random): SpawnConfig {
+  return {
+    cars: 4 + Math.floor(rng() * 18),
+    trucks: Math.floor(rng() * 8),
+    pedestrians: 2 + Math.floor(rng() * 12),
+  }
+}
+
+export function randomApproachChoice(rng: () => number = Math.random): Approach {
+  return randomApproach(rng)
+}
+
 export function spawnAgents(
   state: SimState,
   config: SpawnConfig,
@@ -82,7 +94,7 @@ export function spawnAgents(
         id: nextId++,
         kind,
         approach,
-        progress: rng() * 0.35,
+        progress: rng() * 0.45,
         speed: speedFor(kind, rng),
         waiting: false,
         crossed: false,

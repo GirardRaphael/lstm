@@ -6,6 +6,8 @@ import {
   createInitialState,
   createTrafficJam,
   phaseLabel,
+  randomApproachChoice,
+  randomSpawnCounts,
   spawnAgents,
   stepSimulation,
   type Approach,
@@ -15,21 +17,55 @@ import './App.css'
 
 type Mode = 'slides' | 'live'
 
+function countByKind(state: SimState) {
+  let cars = 0
+  let trucks = 0
+  let pedestrians = 0
+  for (const agent of state.agents) {
+    if (agent.crossed) continue
+    if (agent.kind === 'car') cars += 1
+    else if (agent.kind === 'truck') trucks += 1
+    else pedestrians += 1
+  }
+  return { cars, trucks, pedestrians }
+}
+
 export default function App() {
   const [mode, setMode] = useState<Mode>('slides')
   const [slideIndex, setSlideIndex] = useState(0)
-  const [cars, setCars] = useState(6)
-  const [trucks, setTrucks] = useState(2)
-  const [pedestrians, setPedestrians] = useState(4)
+  const [cars, setCars] = useState(8)
+  const [trucks, setTrucks] = useState(3)
+  const [pedestrians, setPedestrians] = useState(5)
   const [jamApproach, setJamApproach] = useState<Approach>('east')
   const [adaptive, setAdaptive] = useState(true)
   const [running, setRunning] = useState(true)
-  const [state, setState] = useState<SimState>(() => createInitialState(true))
+  const [lastAction, setLastAction] = useState('Ready — randomize traffic or force a jam.')
+  const [state, setState] = useState<SimState>(() =>
+    spawnAgents(createInitialState(true), { cars: 5, trucks: 1, pedestrians: 3 }),
+  )
   const lastTs = useRef<number | null>(null)
+  const seededLive = useRef(false)
 
   useEffect(() => {
     setState((prev) => ({ ...prev, adaptive }))
   }, [adaptive])
+
+  useEffect(() => {
+    if (mode === 'live' && !seededLive.current) {
+      seededLive.current = true
+      const counts = randomSpawnCounts()
+      setCars(counts.cars)
+      setTrucks(counts.trucks)
+      setPedestrians(counts.pedestrians)
+      setState(() => {
+        const fresh = createInitialState(adaptive)
+        return spawnAgents(fresh, counts)
+      })
+      setLastAction(
+        `Auto-seeded ${counts.cars} cars, ${counts.trucks} trucks, ${counts.pedestrians} pedestrians.`,
+      )
+    }
+  }, [mode, adaptive])
 
   useEffect(() => {
     if (mode !== 'live' || !running) {
@@ -50,6 +86,7 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
       if (mode === 'slides') {
         if (e.key === 'ArrowRight' || e.key === ' ') {
           e.preventDefault()
@@ -62,6 +99,22 @@ export default function App() {
       }
       if (e.key.toLowerCase() === 'l') setMode('live')
       if (e.key.toLowerCase() === 's') setMode('slides')
+      if (mode === 'live' && e.key.toLowerCase() === 'r') {
+        const counts = randomSpawnCounts()
+        setCars(counts.cars)
+        setTrucks(counts.trucks)
+        setPedestrians(counts.pedestrians)
+        setState((prev) => spawnAgents(prev, counts))
+        setLastAction(
+          `Random spawn: ${counts.cars} cars, ${counts.trucks} trucks, ${counts.pedestrians} pedestrians.`,
+        )
+      }
+      if (mode === 'live' && e.key.toLowerCase() === 'j') {
+        const approach = randomApproachChoice()
+        setJamApproach(approach)
+        setState((prev) => createTrafficJam(prev, approach))
+        setLastAction(`Random jam on the ${approach} approach — watch green time adapt.`)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -71,6 +124,22 @@ export default function App() {
     () => state.queues.north + state.queues.south + state.queues.east + state.queues.west,
     [state.queues],
   )
+  const liveCounts = useMemo(() => countByKind(state), [state])
+  const congested = useMemo(() => {
+    const entries = Object.entries(state.queues) as [Approach, number][]
+    return entries.sort((a, b) => b[1] - a[1])[0]
+  }, [state.queues])
+
+  const randomizeCounts = () => {
+    const counts = randomSpawnCounts()
+    setCars(counts.cars)
+    setTrucks(counts.trucks)
+    setPedestrians(counts.pedestrians)
+    setLastAction(
+      `Rolled random counts: ${counts.cars} cars, ${counts.trucks} trucks, ${counts.pedestrians} pedestrians.`,
+    )
+    return counts
+  }
 
   return (
     <div className="app-shell">
@@ -95,7 +164,9 @@ export default function App() {
             Live intersection
           </button>
         </nav>
-        <div className="top-hint">← → navigate · L live · S slides</div>
+        <div className="top-hint">
+          {mode === 'slides' ? '← → navigate · L live' : 'R random spawn · J random jam · S slides'}
+        </div>
       </header>
 
       {mode === 'slides' ? (
@@ -125,6 +196,14 @@ export default function App() {
         <main className="live-stage">
           <section className="live-visual">
             <IntersectionCanvas state={state} />
+            <div className={`response-banner ${state.jamActive ? 'hot' : ''}`}>
+              <strong>{state.jamActive ? 'Jam response active' : 'Steady traffic'}</strong>
+              <span>
+                Heaviest queue: {congested[0]} ({congested[1]} PCU) · NS green{' '}
+                {state.nsGreen.toFixed(1)}s · EW green {state.ewGreen.toFixed(1)}s
+                {adaptive ? ' · adaptive ON' : ' · adaptive OFF'}
+              </span>
+            </div>
             <p className="sim-disclaimer">
               Simulated 2D intersection — adaptive greens respond to queue pressure. Not connected to
               real signals or city sensors.
@@ -134,8 +213,12 @@ export default function App() {
           <aside className="live-panel">
             <h2>Intersection controls</h2>
             <p className="panel-lead">
-              Spawn mixed traffic, force a jam, and watch phase timing stretch toward the congested
-              approach when adaptive mode is on.
+              Generate random cars, trucks, and pedestrians, force a jam, and watch phase timing
+              stretch toward the congested approach.
+            </p>
+
+            <p className="action-log" role="status">
+              {lastAction}
             </p>
 
             <div className="stat-row">
@@ -152,9 +235,23 @@ export default function App() {
                 <strong>{queueTotal}</strong>
               </div>
               <div>
-                <span className="stat-label">Throughput</span>
-                <strong>{state.throughput}</strong>
+                <span className="stat-label">On road now</span>
+                <strong>
+                  {liveCounts.cars}c / {liveCounts.trucks}t / {liveCounts.pedestrians}p
+                </strong>
               </div>
+            </div>
+
+            <div className="legend">
+              <span>
+                <i className="swatch car" /> Car
+              </span>
+              <span>
+                <i className="swatch truck" /> Truck
+              </span>
+              <span>
+                <i className="swatch ped" /> Pedestrian
+              </span>
             </div>
 
             <label className="field">
@@ -166,7 +263,14 @@ export default function App() {
                 value={cars}
                 onChange={(e) => setCars(Number(e.target.value))}
               />
-              <em>{cars}</em>
+              <input
+                className="count-box"
+                type="number"
+                min={0}
+                max={30}
+                value={cars}
+                onChange={(e) => setCars(Math.max(0, Math.min(30, Number(e.target.value) || 0)))}
+              />
             </label>
             <label className="field">
               <span>Trucks</span>
@@ -177,7 +281,14 @@ export default function App() {
                 value={trucks}
                 onChange={(e) => setTrucks(Number(e.target.value))}
               />
-              <em>{trucks}</em>
+              <input
+                className="count-box"
+                type="number"
+                min={0}
+                max={15}
+                value={trucks}
+                onChange={(e) => setTrucks(Math.max(0, Math.min(15, Number(e.target.value) || 0)))}
+              />
             </label>
             <label className="field">
               <span>Pedestrians</span>
@@ -188,7 +299,16 @@ export default function App() {
                 value={pedestrians}
                 onChange={(e) => setPedestrians(Number(e.target.value))}
               />
-              <em>{pedestrians}</em>
+              <input
+                className="count-box"
+                type="number"
+                min={0}
+                max={20}
+                value={pedestrians}
+                onChange={(e) =>
+                  setPedestrians(Math.max(0, Math.min(20, Number(e.target.value) || 0)))
+                }
+              />
             </label>
 
             <label className="field">
@@ -216,26 +336,61 @@ export default function App() {
             <div className="action-row">
               <button
                 type="button"
+                onClick={() => {
+                  const counts = randomizeCounts()
+                  setState((prev) => spawnAgents(prev, counts))
+                  setLastAction(
+                    `Random spawn: ${counts.cars} cars, ${counts.trucks} trucks, ${counts.pedestrians} pedestrians.`,
+                  )
+                }}
+              >
+                Randomize &amp; spawn
+              </button>
+              <button
+                type="button"
                 className="accent"
-                onClick={() =>
+                onClick={() => {
                   setState((prev) => spawnAgents(prev, { cars, trucks, pedestrians }))
-                }
+                  setLastAction(
+                    `Spawned ${cars} cars, ${trucks} trucks, ${pedestrians} pedestrians.`,
+                  )
+                }}
               >
                 Spawn traffic
               </button>
               <button
                 type="button"
                 className="warn"
-                onClick={() => setState((prev) => createTrafficJam(prev, jamApproach))}
+                onClick={() => {
+                  setState((prev) => createTrafficJam(prev, jamApproach))
+                  setLastAction(
+                    `Traffic jam on ${jamApproach} — compare NS/EW green timers as queues build.`,
+                  )
+                }}
               >
                 Create traffic jam
+              </button>
+              <button
+                type="button"
+                className="warn"
+                onClick={() => {
+                  const approach = randomApproachChoice()
+                  setJamApproach(approach)
+                  setState((prev) => createTrafficJam(prev, approach))
+                  setLastAction(`Random jam on the ${approach} approach.`)
+                }}
+              >
+                Random jam
               </button>
               <button type="button" onClick={() => setRunning((v) => !v)}>
                 {running ? 'Pause' : 'Resume'}
               </button>
               <button
                 type="button"
-                onClick={() => setState(createInitialState(adaptive))}
+                onClick={() => {
+                  setState(createInitialState(adaptive))
+                  setLastAction('Intersection reset.')
+                }}
               >
                 Reset
               </button>
@@ -254,9 +409,8 @@ export default function App() {
             </div>
 
             <p className="forecast-note">
-              In the full stack, hourly LSTM / XGBoost forecasts feed demand estimates that a
-              controller could consume. Here, queue pressure stands in for that demand signal so you
-              can see the response live.
+              In the full stack, hourly LSTM / XGBoost forecasts feed demand estimates. Here, queue
+              pressure stands in for that signal so the audience can see a response live.
             </p>
           </aside>
         </main>

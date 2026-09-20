@@ -11,6 +11,7 @@ Current continuation — 2026-09-20 (cloud resume + presentation deck)
 | --- | --- |
 | GitHub | https://github.com/GirardRaphael/lstm |
 | Working tip | `observatory/phase2-v2-wiring` |
+| Presenter card | [`PRESENTATION.md`](PRESENTATION.md) |
 | Presentation deck | [`presentation/`](presentation/) — slideshow + live 2D intersection |
 | Run deck | `cd presentation && npm install && npm run dev -- --port 43125` |
 | Streamlit workbench | `./run_app.ps1` or `PYTHONPATH=src streamlit run app/streamlit_app.py` |

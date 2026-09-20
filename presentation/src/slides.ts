@@ -84,7 +84,20 @@ export const SLIDES: Slide[] = [
     variant: 'hero',
     kicker: '06 · Live demo',
     title: 'Open the 2D intersection.',
-    body: 'Spawn cars, trucks, and pedestrians. Jam one approach. Watch queues grow — and watch adaptive green time respond in simulation.',
+    body: 'Randomize cars, trucks, and pedestrians. Jam one approach. Watch queues grow — and watch adaptive green time stretch toward the jam.',
     footer: 'Press Live intersection → in the top bar',
+  },
+  {
+    id: 'talk-track',
+    variant: 'content',
+    kicker: '07 · 3-minute talk track',
+    title: 'Say this, then click Live.',
+    bullets: [
+      '“We forecast next-hour volume with a causal LSTM — and we can open every gate.”',
+      '“On motorway data, calendar features help; weather mostly overfits the LSTM.”',
+      '“XGBoost wins here; on bike rentals the LSTM edges it — the tool is empirical.”',
+      '“Now the demo: random traffic → force a jam → adaptive green responds in simulation only.”',
+    ],
+    footer: 'Keep the product boundary slide in reserve if someone asks about real signals.',
   },
 ]

@@ -12,21 +12,42 @@ const CENTER = SIZE / 2
 const ROAD = 150
 const LANE = 36
 
-function approachOrigin(approach: Approach, progress: number): { x: number; y: number; angle: number } {
+function approachOrigin(
+  approach: Approach,
+  progress: number,
+  laneOffset = 0,
+): { x: number; y: number; angle: number } {
   // progress 0 far away, 1 at center stop, >1 past center
   const stop = CENTER - ROAD / 2 - 8
   const travel = stop + Math.max(0, progress - 1) * (ROAD + 120)
   const approachDist = stop * (1 - Math.min(progress, 1))
+  const offset = laneOffset * 14
 
   switch (approach) {
     case 'north':
-      return { x: CENTER - LANE / 2, y: approachDist + (progress > 1 ? travel - stop : 0), angle: Math.PI / 2 }
+      return {
+        x: CENTER - LANE / 2 + offset,
+        y: approachDist + (progress > 1 ? travel - stop : 0),
+        angle: Math.PI / 2,
+      }
     case 'south':
-      return { x: CENTER + LANE / 2, y: SIZE - approachDist - (progress > 1 ? travel - stop : 0), angle: -Math.PI / 2 }
+      return {
+        x: CENTER + LANE / 2 + offset,
+        y: SIZE - approachDist - (progress > 1 ? travel - stop : 0),
+        angle: -Math.PI / 2,
+      }
     case 'west':
-      return { x: approachDist + (progress > 1 ? travel - stop : 0), y: CENTER + LANE / 2, angle: 0 }
+      return {
+        x: approachDist + (progress > 1 ? travel - stop : 0),
+        y: CENTER + LANE / 2 + offset,
+        angle: 0,
+      }
     case 'east':
-      return { x: SIZE - approachDist - (progress > 1 ? travel - stop : 0), y: CENTER - LANE / 2, angle: Math.PI }
+      return {
+        x: SIZE - approachDist - (progress > 1 ? travel - stop : 0),
+        y: CENTER - LANE / 2 + offset,
+        angle: Math.PI,
+      }
   }
 }
 
@@ -104,8 +125,8 @@ function drawLights(ctx: CanvasRenderingContext2D, phase: Phase) {
   drawLight(ctx, (SIZE - ROAD) / 2 - 10, (SIZE + ROAD) / 2 + 28, ew)
 }
 
-function drawAgent(ctx: CanvasRenderingContext2D, agent: Agent) {
-  const { x, y, angle } = approachOrigin(agent.approach, agent.progress)
+function drawAgent(ctx: CanvasRenderingContext2D, agent: Agent, laneOffset: number) {
+  const { x, y, angle } = approachOrigin(agent.approach, agent.progress, laneOffset)
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate(angle)
@@ -132,8 +153,12 @@ function drawAgent(ctx: CanvasRenderingContext2D, agent: Agent) {
 function paint(ctx: CanvasRenderingContext2D, state: SimState) {
   drawRoad(ctx)
   drawLights(ctx, state.phase)
+  const laneCursor: Record<Approach, number> = { north: 0, south: 0, east: 0, west: 0 }
   for (const agent of state.agents) {
-    drawAgent(ctx, agent)
+    const offsetIndex = laneCursor[agent.approach]
+    laneCursor[agent.approach] += 1
+    const laneOffset = (offsetIndex % 3) - 1
+    drawAgent(ctx, agent, agent.kind === 'pedestrian' ? laneOffset * 1.4 : laneOffset * 0.55)
   }
 
   // center plaque
