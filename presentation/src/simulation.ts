@@ -155,13 +155,21 @@ export function spawnAgents(
     const kind: VehicleKind = i < config.cars ? 'car' : 'truck'
     const approach = randomApproach(rng)
     const intent = randomIntent(rng)
+    const lane = laneForIntent(intent)
+    // Queue behind whatever is already in this lane — never overlap.
+    let spawn = -0.03 - rng() * 0.05
+    for (const v of vehicles) {
+      if (v.approach === approach && v.lane === lane && v.progress < 0.35) {
+        spawn = Math.min(spawn, v.progress - 0.09)
+      }
+    }
     vehicles.push({
       id: nextId++,
       kind,
       approach,
-      lane: laneForIntent(intent),
+      lane,
       intent,
-      progress: rng() * 0.4,
+      progress: spawn,
       speed: speedFor(kind, rng),
       waiting: false,
       crossed: false,
@@ -189,17 +197,23 @@ export function createTrafficJam(
   rng: () => number = Math.random,
 ): SimState {
   const vehicles = [...state.vehicles]
-  const jamCount = 14 + Math.floor(rng() * 8)
+  const jamCount = 12 + Math.floor(rng() * 6)
+  // Pack a stopped queue backward from the stop line, respecting follow gaps.
+  const laneDepth: Record<Lane, number> = { left: 0, straight: 0, right: 0 }
   for (let i = 0; i < jamCount; i += 1) {
     const kind: VehicleKind = rng() < 0.2 ? 'truck' : 'car'
     const intent = randomIntent(rng)
+    const lane = laneForIntent(intent)
+    const gap = kind === 'truck' ? 0.09 : 0.075
+    const depth = laneDepth[lane]
+    laneDepth[lane] += 1
     vehicles.push({
       id: nextId++,
       kind,
       approach,
-      lane: laneForIntent(intent),
+      lane,
       intent,
-      progress: Math.min(0.92, 0.08 + i * 0.05 + rng() * 0.02),
+      progress: 0.95 - depth * gap,
       speed: speedFor(kind, rng) * 0.6,
       waiting: true,
       crossed: false,
@@ -420,7 +434,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
       throughput += v.kind === 'truck' ? 2 : 1
     }
 
-    if (v.progress < 2.5) {
+    if (v.progress < 3.4) {
       vehicles.push(v)
     }
   }

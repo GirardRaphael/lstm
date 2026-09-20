@@ -16,48 +16,145 @@ const LANE_GAP = 4
 
 type Lane = 'left' | 'straight' | 'right'
 
+type Vec = { x: number; y: number }
+
 function laneOffset(lane: Lane): number {
-  if (lane === 'left') return -(LANE_W + LANE_GAP)
-  if (lane === 'right') return LANE_W + LANE_GAP
+  // Left-turn lane sits nearest the centre line (right-hand traffic).
+  if (lane === 'left') return LANE_W + LANE_GAP
+  if (lane === 'right') return -(LANE_W + LANE_GAP)
   return 0
 }
 
-function approachOrigin(
-  approach: Approach,
-  progress: number,
-  lane: Lane,
-): { x: number; y: number; angle: number } {
-  const stop = CENTER - ROAD / 2 - 10
-  const travel = stop + Math.max(0, progress - 1) * (ROAD + 140)
-  const approachDist = stop * (1 - Math.min(progress, 1))
-  const offset = laneOffset(lane)
+// Stop-line distance from the canvas edge for each approach.
+const STOP = CENTER - ROAD / 2 - 10 // 300
+const SPAWN_DIST = 40 // how far off-screen vehicles appear
 
+// Heading angles (canvas coords, y down): 0 = east, π/2 = south.
+const HEADING: Record<Approach, number> = {
+  west: 0,
+  north: Math.PI / 2,
+  east: Math.PI,
+  south: -Math.PI / 2,
+}
+
+function laneBase(approach: Approach, lane: Lane): Vec {
+  // Right-hand traffic: the approach lane sits on the driver's right side.
+  const o = laneOffset(lane)
   switch (approach) {
-    case 'north':
-      return {
-        x: CENTER - ROAD / 4 + offset,
-        y: approachDist + (progress > 1 ? travel - stop : 0),
-        angle: Math.PI / 2,
-      }
-    case 'south':
-      return {
-        x: CENTER + ROAD / 4 - offset,
-        y: SIZE - approachDist - (progress > 1 ? travel - stop : 0),
-        angle: -Math.PI / 2,
-      }
-    case 'west':
-      return {
-        x: approachDist + (progress > 1 ? travel - stop : 0),
-        y: CENTER + ROAD / 4 - offset,
-        angle: 0,
-      }
-    case 'east':
-      return {
-        x: SIZE - approachDist - (progress > 1 ? travel - stop : 0),
-        y: CENTER - ROAD / 4 + offset,
-        angle: Math.PI,
-      }
+    case 'north': return { x: CENTER - ROAD / 4 + o, y: 0 }
+    case 'south': return { x: CENTER + ROAD / 4 - o, y: 0 }
+    case 'west': return { x: 0, y: CENTER + ROAD / 4 - o }
+    case 'east': return { x: 0, y: CENTER - ROAD / 4 + o }
   }
+}
+
+function stopPoint(approach: Approach, lane: Lane): Vec {
+  const base = laneBase(approach, lane)
+  switch (approach) {
+    case 'north': return { x: base.x, y: STOP }
+    case 'south': return { x: base.x, y: SIZE - STOP }
+    case 'west': return { x: STOP, y: base.y }
+    case 'east': return { x: SIZE - STOP, y: base.y }
+  }
+}
+
+function spawnPoint(approach: Approach, lane: Lane): Vec {
+  const base = laneBase(approach, lane)
+  switch (approach) {
+    case 'north': return { x: base.x, y: -SPAWN_DIST }
+    case 'south': return { x: base.x, y: SIZE + SPAWN_DIST }
+    case 'west': return { x: -SPAWN_DIST, y: base.y }
+    case 'east': return { x: SIZE + SPAWN_DIST, y: base.y }
+  }
+}
+
+// Where a vehicle exits after crossing, per intent (right-hand traffic).
+function exitPoint(approach: Approach, intent: 'left' | 'straight' | 'right', lane: Lane): Vec {
+  const o = laneOffset(lane)
+  const past = ROAD / 2 + 70
+  switch (approach) {
+    case 'north': // heading south
+      if (intent === 'straight') return { x: CENTER - ROAD / 4 + o, y: CENTER + past }
+      if (intent === 'right') return { x: CENTER - past, y: CENTER - ROAD / 4 + o } // westbound
+      return { x: CENTER + past, y: CENTER + ROAD / 4 - o } // left → eastbound
+    case 'south': // heading north
+      if (intent === 'straight') return { x: CENTER + ROAD / 4 - o, y: CENTER - past }
+      if (intent === 'right') return { x: CENTER + past, y: CENTER + ROAD / 4 - o } // eastbound
+      return { x: CENTER - past, y: CENTER - ROAD / 4 + o } // left → westbound
+    case 'west': // heading east
+      if (intent === 'straight') return { x: CENTER + past, y: CENTER + ROAD / 4 - o }
+      if (intent === 'right') return { x: CENTER + ROAD / 4 - o, y: CENTER + past } // southbound
+      return { x: CENTER - ROAD / 4 + o, y: CENTER - past } // left → northbound
+    case 'east': // heading west
+      if (intent === 'straight') return { x: CENTER - past, y: CENTER - ROAD / 4 + o }
+      if (intent === 'right') return { x: CENTER - ROAD / 4 + o, y: CENTER - past } // northbound
+      return { x: CENTER + ROAD / 4 - o, y: CENTER + past } // left → southbound
+  }
+}
+
+function bezier(p0: Vec, p1: Vec, p2: Vec, t: number): Vec {
+  const u = 1 - t
+  return {
+    x: u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x,
+    y: u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y,
+  }
+}
+
+function bezierDir(p0: Vec, p1: Vec, p2: Vec, t: number): Vec {
+  return {
+    x: 2 * (1 - t) * (p1.x - p0.x) + 2 * t * (p2.x - p1.x),
+    y: 2 * (1 - t) * (p1.y - p0.y) + 2 * t * (p2.y - p1.y),
+  }
+}
+
+function controlPoint(approach: Approach, intent: 'left' | 'straight' | 'right', p0: Vec): Vec {
+  const h = HEADING[approach]
+  const fwd = { x: Math.cos(h), y: Math.sin(h) }
+  if (intent === 'straight') {
+    return { x: p0.x + fwd.x * (ROAD / 2), y: p0.y + fwd.y * (ROAD / 2) }
+  }
+  if (intent === 'right') {
+    // tight corner
+    return { x: p0.x + fwd.x * 34, y: p0.y + fwd.y * 34 }
+  }
+  // left: sweep toward the middle of the box
+  return {
+    x: p0.x + fwd.x * (ROAD * 0.62),
+    y: p0.y + fwd.y * (ROAD * 0.62),
+  }
+}
+
+function vehiclePose(v: Vehicle): { x: number; y: number; angle: number } {
+  const p0 = stopPoint(v.approach, v.lane)
+  const sp = spawnPoint(v.approach, v.lane)
+  const heading = HEADING[v.approach]
+
+  if (v.progress <= 1) {
+    const t = Math.max(0, v.progress)
+    return {
+      x: sp.x + (p0.x - sp.x) * t,
+      y: sp.y + (p0.y - sp.y) * t,
+      angle: heading,
+    }
+  }
+
+  const p2 = exitPoint(v.approach, v.intent, v.lane)
+  const p1 = controlPoint(v.approach, v.intent, p0)
+  const t = Math.min(v.progress - 1, 1)
+  const pos = bezier(p0, p1, p2, t)
+  const dir = bezierDir(p0, p1, p2, t)
+  let angle = Math.atan2(dir.y, dir.x)
+
+  if (v.progress > 2) {
+    // continue straight along the exit heading
+    const exitHeading = Math.atan2(p2.y - p1.y, p2.x - p1.x)
+    const extra = (v.progress - 2) * 230
+    pos.x = p2.x + Math.cos(exitHeading) * extra
+    pos.y = p2.y + Math.sin(exitHeading) * extra
+    angle = exitHeading
+  }
+
+  return { x: pos.x, y: pos.y, angle }
 }
 
 function roundRect(
@@ -366,7 +463,7 @@ function drawLights(ctx: CanvasRenderingContext2D, state: SimState) {
 }
 
 function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
-  const { x, y, angle } = approachOrigin(v.approach, v.progress, v.lane)
+  const { x, y, angle } = vehiclePose(v)
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate(angle)

@@ -311,7 +311,7 @@ button.warn {
 }
 
 .live-stage.thinking-layout {
-  grid-template-columns: minmax(300px, 0.9fr) minmax(340px, 1.1fr) minmax(280px, 0.85fr);
+  grid-template-columns: minmax(460px, 1.3fr) minmax(320px, 0.95fr) minmax(250px, 0.75fr);
   align-items: start;
 }
 
