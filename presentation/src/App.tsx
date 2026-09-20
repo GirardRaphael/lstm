@@ -8,6 +8,7 @@ import {
   createInitialState,
   createTrafficJam,
   phaseLabel,
+  pressCrosswalkButton,
   randomApproachChoice,
   randomSpawnCounts,
   spawnAgents,
@@ -23,11 +24,13 @@ function countByKind(state: SimState) {
   let cars = 0
   let trucks = 0
   let pedestrians = 0
-  for (const agent of state.agents) {
-    if (agent.crossed) continue
-    if (agent.kind === 'car') cars += 1
-    else if (agent.kind === 'truck') trucks += 1
-    else pedestrians += 1
+  for (const v of state.vehicles) {
+    if (v.crossed) continue
+    if (v.kind === 'car') cars += 1
+    else trucks += 1
+  }
+  for (const p of state.pedestrians) {
+    if (!p.done) pedestrians += 1
   }
   return { cars, trucks, pedestrians }
 }
@@ -341,6 +344,30 @@ export default function App() {
               />
               Adaptive green (queue-aware)
             </label>
+
+            <div className="crosswalk-row">
+              <span className="crosswalk-label">Crosswalk</span>
+              <button
+                type="button"
+                className={`crosswalk-btn ${state.crosswalkRequest.ns ? 'pressed' : ''}`}
+                onClick={() => {
+                  setState((prev) => pressCrosswalkButton(prev, 'ns'))
+                  setLastAction('Pedestrian pressed NS crosswalk — light will change.')
+                }}
+              >
+                NS
+              </button>
+              <button
+                type="button"
+                className={`crosswalk-btn ${state.crosswalkRequest.ew ? 'pressed' : ''}`}
+                onClick={() => {
+                  setState((prev) => pressCrosswalkButton(prev, 'ew'))
+                  setLastAction('Pedestrian pressed EW crosswalk — light will change.')
+                }}
+              >
+                EW
+              </button>
+            </div>
 
             <div className="action-row">
               <button

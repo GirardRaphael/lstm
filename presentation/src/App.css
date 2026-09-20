@@ -739,6 +739,42 @@ button.warn {
   opacity: 0.8;
 }
 
+/* Crosswalk buttons */
+.crosswalk-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.crosswalk-label {
+  font-size: 0.82rem;
+  color: var(--steel);
+}
+
+.crosswalk-btn {
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(244, 239, 230, 0.12);
+  background: rgba(10, 15, 20, 0.8);
+  color: var(--paper);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  transition: all 180ms ease;
+}
+
+.crosswalk-btn:hover {
+  border-color: rgba(240, 162, 2, 0.4);
+  background: rgba(240, 162, 2, 0.1);
+}
+
+.crosswalk-btn.pressed {
+  background: rgba(240, 162, 2, 0.2);
+  border-color: var(--amber);
+  color: var(--amber);
+  box-shadow: 0 0 12px rgba(240, 162, 2, 0.3);
+}
+
 /* ---------------- Responsive ---------------- */
 
 @media (max-width: 1200px) {

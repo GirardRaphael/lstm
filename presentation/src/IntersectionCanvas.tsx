@@ -1,50 +1,60 @@
 import { useEffect, useRef } from 'react'
 import {
-  type Agent,
   type Approach,
-  type Phase,
+  type Pedestrian,
+  type Vehicle,
   lightColor,
+  pedestrianSignal,
   type SimState,
 } from './simulation'
 
-const SIZE = 720
+const SIZE = 800
 const CENTER = SIZE / 2
-const ROAD = 150
-const LANE = 36
+const ROAD = 180
+const LANE_W = 28
+const LANE_GAP = 4
+
+type Lane = 'left' | 'straight' | 'right'
+
+function laneOffset(lane: Lane): number {
+  if (lane === 'left') return -(LANE_W + LANE_GAP)
+  if (lane === 'right') return LANE_W + LANE_GAP
+  return 0
+}
 
 function approachOrigin(
   approach: Approach,
   progress: number,
-  laneOffset = 0,
+  lane: Lane,
 ): { x: number; y: number; angle: number } {
-  const stop = CENTER - ROAD / 2 - 8
-  const travel = stop + Math.max(0, progress - 1) * (ROAD + 120)
+  const stop = CENTER - ROAD / 2 - 10
+  const travel = stop + Math.max(0, progress - 1) * (ROAD + 140)
   const approachDist = stop * (1 - Math.min(progress, 1))
-  const offset = laneOffset * 14
+  const offset = laneOffset(lane)
 
   switch (approach) {
     case 'north':
       return {
-        x: CENTER - LANE / 2 + offset,
+        x: CENTER - ROAD / 4 + offset,
         y: approachDist + (progress > 1 ? travel - stop : 0),
         angle: Math.PI / 2,
       }
     case 'south':
       return {
-        x: CENTER + LANE / 2 + offset,
+        x: CENTER + ROAD / 4 - offset,
         y: SIZE - approachDist - (progress > 1 ? travel - stop : 0),
         angle: -Math.PI / 2,
       }
     case 'west':
       return {
         x: approachDist + (progress > 1 ? travel - stop : 0),
-        y: CENTER + LANE / 2 + offset,
+        y: CENTER + ROAD / 4 - offset,
         angle: 0,
       }
     case 'east':
       return {
         x: SIZE - approachDist - (progress > 1 ? travel - stop : 0),
-        y: CENTER - LANE / 2 + offset,
+        y: CENTER - ROAD / 4 + offset,
         angle: Math.PI,
       }
   }
@@ -68,238 +78,481 @@ function roundRect(
 }
 
 function drawRoad(ctx: CanvasRenderingContext2D) {
-  // deep backdrop
   const bg = ctx.createLinearGradient(0, 0, 0, SIZE)
-  bg.addColorStop(0, '#0b1117')
-  bg.addColorStop(1, '#101a22')
+  bg.addColorStop(0, '#0a0f14')
+  bg.addColorStop(1, '#0d141a')
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, SIZE, SIZE)
 
   const half = (SIZE - ROAD) / 2
 
-  // corner blocks with soft depth
+  // Corner blocks
   const corner = ctx.createLinearGradient(0, 0, half, half)
-  corner.addColorStop(0, '#16302a')
-  corner.addColorStop(1, '#0f241f')
+  corner.addColorStop(0, '#14251f')
+  corner.addColorStop(1, '#0d1a16')
   ctx.fillStyle = corner
   ctx.fillRect(0, 0, half, half)
   ctx.fillRect(SIZE - half, 0, half, half)
   ctx.fillRect(0, SIZE - half, half, half)
   ctx.fillRect(SIZE - half, SIZE - half, half, half)
 
-  // subtle texture on corners
-  ctx.strokeStyle = 'rgba(46,196,182,0.05)'
-  ctx.lineWidth = 1
-  for (let i = 0; i < 6; i += 1) {
-    ctx.beginPath()
-    ctx.moveTo(0, 30 + i * 26)
-    ctx.lineTo(half - 8, 30 + i * 26)
-    ctx.stroke()
-  }
+  // Sidewalk edges
+  ctx.strokeStyle = 'rgba(244,239,230,0.08)'
+  ctx.lineWidth = 2
+  ctx.strokeRect(half - 4, half - 4, ROAD + 8, ROAD + 8)
 
-  // road shadow (underlay)
-  ctx.fillStyle = 'rgba(0,0,0,0.45)'
-  ctx.fillRect(half - 6, 0, ROAD + 12, SIZE)
-  ctx.fillRect(0, half - 6, SIZE, ROAD + 12)
+  // Road shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.4)'
+  ctx.fillRect(half - 4, 0, ROAD + 8, SIZE)
+  ctx.fillRect(0, half - 4, SIZE, ROAD + 8)
 
-  // asphalt with gradient
+  // Asphalt
   const road = ctx.createLinearGradient(half, 0, half + ROAD, 0)
-  road.addColorStop(0, '#1d2630')
-  road.addColorStop(0.5, '#232f3b')
-  road.addColorStop(1, '#1a232c')
+  road.addColorStop(0, '#1a232c')
+  road.addColorStop(0.5, '#212d38')
+  road.addColorStop(1, '#182028')
   ctx.fillStyle = road
   ctx.fillRect(half, 0, ROAD, SIZE)
 
   const roadH = ctx.createLinearGradient(0, half, 0, half + ROAD)
-  roadH.addColorStop(0, '#1d2630')
-  roadH.addColorStop(0.5, '#232f3b')
-  roadH.addColorStop(1, '#1a232c')
+  roadH.addColorStop(0, '#1a232c')
+  roadH.addColorStop(0.5, '#212d38')
+  roadH.addColorStop(1, '#182028')
   ctx.fillStyle = roadH
   ctx.fillRect(0, half, SIZE, ROAD)
 
-  // center box
-  ctx.fillStyle = '#202b36'
+  // Center box
+  ctx.fillStyle = '#1e2933'
   ctx.fillRect(half, half, ROAD, ROAD)
 
-  // curbs
-  ctx.strokeStyle = 'rgba(232,224,200,0.14)'
+  // Lane markings — 3 lanes each direction
+  ctx.strokeStyle = 'rgba(232,224,200,0.45)'
   ctx.lineWidth = 2
-  ctx.strokeRect(half + 1, half + 1, ROAD - 2, ROAD - 2)
+  ctx.setLineDash([16, 14])
 
-  // lane markings
-  ctx.strokeStyle = 'rgba(232,224,200,0.5)'
-  ctx.setLineDash([20, 18])
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.moveTo(CENTER, 0)
-  ctx.lineTo(CENTER, half)
-  ctx.moveTo(CENTER, half + ROAD)
-  ctx.lineTo(CENTER, SIZE)
-  ctx.moveTo(0, CENTER)
-  ctx.lineTo(half, CENTER)
-  ctx.moveTo(half + ROAD, CENTER)
-  ctx.lineTo(SIZE, CENTER)
-  ctx.stroke()
-  ctx.setLineDash([])
-
-  // crosswalks — crisp bars
-  ctx.fillStyle = 'rgba(244,239,230,0.72)'
-  for (let i = 0; i < 6; i += 1) {
-    const o = i * 14
-    ctx.fillRect(half - 24, half + 18 + o, 20, 8)
-    ctx.fillRect(half + ROAD + 4, half + 18 + o, 20, 8)
-    ctx.fillRect(half + 18 + o, half - 24, 8, 20)
-    ctx.fillRect(half + 18 + o, half + ROAD + 4, 8, 20)
+  // Vertical road lanes
+  for (const dir of [-1, 1]) {
+    const baseX = CENTER + dir * (ROAD / 4)
+    for (const laneOff of [-LANE_W - LANE_GAP, 0, LANE_W + LANE_GAP]) {
+      const x = baseX + laneOff
+      ctx.beginPath()
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, half)
+      ctx.moveTo(x, half + ROAD)
+      ctx.lineTo(x, SIZE)
+      ctx.stroke()
+    }
   }
 
-  // stop lines
-  ctx.fillStyle = 'rgba(244,239,230,0.6)'
-  ctx.fillRect(half + 8, half - 8, LANE, 4)
-  ctx.fillRect(half + ROAD - LANE - 8, half + ROAD + 4, LANE, 4)
-  ctx.fillRect(half - 8, half + ROAD - LANE - 8, 4, LANE)
-  ctx.fillRect(half + ROAD + 4, half + 8, 4, LANE)
+  // Horizontal road lanes
+  for (const dir of [-1, 1]) {
+    const baseY = CENTER + dir * (ROAD / 4)
+    for (const laneOff of [-LANE_W - LANE_GAP, 0, LANE_W + LANE_GAP]) {
+      const y = baseY + laneOff
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(half, y)
+      ctx.moveTo(half + ROAD, y)
+      ctx.lineTo(SIZE, y)
+      ctx.stroke()
+    }
+  }
+  ctx.setLineDash([])
+
+  // Center lines (double yellow)
+  ctx.strokeStyle = 'rgba(240,162,2,0.5)'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(CENTER - 2, 0)
+  ctx.lineTo(CENTER - 2, half)
+  ctx.moveTo(CENTER + 2, 0)
+  ctx.lineTo(CENTER + 2, half)
+  ctx.moveTo(CENTER - 2, half + ROAD)
+  ctx.lineTo(CENTER - 2, SIZE)
+  ctx.moveTo(CENTER + 2, half + ROAD)
+  ctx.lineTo(CENTER + 2, SIZE)
+  ctx.moveTo(0, CENTER - 2)
+  ctx.lineTo(half, CENTER - 2)
+  ctx.moveTo(0, CENTER + 2)
+  ctx.lineTo(half, CENTER + 2)
+  ctx.moveTo(half + ROAD, CENTER - 2)
+  ctx.lineTo(SIZE, CENTER - 2)
+  ctx.moveTo(half + ROAD, CENTER + 2)
+  ctx.lineTo(SIZE, CENTER + 2)
+  ctx.stroke()
+
+  // Crosswalks — zebra stripes
+  ctx.fillStyle = 'rgba(244,239,230,0.75)'
+  const cwStripe = 8
+  const cwGap = 6
+
+  // North crosswalk
+  for (let i = 0; i < 8; i++) {
+    ctx.fillRect(half + 10 + i * (cwStripe + cwGap), half - 20, cwStripe, 16)
+  }
+  // South crosswalk
+  for (let i = 0; i < 8; i++) {
+    ctx.fillRect(half + 10 + i * (cwStripe + cwGap), half + ROAD + 4, cwStripe, 16)
+  }
+  // West crosswalk
+  for (let i = 0; i < 8; i++) {
+    ctx.fillRect(half - 20, half + 10 + i * (cwStripe + cwGap), 16, cwStripe)
+  }
+  // East crosswalk
+  for (let i = 0; i < 8; i++) {
+    ctx.fillRect(half + ROAD + 4, half + 10 + i * (cwStripe + cwGap), 16, cwStripe)
+  }
+
+  // Stop lines
+  ctx.fillStyle = 'rgba(244,239,230,0.7)'
+  ctx.fillRect(half + 6, half - 6, ROAD / 2 - 12, 4)
+  ctx.fillRect(half + ROAD / 2 + 6, half + ROAD + 2, ROAD / 2 - 12, 4)
+  ctx.fillRect(half - 6, half + ROAD / 2 + 6, 4, ROAD / 2 - 12)
+  ctx.fillRect(half + ROAD + 2, half + 6, 4, ROAD / 2 - 12)
 }
 
-function drawLight(
+function drawTrafficLight(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  color: 'red' | 'yellow' | 'green',
+  straightColor: 'red' | 'yellow' | 'green',
+  leftColor: 'red' | 'yellow' | 'green',
+  vertical: boolean,
 ) {
-  // housing with rounded corners + drop shadow
   ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.55)'
-  ctx.shadowBlur = 14
-  ctx.shadowOffsetY = 5
+
+  // Housing
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'
+  ctx.shadowBlur = 12
+  ctx.shadowOffsetY = 4
   ctx.fillStyle = '#0a0e13'
-  roundRect(ctx, x - 11, y - 30, 22, 60, 6)
+
+  if (vertical) {
+    roundRect(ctx, x - 14, y - 44, 28, 88, 8)
+  } else {
+    roundRect(ctx, x - 44, y - 14, 88, 28, 8)
+  }
   ctx.fill()
   ctx.restore()
 
-  // housing highlight
-  ctx.strokeStyle = 'rgba(244,239,230,0.08)'
+  // Housing border
+  ctx.strokeStyle = 'rgba(244,239,230,0.1)'
   ctx.lineWidth = 1
-  roundRect(ctx, x - 11, y - 30, 22, 60, 6)
+  if (vertical) {
+    roundRect(ctx, x - 14, y - 44, 28, 88, 8)
+  } else {
+    roundRect(ctx, x - 44, y - 14, 88, 28, 8)
+  }
   ctx.stroke()
 
-  const lamps = [
-    { on: color === 'red', col: '#ff5a5f' },
-    { on: color === 'yellow', col: '#ffd166' },
-    { on: color === 'green', col: '#2ec4b6' },
-  ] as const
+  const colors = { red: '#ff5a5f', yellow: '#ffd166', green: '#2ec4b6' }
 
-  lamps.forEach((lamp, i) => {
-    const cy = y - 17 + i * 17
-    ctx.beginPath()
-    ctx.fillStyle = lamp.on ? lamp.col : '#232b33'
-    ctx.arc(x, cy, 6.5, 0, Math.PI * 2)
+  // Left turn arrow (smaller, offset)
+  const leftX = vertical ? x : x - 30
+  const leftY = vertical ? y - 30 : y
+  ctx.beginPath()
+  ctx.fillStyle = leftColor === 'red' ? '#2a323c' : colors[leftColor]
+  ctx.arc(leftX, leftY, 5, 0, Math.PI * 2)
+  ctx.fill()
+  if (leftColor !== 'red') {
+    ctx.shadowColor = colors[leftColor]
+    ctx.shadowBlur = 10
     ctx.fill()
-    if (lamp.on) {
-      ctx.shadowColor = lamp.col
-      ctx.shadowBlur = 16
+    ctx.shadowBlur = 0
+  }
+  // Arrow indicator
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  ctx.font = 'bold 6px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('←', leftX, leftY + 2)
+
+  // Main lights
+  const mainLights = [
+    { color: 'red' as const, on: straightColor === 'red' },
+    { color: 'yellow' as const, on: straightColor === 'yellow' },
+    { color: 'green' as const, on: straightColor === 'green' },
+  ]
+
+  mainLights.forEach((light, i) => {
+    const lx = vertical ? x : x - 10 + i * 20
+    const ly = vertical ? y - 10 + i * 20 : y
+    ctx.beginPath()
+    ctx.fillStyle = light.on ? colors[light.color] : '#2a323c'
+    ctx.arc(lx, ly, 7, 0, Math.PI * 2)
+    ctx.fill()
+    if (light.on) {
+      ctx.shadowColor = colors[light.color]
+      ctx.shadowBlur = 14
       ctx.fill()
       ctx.shadowBlur = 0
-      // inner highlight
+      // Highlight
       ctx.beginPath()
       ctx.fillStyle = 'rgba(255,255,255,0.35)'
-      ctx.arc(x - 2, cy - 2, 2.2, 0, Math.PI * 2)
+      ctx.arc(lx - 2, ly - 2, 2.5, 0, Math.PI * 2)
       ctx.fill()
     }
   })
 }
 
-function drawLights(ctx: CanvasRenderingContext2D, phase: Phase) {
-  const ns = lightColor(phase, 'ns')
-  const ew = lightColor(phase, 'ew')
-  const half = (SIZE - ROAD) / 2
-  drawLight(ctx, half - 30, half - 12, ns)
-  drawLight(ctx, half + ROAD + 30, half + ROAD + 12, ns)
-  drawLight(ctx, half + ROAD + 12, half - 30, ew)
-  drawLight(ctx, half - 12, half + ROAD + 30, ew)
+function drawPedestrianSignal(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  signal: 'walk' | 'dont-walk' | 'flashing',
+  pressed: boolean,
+) {
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.4)'
+  ctx.shadowBlur = 8
+  ctx.shadowOffsetY = 3
+  ctx.fillStyle = '#0a0e13'
+  roundRect(ctx, x - 10, y - 10, 20, 20, 4)
+  ctx.fill()
+  ctx.restore()
+
+  ctx.strokeStyle = pressed ? 'rgba(240,162,2,0.6)' : 'rgba(244,239,230,0.1)'
+  ctx.lineWidth = pressed ? 2 : 1
+  roundRect(ctx, x - 10, y - 10, 20, 20, 4)
+  ctx.stroke()
+
+  if (signal === 'walk') {
+    ctx.fillStyle = '#2ec4b6'
+    ctx.font = '10px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('🚶', x, y + 4)
+  } else {
+    ctx.fillStyle = '#ff5a5f'
+    ctx.font = 'bold 10px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('✋', x, y + 4)
+  }
+
+  // Button indicator
+  if (pressed) {
+    ctx.beginPath()
+    ctx.fillStyle = '#f0a202'
+    ctx.arc(x + 12, y - 12, 4, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.shadowColor = '#f0a202'
+    ctx.shadowBlur = 8
+    ctx.fill()
+    ctx.shadowBlur = 0
+  }
 }
 
-function drawAgent(ctx: CanvasRenderingContext2D, agent: Agent, laneOffset: number) {
-  const { x, y, angle } = approachOrigin(agent.approach, agent.progress, laneOffset)
+function drawLights(ctx: CanvasRenderingContext2D, state: SimState) {
+  const half = (SIZE - ROAD) / 2
+  const { phase, crosswalkRequest } = state
+
+  // NS lights (vertical orientation)
+  const nsStraight = lightColor(phase, 'ns', 'straight')
+  const nsLeft = lightColor(phase, 'ns', 'left')
+  drawTrafficLight(ctx, half - 24, half - 16, nsStraight, nsLeft, true)
+  drawTrafficLight(ctx, half + ROAD + 24, half + ROAD + 16, nsStraight, nsLeft, true)
+
+  // EW lights (horizontal orientation)
+  const ewStraight = lightColor(phase, 'ew', 'straight')
+  const ewLeft = lightColor(phase, 'ew', 'left')
+  drawTrafficLight(ctx, half + ROAD + 16, half - 24, ewStraight, ewLeft, false)
+  drawTrafficLight(ctx, half - 16, half + ROAD + 24, ewStraight, ewLeft, false)
+
+  // Pedestrian signals
+  const nsPed = pedestrianSignal(phase, 'ns')
+  const ewPed = pedestrianSignal(phase, 'ew')
+  drawPedestrianSignal(ctx, half - 40, half - 40, nsPed, crosswalkRequest.ns)
+  drawPedestrianSignal(ctx, half + ROAD + 40, half + ROAD + 40, nsPed, crosswalkRequest.ns)
+  drawPedestrianSignal(ctx, half + ROAD + 40, half - 40, ewPed, crosswalkRequest.ew)
+  drawPedestrianSignal(ctx, half - 40, half + ROAD + 40, ewPed, crosswalkRequest.ew)
+}
+
+function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
+  const { x, y, angle } = approachOrigin(v.approach, v.progress, v.lane)
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate(angle)
 
-  // soft shadow
+  // Shadow
   ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.5)'
-  ctx.shadowBlur = 8
-  ctx.shadowOffsetY = 4
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'
+  ctx.shadowBlur = 6
+  ctx.shadowOffsetY = 3
 
-  if (agent.kind === 'pedestrian') {
-    const grad = ctx.createRadialGradient(-1.5, -1.5, 0.5, 0, 0, 6)
-    grad.addColorStop(0, agent.waiting ? '#ffe3a3' : '#ffffff')
-    grad.addColorStop(1, agent.waiting ? '#f0a202' : '#d9d0b4')
+  if (v.kind === 'truck') {
+    // Truck body
+    const grad = ctx.createLinearGradient(-20, -11, 20, 11)
+    grad.addColorStop(0, v.waiting ? '#b45309' : '#f59e0b')
+    grad.addColorStop(1, v.waiting ? '#7c2d12' : '#d97706')
     ctx.fillStyle = grad
-    ctx.beginPath()
-    ctx.arc(0, 0, 5.5, 0, Math.PI * 2)
-    ctx.fill()
-  } else if (agent.kind === 'truck') {
-    const grad = ctx.createLinearGradient(-18, -10, 18, 10)
-    grad.addColorStop(0, agent.waiting ? '#b45309' : '#f59e0b')
-    grad.addColorStop(1, agent.waiting ? '#7c2d12' : '#d97706')
-    ctx.fillStyle = grad
-    roundRect(ctx, -18, -10, 36, 20, 4)
+    roundRect(ctx, -20, -11, 40, 22, 4)
     ctx.fill()
     ctx.restore()
     ctx.save()
-    ctx.fillStyle = 'rgba(255,255,255,0.14)'
-    roundRect(ctx, -16, -8, 32, 4, 2)
+    // Cab
+    ctx.fillStyle = '#1f2937'
+    roundRect(ctx, 10, -9, 10, 18, 2)
     ctx.fill()
-    ctx.fillStyle = '#111827'
-    roundRect(ctx, 8, -7, 9, 14, 2)
+    // Windshield
+    ctx.fillStyle = 'rgba(147,197,253,0.4)'
+    roundRect(ctx, 12, -7, 6, 14, 1)
     ctx.fill()
   } else {
-    const grad = ctx.createLinearGradient(-12, -7, 12, 7)
-    grad.addColorStop(0, agent.waiting ? '#64748b' : '#7dd3fc')
-    grad.addColorStop(1, agent.waiting ? '#334155' : '#38bdf8')
+    // Car body
+    const grad = ctx.createLinearGradient(-14, -8, 14, 8)
+    grad.addColorStop(0, v.color)
+    grad.addColorStop(1, shadeColor(v.color, -20))
     ctx.fillStyle = grad
-    roundRect(ctx, -12, -7, 24, 14, 4)
+    roundRect(ctx, -14, -8, 28, 16, 4)
     ctx.fill()
     ctx.restore()
     ctx.save()
-    ctx.fillStyle = 'rgba(255,255,255,0.2)'
-    roundRect(ctx, -10, -5, 20, 3, 1.5)
+    // Roof
+    ctx.fillStyle = shadeColor(v.color, -30)
+    roundRect(ctx, -6, -6, 12, 12, 3)
     ctx.fill()
-    ctx.fillStyle = '#0b1220'
-    roundRect(ctx, 4, -4, 7, 8, 2)
+    // Windshield
+    ctx.fillStyle = 'rgba(147,197,253,0.35)'
+    roundRect(ctx, 4, -5, 5, 10, 1)
     ctx.fill()
   }
+
+  // Turn signal indicator
+  if (v.waiting && v.intent !== 'straight') {
+    ctx.fillStyle = v.intent === 'left' ? '#f0a202' : '#2ec4b6'
+    ctx.beginPath()
+    ctx.arc(v.intent === 'left' ? -10 : 10, 0, 3, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
   ctx.restore()
+}
+
+function shadeColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const amt = Math.round(2.55 * percent)
+  const R = Math.min(255, Math.max(0, (num >> 16) + amt))
+  const G = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amt))
+  const B = Math.min(255, Math.max(0, (num & 0xff) + amt))
+  return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`
+}
+
+function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian) {
+  const half = (SIZE - ROAD) / 2
+  let x: number, y: number
+
+  if (p.crossing) {
+    // Crossing the road
+    const t = p.progress
+    switch (p.approach) {
+      case 'north':
+        x = half + 30 + t * (ROAD - 60)
+        y = half - 12
+        break
+      case 'south':
+        x = half + 30 + t * (ROAD - 60)
+        y = half + ROAD + 12
+        break
+      case 'west':
+        x = half - 12
+        y = half + 30 + t * (ROAD - 60)
+        break
+      case 'east':
+        x = half + ROAD + 12
+        y = half + 30 + t * (ROAD - 60)
+        break
+    }
+  } else {
+    // Waiting at corner
+    switch (p.approach) {
+      case 'north':
+        x = half - 30
+        y = half - 30
+        break
+      case 'south':
+        x = half + ROAD + 30
+        y = half + ROAD + 30
+        break
+      case 'west':
+        x = half - 30
+        y = half + ROAD + 30
+        break
+      case 'east':
+        x = half + ROAD + 30
+        y = half - 30
+        break
+    }
+  }
+
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'
+  ctx.shadowBlur = 4
+  ctx.shadowOffsetY = 2
+
+  const grad = ctx.createRadialGradient(x - 1, y - 1, 0.5, x, y, 6)
+  grad.addColorStop(0, p.crossing ? '#fff' : '#f4efe6')
+  grad.addColorStop(1, p.crossing ? '#d9d0b4' : '#b8ae9a')
+  ctx.fillStyle = grad
+  ctx.beginPath()
+  ctx.arc(x, y, 5, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  // Waiting indicator
+  if (p.waiting) {
+    ctx.beginPath()
+    ctx.strokeStyle = 'rgba(240,162,2,0.6)'
+    ctx.lineWidth = 2
+    ctx.arc(x, y, 8, 0, Math.PI * 2)
+    ctx.stroke()
+  }
 }
 
 function paint(ctx: CanvasRenderingContext2D, state: SimState) {
   drawRoad(ctx)
-  drawLights(ctx, state.phase)
-  const laneCursor: Record<Approach, number> = { north: 0, south: 0, east: 0, west: 0 }
-  for (const agent of state.agents) {
-    const offsetIndex = laneCursor[agent.approach]
-    laneCursor[agent.approach] += 1
-    const laneOffset = (offsetIndex % 3) - 1
-    drawAgent(ctx, agent, agent.kind === 'pedestrian' ? laneOffset * 1.4 : laneOffset * 0.55)
+  drawLights(ctx, state)
+
+  // Draw vehicles sorted by approach for proper layering
+  const sorted = [...state.vehicles].sort((a, b) => a.progress - b.progress)
+  for (const v of sorted) {
+    drawVehicle(ctx, v)
   }
 
-  // center status plaque — glassy
+  // Draw pedestrians
+  for (const p of state.pedestrians) {
+    drawPedestrian(ctx, p)
+  }
+
+  // Center status
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.4)'
-  ctx.shadowBlur = 16
-  ctx.shadowOffsetY = 4
-  ctx.fillStyle = state.jamActive ? 'rgba(124,45,18,0.82)' : 'rgba(13,20,27,0.82)'
-  roundRect(ctx, CENTER - 78, CENTER - 17, 156, 34, 9)
+  ctx.shadowBlur = 12
+  ctx.shadowOffsetY = 3
+  ctx.fillStyle = state.jamActive
+    ? 'rgba(124,45,18,0.85)'
+    : state.pedestrianCrossing
+      ? 'rgba(30,64,60,0.85)'
+      : 'rgba(10,15,20,0.85)'
+  roundRect(ctx, CENTER - 70, CENTER - 16, 140, 32, 8)
   ctx.fill()
   ctx.restore()
-  ctx.strokeStyle = state.jamActive ? 'rgba(255,122,89,0.5)' : 'rgba(46,196,182,0.35)'
+
+  ctx.strokeStyle = state.jamActive
+    ? 'rgba(255,122,89,0.5)'
+    : state.pedestrianCrossing
+      ? 'rgba(46,196,182,0.5)'
+      : 'rgba(244,239,230,0.15)'
   ctx.lineWidth = 1
-  roundRect(ctx, CENTER - 78, CENTER - 17, 156, 34, 9)
+  roundRect(ctx, CENTER - 70, CENTER - 16, 140, 32, 8)
   ctx.stroke()
+
   ctx.fillStyle = '#f4efe6'
-  ctx.font = '600 12px "Instrument Sans", sans-serif'
+  ctx.font = '600 11px "Instrument Sans", sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText(state.jamActive ? 'JAM RESPONSE' : 'LIVE SIMULATION', CENTER, CENTER + 4)
+  const label = state.jamActive
+    ? 'JAM RESPONSE'
+    : state.pedestrianCrossing
+      ? 'PEDESTRIANS'
+      : 'LIVE'
+  ctx.fillText(label, CENTER, CENTER + 4)
 }
 
 type Props = {
