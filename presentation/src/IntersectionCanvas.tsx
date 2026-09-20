@@ -1,5 +1,14 @@
 import { useLayoutEffect, useRef } from 'react'
 import {
+  CENTER,
+  LANE_GAP,
+  LANE_W,
+  ROAD,
+  SIZE,
+  laneOffset,
+  vehiclePose,
+} from './intersectionGeometry'
+import {
   type Approach,
   type Pedestrian,
   type Vehicle,
@@ -7,169 +16,6 @@ import {
   pedestrianSignal,
   type SimState,
 } from './simulation'
-
-const SIZE = 800
-const CENTER = SIZE / 2
-const ROAD = 180
-const LANE_W = 28
-const LANE_GAP = 4
-
-type Lane = 'left' | 'straight' | 'right'
-
-type Vec = { x: number; y: number }
-
-function laneOffset(lane: Lane): number {
-  // Left-turn lane sits nearest the centre line (right-hand traffic).
-  if (lane === 'left') return LANE_W + LANE_GAP
-  if (lane === 'right') return -(LANE_W + LANE_GAP)
-  return 0
-}
-
-// Stop-line distance from the canvas edge for each approach.
-const STOP = CENTER - ROAD / 2 - 10 // 300
-// Spawn sits just off the canvas edge so progress≈0 is already readable
-// as a vehicle rolling onto the approach instead of 40px off-screen.
-const SPAWN_DIST = 8
-
-// Heading angles (canvas coords, y down): 0 = east, π/2 = south.
-const HEADING: Record<Approach, number> = {
-  west: 0,
-  north: Math.PI / 2,
-  east: Math.PI,
-  south: -Math.PI / 2,
-}
-
-// Exact departure heading per approach + intent (right-hand traffic), so a
-// vehicle tracks the centre of its exit lane after clearing the box instead
-// of drifting along the Bezier's terminal tangent.
-const EXIT_HEADING: Record<Approach, Record<'left' | 'straight' | 'right', number>> = {
-  north: { straight: Math.PI / 2, right: Math.PI, left: 0 },
-  south: { straight: -Math.PI / 2, right: 0, left: Math.PI },
-  west: { straight: 0, right: Math.PI / 2, left: -Math.PI / 2 },
-  east: { straight: Math.PI, right: -Math.PI / 2, left: Math.PI / 2 },
-}
-
-function laneBase(approach: Approach, lane: Lane): Vec {
-  // Right-hand traffic: the approach lane sits on the driver's right side.
-  const o = laneOffset(lane)
-  switch (approach) {
-    case 'north': return { x: CENTER - ROAD / 4 + o, y: 0 }
-    case 'south': return { x: CENTER + ROAD / 4 - o, y: 0 }
-    case 'west': return { x: 0, y: CENTER + ROAD / 4 - o }
-    case 'east': return { x: 0, y: CENTER - ROAD / 4 + o }
-  }
-}
-
-function stopPoint(approach: Approach, lane: Lane): Vec {
-  const base = laneBase(approach, lane)
-  switch (approach) {
-    case 'north': return { x: base.x, y: STOP }
-    case 'south': return { x: base.x, y: SIZE - STOP }
-    case 'west': return { x: STOP, y: base.y }
-    case 'east': return { x: SIZE - STOP, y: base.y }
-  }
-}
-
-function spawnPoint(approach: Approach, lane: Lane): Vec {
-  const base = laneBase(approach, lane)
-  switch (approach) {
-    case 'north': return { x: base.x, y: -SPAWN_DIST }
-    case 'south': return { x: base.x, y: SIZE + SPAWN_DIST }
-    case 'west': return { x: -SPAWN_DIST, y: base.y }
-    case 'east': return { x: SIZE + SPAWN_DIST, y: base.y }
-  }
-}
-
-// Where a vehicle exits after crossing, per intent (right-hand traffic).
-function exitPoint(approach: Approach, intent: 'left' | 'straight' | 'right', lane: Lane): Vec {
-  const o = laneOffset(lane)
-  const past = ROAD / 2 + 70
-  switch (approach) {
-    case 'north': // heading south
-      if (intent === 'straight') return { x: CENTER - ROAD / 4 + o, y: CENTER + past }
-      if (intent === 'right') return { x: CENTER - past, y: CENTER - ROAD / 4 + o } // westbound
-      return { x: CENTER + past, y: CENTER + ROAD / 4 - o } // left → eastbound
-    case 'south': // heading north
-      if (intent === 'straight') return { x: CENTER + ROAD / 4 - o, y: CENTER - past }
-      if (intent === 'right') return { x: CENTER + past, y: CENTER + ROAD / 4 - o } // eastbound
-      return { x: CENTER - past, y: CENTER - ROAD / 4 + o } // left → westbound
-    case 'west': // heading east
-      if (intent === 'straight') return { x: CENTER + past, y: CENTER + ROAD / 4 - o }
-      if (intent === 'right') return { x: CENTER + ROAD / 4 - o, y: CENTER + past } // southbound
-      return { x: CENTER - ROAD / 4 + o, y: CENTER - past } // left → northbound
-    case 'east': // heading west
-      if (intent === 'straight') return { x: CENTER - past, y: CENTER - ROAD / 4 + o }
-      if (intent === 'right') return { x: CENTER - ROAD / 4 + o, y: CENTER - past } // northbound
-      return { x: CENTER + ROAD / 4 - o, y: CENTER + past } // left → southbound
-  }
-}
-
-function bezier(p0: Vec, p1: Vec, p2: Vec, t: number): Vec {
-  const u = 1 - t
-  return {
-    x: u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x,
-    y: u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y,
-  }
-}
-
-function bezierDir(p0: Vec, p1: Vec, p2: Vec, t: number): Vec {
-  return {
-    x: 2 * (1 - t) * (p1.x - p0.x) + 2 * t * (p2.x - p1.x),
-    y: 2 * (1 - t) * (p1.y - p0.y) + 2 * t * (p2.y - p1.y),
-  }
-}
-
-function controlPoint(approach: Approach, intent: 'left' | 'straight' | 'right', p0: Vec): Vec {
-  const h = HEADING[approach]
-  const fwd = { x: Math.cos(h), y: Math.sin(h) }
-  if (intent === 'straight') {
-    return { x: p0.x + fwd.x * (ROAD / 2), y: p0.y + fwd.y * (ROAD / 2) }
-  }
-  if (intent === 'right') {
-    // tight corner
-    return { x: p0.x + fwd.x * 34, y: p0.y + fwd.y * 34 }
-  }
-  // left: sweep toward the middle of the box
-  return {
-    x: p0.x + fwd.x * (ROAD * 0.62),
-    y: p0.y + fwd.y * (ROAD * 0.62),
-  }
-}
-
-function vehiclePose(v: Vehicle): { x: number; y: number; angle: number } {
-  const p0 = stopPoint(v.approach, v.lane)
-  const sp = spawnPoint(v.approach, v.lane)
-  const heading = HEADING[v.approach]
-
-  if (v.progress <= 1) {
-    // Negative progress extends backward past the spawn point so queued
-    // arrivals stay on the correct heading instead of stacking at the edge.
-    const t = v.progress
-    return {
-      x: sp.x + (p0.x - sp.x) * t,
-      y: sp.y + (p0.y - sp.y) * t,
-      angle: heading,
-    }
-  }
-
-  const p2 = exitPoint(v.approach, v.intent, v.lane)
-  const p1 = controlPoint(v.approach, v.intent, p0)
-  const t = Math.min(v.progress - 1, 1)
-  const pos = bezier(p0, p1, p2, t)
-  const dir = bezierDir(p0, p1, p2, t)
-  let angle = Math.atan2(dir.y, dir.x)
-
-  if (v.progress > 2) {
-    // continue straight along the exit lane's exact heading
-    const exitHeading = EXIT_HEADING[v.approach][v.intent]
-    const extra = (v.progress - 2) * 230
-    pos.x = p2.x + Math.cos(exitHeading) * extra
-    pos.y = p2.y + Math.sin(exitHeading) * extra
-    angle = exitHeading
-  }
-
-  return { x: pos.x, y: pos.y, angle }
-}
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -550,8 +396,7 @@ function drawLights(ctx: CanvasRenderingContext2D, state: SimState) {
   drawTrafficLight(ctx, half - 16, half + ROAD + 24, ewStraight, ewLeft, false)
 
   // Pedestrian signals sit at the corner where those pedestrians wait.
-  // North/south walkers cross the NS roadway with EW traffic; east/west
-  // walkers cross the EW roadway with NS traffic.
+  // Walk is exclusive to the dedicated all-red pedestrian phase.
   const nsPed = pedestrianSignal(phase, 'ns')
   const ewPed = pedestrianSignal(phase, 'ew')
   drawPedestrianSignal(ctx, half - 40, half - 40, ewPed, crosswalkRequest.ew)
@@ -628,55 +473,61 @@ function shadeColor(hex: string, percent: number): string {
   return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`
 }
 
-function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian) {
+function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian, slot: number) {
   const half = (SIZE - ROAD) / 2
   let x = 0
   let y = 0
-  const slot = p.id % 8
-  const spread = (slot % 4) * 9
-  const row = Math.floor(slot / 4) * 11
-  const lane = (p.id % 3) - 1
+  const col = slot % 4
+  const row = Math.floor(slot / 4)
+  const dx = 14
+  const dy = 14
+  const curb = 18
+  const zebraLane = ((slot % 3) - 1) * 4
+  // Tiny per-person jitter so a corner queue reads as a crowd, not a grid.
+  const jx = ((p.id * 13) % 7) - 3
+  const jy = ((p.id * 29) % 7) - 3
 
   if (p.crossing) {
-    // Crossing the road along the painted zebra band; offset so a group
-    // doesn't occupy a single pixel.
-    const t = p.progress
+    // Walk the painted zebra from the waiting curb to the far curb — never
+    // through the centre of the box.
+    const t = Math.min(Math.max(p.progress, 0), 1)
     switch (p.approach) {
-      case 'north':
-        x = half + 30 + t * (ROAD - 60)
-        y = half + 10 + lane * 5
+      case 'north': // NW → east along the north zebra
+        x = half + 12 + t * (ROAD - 24)
+        y = half + 10 + zebraLane
         break
-      case 'south':
-        x = half + 30 + t * (ROAD - 60)
-        y = half + ROAD - 10 + lane * 5
+      case 'south': // SE → west along the south zebra
+        x = half + ROAD - 12 - t * (ROAD - 24)
+        y = half + ROAD - 10 + zebraLane
         break
-      case 'west':
-        x = half + 10 + lane * 5
-        y = half + 30 + t * (ROAD - 60)
+      case 'west': // SW → north along the west zebra
+        x = half + 10 + zebraLane
+        y = half + ROAD - 12 - t * (ROAD - 24)
         break
-      case 'east':
-        x = half + ROAD - 10 + lane * 5
-        y = half + 30 + t * (ROAD - 60)
+      case 'east': // NE → south along the east zebra
+        x = half + ROAD - 10 + zebraLane
+        y = half + 12 + t * (ROAD - 24)
         break
     }
   } else {
-    // Waiting on the sidewalk, fanned out from the inner corner.
+    // Waiting on the sidewalk at the inner corner, stacked in a 4-wide grid
+    // so a group of 4–8 reads as a cluster instead of a single blob.
     switch (p.approach) {
-      case 'north':
-        x = half - 22 - spread
-        y = half - 22 - row
+      case 'north': // NW sidewalk
+        x = half - curb - col * dx + jx
+        y = half - curb - row * dy + jy
         break
-      case 'south':
-        x = half + ROAD + 22 + spread
-        y = half + ROAD + 22 + row
+      case 'south': // SE sidewalk
+        x = half + ROAD + curb + col * dx + jx
+        y = half + ROAD + curb + row * dy + jy
         break
-      case 'west':
-        x = half - 22 - spread
-        y = half + ROAD + 22 + row
+      case 'west': // SW sidewalk
+        x = half - curb - col * dx + jx
+        y = half + ROAD + curb + row * dy + jy
         break
-      case 'east':
-        x = half + ROAD + 22 + spread
-        y = half - 22 - row
+      case 'east': // NE sidewalk
+        x = half + ROAD + curb + col * dx + jx
+        y = half - curb - row * dy + jy
         break
     }
   }
@@ -720,9 +571,12 @@ function paint(ctx: CanvasRenderingContext2D, state: SimState) {
     drawVehicle(ctx, v)
   }
 
-  // Draw pedestrians
+  // Draw pedestrians — slot by approach so waiting clusters don't overlap.
+  const waitSlot: Record<Approach, number> = { north: 0, south: 0, east: 0, west: 0 }
+  const walkSlot: Record<Approach, number> = { north: 0, south: 0, east: 0, west: 0 }
   for (const p of state.pedestrians) {
-    drawPedestrian(ctx, p)
+    const slot = p.crossing ? walkSlot[p.approach]++ : waitSlot[p.approach]++
+    drawPedestrian(ctx, p, slot)
   }
 
   // Center status

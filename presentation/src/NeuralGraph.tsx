@@ -5,7 +5,7 @@ type Props = {
   thought: DecisionThought
 }
 
-type Node = {
+export type GraphNode = {
   id: string
   layer: number
   x: number
@@ -15,8 +15,8 @@ type Node = {
 }
 
 type Edge = {
-  from: Node
-  to: Node
+  from: GraphNode
+  to: GraphNode
   weight: number
 }
 
@@ -28,39 +28,56 @@ const LAYERS = [
   { id: 'output', label: 'Forecast', count: 1, x: 0.88 },
 ]
 
-function buildGraph(thought: DecisionThought): { nodes: Node[]; edges: Edge[] } {
-  const nodes: Node[] = []
-  const intensity = thought.intensity
+function patterned(i: number, layer: number, intensity: number, gateOpen: number): number {
+  const wave = 0.5 + 0.5 * Math.sin(i * 1.41 + layer * 0.73 + intensity * 3.7)
+  const jam = intensity * (0.42 + 0.5 * wave) * (0.5 + 0.5 * gateOpen)
+  // A few nodes keep a residual under calm so the tree isn't dead.
+  const residual = wave > 0.55 ? 0.22 * (1 - intensity * 0.5) : 0.08 * (1 - intensity)
+  return jam + residual
+}
 
-  // Input layer — queue pressure per approach
+function fromTrace(
+  raw: number,
+  i: number,
+  layer: number,
+  scale: number,
+  intensity: number,
+  gateOpen: number,
+): number {
+  const traced = Math.min(1, Math.abs(raw) * scale)
+  return Math.max(0, Math.min(1, traced * 0.4 + patterned(i, layer, intensity, gateOpen)))
+}
+
+export function buildGraph(thought: DecisionThought): { nodes: GraphNode[]; edges: Edge[] } {
+  const nodes: GraphNode[] = []
+  const intensity = thought.intensity
+  const gateOpen = (thought.gates.i + thought.gates.f + thought.gates.o) / 3
+
   const inputActs = [
-    thought.congestedQueue / 30,
-    intensity * 0.8,
-    intensity * 0.6,
-    intensity * 0.4,
-    intensity * 0.3,
-    intensity * 0.2,
+    Math.min(1, thought.congestedQueue / 18 + intensity * 0.25),
+    intensity * 0.95 + 0.12,
+    intensity * 0.85 + 0.1,
+    intensity * 0.7 + 0.08,
+    intensity * 0.55 + 0.08,
+    intensity * 0.4 + 0.06,
   ]
+
   LAYERS.forEach((layer, li) => {
     for (let i = 0; i < layer.count; i += 1) {
       let activation = 0
       if (li === 0) {
-        activation = inputActs[i] ?? 0
+        activation = inputActs[i] ?? patterned(i, 0, intensity, gateOpen)
       } else if (li === 1) {
-        // LSTM-1: blend of input + gate opening
         const gateAvg = (thought.gates.i + thought.gates.f) / 2
-        activation = Math.sin(i * 1.3 + intensity * 5) * 0.3 + gateAvg * 0.7
+        activation = patterned(i, 1, intensity, gateOpen) * 0.65 + gateAvg * 0.45
       } else if (li === 2) {
-        // LSTM-2: use real neuron data
-        const n = thought.neurons[i % thought.neurons.length] ?? 0
-        activation = Math.abs(n)
+        const n = thought.neurons[i % Math.max(1, thought.neurons.length)] ?? 0
+        activation = fromTrace(n, i, 2, 4, intensity, gateOpen)
       } else if (li === 3) {
-        // Dense
-        const d = thought.dense[i % thought.dense.length] ?? 0
-        activation = Math.max(0, d)
+        const d = thought.dense[i % Math.max(1, thought.dense.length)] ?? 0
+        activation = fromTrace(d, i, 3, 2.2, intensity, gateOpen)
       } else {
-        // Output
-        activation = intensity
+        activation = Math.max(0.22, Math.min(1, intensity * 0.85 + 0.22))
       }
       const ySpread = 0.72
       const yStart = 0.14
@@ -76,16 +93,18 @@ function buildGraph(thought: DecisionThought): { nodes: Node[]; edges: Edge[] } 
     }
   })
 
-  // Edges between adjacent layers
+  // Edges between adjacent layers. Geometric mean + jam boost keeps later
+  // hops above the pulse threshold (weight > 0.25) when congestion is high.
   const edges: Edge[] = []
+  const weightBoost = 0.22 + intensity * 0.4
   for (let li = 0; li < LAYERS.length - 1; li += 1) {
     const fromNodes = nodes.filter((n) => n.layer === li)
     const toNodes = nodes.filter((n) => n.layer === li + 1)
     for (const from of fromNodes) {
       for (const to of toNodes) {
-        // Weight: product of activations + deterministic pseudo-random
         const seed = Math.sin(from.x * 100 + to.y * 200) * 0.5 + 0.5
-        const weight = from.activation * to.activation * (0.3 + seed * 0.7)
+        const coupled = Math.sqrt(from.activation * to.activation)
+        const weight = Math.min(1, coupled * (0.5 + seed * 0.5) + weightBoost * coupled)
         edges.push({ from, to, weight })
       }
     }

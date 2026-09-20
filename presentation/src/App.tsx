@@ -40,14 +40,14 @@ export default function App() {
   const [slideIndex, setSlideIndex] = useState(0)
   const [cars, setCars] = useState(8)
   const [trucks, setTrucks] = useState(3)
-  const [pedestrians, setPedestrians] = useState(5)
+  const [pedestrians, setPedestrians] = useState(12)
   const [jamApproach, setJamApproach] = useState<Approach>('east')
   const [adaptive, setAdaptive] = useState(true)
   const [running, setRunning] = useState(true)
   const [lastAction, setLastAction] = useState('Ready — randomize traffic or force a jam.')
   const [traces, setTraces] = useState<NeuronTraceFile | null>(null)
   const [state, setState] = useState<SimState>(() =>
-    spawnAgents(createInitialState(true), { cars: 12, trucks: 3, pedestrians: 6 }),
+    spawnAgents(createInitialState(true), { cars: 12, trucks: 3, pedestrians: 12 }),
   )
   const lastTs = useRef<number | null>(null)
   const seededLive = useRef(false)
@@ -307,7 +307,7 @@ export default function App() {
               <input
                 type="range"
                 min={0}
-                max={20}
+                max={24}
                 value={pedestrians}
                 onChange={(e) => setPedestrians(Number(e.target.value))}
               />
@@ -315,10 +315,10 @@ export default function App() {
                 className="count-box"
                 type="number"
                 min={0}
-                max={20}
+                max={24}
                 value={pedestrians}
                 onChange={(e) =>
-                  setPedestrians(Math.max(0, Math.min(20, Number(e.target.value) || 0)))
+                  setPedestrians(Math.max(0, Math.min(24, Number(e.target.value) || 0)))
                 }
               />
             </label>

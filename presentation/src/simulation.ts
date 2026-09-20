@@ -36,6 +36,8 @@ export type Pedestrian = {
   crossing: boolean
   waiting: boolean
   done: boolean
+  /** Seconds spent waiting at the curb. Used to auto-press the button. */
+  waitTime: number
 }
 
 export type CrosswalkRequest = {
@@ -78,6 +80,21 @@ const MAX_GREEN = 16
 const MIN_LEFT_GREEN = 3
 const MAX_LEFT_GREEN = 8
 const PEDESTRIAN_TIME = 5
+/** Seconds a waiting pedestrian stands at the curb before auto-pressing. */
+const PED_AUTO_PRESS_WAIT = 4.5
+/** Hard barrier at the stop line for vehicles that may not enter the box. */
+export const STOP_LINE = 0.97
+/** Progress range that occupies the intersection box (after the stop line, before the exit). */
+export const BOX_PROGRESS = { enter: 1, exit: 2 } as const
+
+export function vehicleOccupiesBox(v: Vehicle): boolean {
+  return v.progress > BOX_PROGRESS.enter && v.progress < BOX_PROGRESS.exit
+}
+
+export function pedestrianInCrosswalk(p: Pedestrian): boolean {
+  return p.crossing && p.progress < 1
+}
+
 /** Follow / spawn gaps in progress units — sized to car (~0.09) and truck (~0.13) drawing length. */
 const CAR_GAP = 0.10
 const TRUCK_GAP = 0.135
@@ -149,7 +166,7 @@ export function randomSpawnCounts(rng: () => number = Math.random): SpawnConfig 
   return {
     cars: 10 + Math.floor(rng() * 8),
     trucks: 2 + Math.floor(rng() * 4),
-    pedestrians: 4 + Math.floor(rng() * 5),
+    pedestrians: 8 + Math.floor(rng() * 8),
   }
 }
 
@@ -209,6 +226,7 @@ export function spawnAgents(
       crossing: false,
       waiting: true,
       done: false,
+      waitTime: 0,
     })
   }
 
@@ -331,23 +349,10 @@ function nextPhase(state: SimState): Pick<
     nextAxis,
   } = state
 
-  // A pedestrian request diverts the upcoming axis change into an all-walk
-  // phase. nextAxis already points at the axis that did NOT just have green,
-  // so service resumes on the correct side afterwards.
+  // A pedestrian request is honoured on all-red so the box can clear before
+  // walkers enter the zebra. nextAxis already points at the axis that did
+  // NOT just have green, so service resumes on the correct side afterwards.
   const wantsPedestrian = crosswalkRequest.ns || crosswalkRequest.ew
-  if (wantsPedestrian && phase !== 'pedestrian-crossing' && (phase === 'ns-yellow' || phase === 'ew-yellow')) {
-    return {
-      phase: 'pedestrian-crossing',
-      phaseTimer: PEDESTRIAN_TIME,
-      nsGreen,
-      ewGreen,
-      nsLeftGreen,
-      ewLeftGreen,
-      pedestrianCrossing: true,
-      crosswalkRequest: { ns: false, ew: false },
-      nextAxis,
-    }
-  }
 
   const greenFor = (axis: 'ns' | 'ew'): number => {
     if (!adaptive) return axis === 'ns' ? nsGreen : ewGreen
@@ -444,20 +449,30 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   let nextAxis = state.nextAxis
 
   if (phaseTimer <= 0) {
-    const nxt = nextPhase(state)
-    phase = nxt.phase
-    phaseTimer = nxt.phaseTimer
-    nsGreen = nxt.nsGreen
-    ewGreen = nxt.ewGreen
-    nsLeftGreen = nxt.nsLeftGreen
-    ewLeftGreen = nxt.ewLeftGreen
-    pedestrianCrossing = nxt.pedestrianCrossing
-    crosswalkRequest = nxt.crosswalkRequest
-    nextAxis = nxt.nextAxis
+    const wantsPed = state.crosswalkRequest.ns || state.crosswalkRequest.ew
+    const boxBusy = state.vehicles.some(vehicleOccupiesBox)
+    const pedsInRoad = state.pedestrians.some(pedestrianInCrosswalk)
+    // Walk never starts while a vehicle is still in the box, and never ends
+    // while a pedestrian is still on the zebra.
+    if (phase === 'all-red' && wantsPed && boxBusy) {
+      phaseTimer = ALL_RED
+    } else if (phase === 'pedestrian-crossing' && pedsInRoad) {
+      phaseTimer = 0.4
+    } else {
+      const nxt = nextPhase(state)
+      phase = nxt.phase
+      phaseTimer = nxt.phaseTimer
+      nsGreen = nxt.nsGreen
+      ewGreen = nxt.ewGreen
+      nsLeftGreen = nxt.nsLeftGreen
+      ewLeftGreen = nxt.ewLeftGreen
+      pedestrianCrossing = nxt.pedestrianCrossing
+      crosswalkRequest = nxt.crosswalkRequest
+      nextAxis = nxt.nextAxis
+    }
   }
 
   // Move vehicles — hard stop line on red, queue behind the car ahead
-  const STOP_LINE = 0.97
   const vehicles: Vehicle[] = []
   for (const raw of state.vehicles) {
     const v = { ...raw }
@@ -480,11 +495,14 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     const turnSlowdown = v.intent === 'left' && v.progress > 1 ? 0.7 : 1
     let newProgress = v.progress + v.speed * dt * turnSlowdown
 
-    // Red light: the stop line is a hard barrier until the phase allows this
-    // movement. Vehicles already past the line keep clearing the box — never
-    // clamp them backward onto the queue behind.
-    if (!v.crossed && !canProceed && v.progress <= STOP_LINE && newProgress > STOP_LINE) {
-      newProgress = STOP_LINE
+    // Red / walk / all-red: nobody who has not yet entered the box may roll
+    // past the stop line. Vehicles already in the box keep clearing.
+    if (!v.crossed && !canProceed && v.progress < BOX_PROGRESS.enter) {
+      if (v.progress <= STOP_LINE) {
+        if (newProgress > STOP_LINE) newProgress = STOP_LINE
+      } else {
+        newProgress = v.progress
+      }
     }
 
     // Car following: never close past the bumper of the vehicle ahead
@@ -509,20 +527,15 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     }
   }
 
-  // Move pedestrians — they cross during the dedicated walk phase or with
-  // their parallel traffic's green, like a normal intersection.
+  // Move pedestrians — they ONLY enter the zebra during the dedicated
+  // all-vehicle-red walk. During every other phase they wait at the corners
+  // and accumulate so a cluster is visible before the walk fires.
   const pedestrians: Pedestrian[] = []
   let autoRequestNS = false
   let autoRequestEW = false
   for (const raw of state.pedestrians) {
     const p = { ...raw }
-    // Pedestrians at the north/south corners cross the vertical road, walking
-    // parallel to EW traffic; east/west corners walk parallel to NS traffic.
-    const parallelGreen =
-      p.approach === 'north' || p.approach === 'south'
-        ? phase === 'ew-green'
-        : phase === 'ns-green'
-    if (p.waiting && (pedestrianCrossing || parallelGreen)) {
+    if (p.waiting && pedestrianCrossing) {
       p.crossing = true
       p.waiting = false
     }
@@ -535,11 +548,14 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
         p.done = true
       }
     }
-    // A waiting pedestrian eventually presses the button — kept rare so the
-    // all-walk phase stays an event rather than running every cycle.
-    if (p.waiting && state.tick > 0 && state.tick % 600 === 0) {
-      if (p.approach === 'north' || p.approach === 'south') autoRequestEW = true
-      else autoRequestNS = true
+    // Auto-press after a few seconds of waiting. Never on tick 0 so the
+    // opening frame shows a cluster rather than an instant walk.
+    if (p.waiting) {
+      p.waitTime = (p.waitTime ?? 0) + dt
+      if (state.tick > 0 && p.waitTime >= PED_AUTO_PRESS_WAIT) {
+        if (p.approach === 'north' || p.approach === 'south') autoRequestEW = true
+        else autoRequestNS = true
+      }
     }
     if (!p.done || p.progress < 1.2) {
       pedestrians.push(p)
@@ -586,8 +602,8 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     }
   }
 
-  // Steady pedestrian arrivals — a living sidewalk, not a flash mob.
-  if (rng() < 0.006 * dt * 60) {
+  // Ambient arrivals high enough that a waiting cluster rebuilds between walks.
+  if (rng() < 0.016 * dt * 60) {
     pedestrians.push({
       id: nextId++,
       approach: randomApproach(rng),
@@ -595,6 +611,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
       crossing: false,
       waiting: true,
       done: false,
+      waitTime: 0,
     })
   }
 
@@ -664,10 +681,7 @@ export function lightColor(phase: Phase, axis: 'ns' | 'ew', lane: 'straight' | '
   return 'red'
 }
 
-export function pedestrianSignal(phase: Phase, axis: 'ns' | 'ew'): 'walk' | 'dont-walk' | 'flashing' {
+export function pedestrianSignal(phase: Phase, _axis: 'ns' | 'ew'): 'walk' | 'dont-walk' | 'flashing' {
   if (phase === 'pedestrian-crossing') return 'walk'
-  // Pedestrians can walk parallel to green traffic
-  if (axis === 'ns' && phase === 'ns-green') return 'walk'
-  if (axis === 'ew' && phase === 'ew-green') return 'walk'
   return 'dont-walk'
 }
