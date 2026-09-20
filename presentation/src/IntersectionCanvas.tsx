@@ -27,7 +27,9 @@ function laneOffset(lane: Lane): number {
 
 // Stop-line distance from the canvas edge for each approach.
 const STOP = CENTER - ROAD / 2 - 10 // 300
-const SPAWN_DIST = 40 // how far off-screen vehicles appear
+// Spawn sits just off the canvas edge so progress≈0 is already readable
+// as a vehicle rolling onto the approach instead of 40px off-screen.
+const SPAWN_DIST = 8
 
 // Heading angles (canvas coords, y down): 0 = east, π/2 = south.
 const HEADING: Record<Approach, number> = {
@@ -35,6 +37,16 @@ const HEADING: Record<Approach, number> = {
   north: Math.PI / 2,
   east: Math.PI,
   south: -Math.PI / 2,
+}
+
+// Exact departure heading per approach + intent (right-hand traffic), so a
+// vehicle tracks the centre of its exit lane after clearing the box instead
+// of drifting along the Bezier's terminal tangent.
+const EXIT_HEADING: Record<Approach, Record<'left' | 'straight' | 'right', number>> = {
+  north: { straight: Math.PI / 2, right: Math.PI, left: 0 },
+  south: { straight: -Math.PI / 2, right: 0, left: Math.PI },
+  west: { straight: 0, right: Math.PI / 2, left: -Math.PI / 2 },
+  east: { straight: Math.PI, right: -Math.PI / 2, left: Math.PI / 2 },
 }
 
 function laneBase(approach: Approach, lane: Lane): Vec {
@@ -130,7 +142,9 @@ function vehiclePose(v: Vehicle): { x: number; y: number; angle: number } {
   const heading = HEADING[v.approach]
 
   if (v.progress <= 1) {
-    const t = Math.max(0, v.progress)
+    // Negative progress extends backward past the spawn point so queued
+    // arrivals stay on the correct heading instead of stacking at the edge.
+    const t = v.progress
     return {
       x: sp.x + (p0.x - sp.x) * t,
       y: sp.y + (p0.y - sp.y) * t,
@@ -146,8 +160,8 @@ function vehiclePose(v: Vehicle): { x: number; y: number; angle: number } {
   let angle = Math.atan2(dir.y, dir.x)
 
   if (v.progress > 2) {
-    // continue straight along the exit heading
-    const exitHeading = Math.atan2(p2.y - p1.y, p2.x - p1.x)
+    // continue straight along the exit lane's exact heading
+    const exitHeading = EXIT_HEADING[v.approach][v.intent]
     const extra = (v.progress - 2) * 230
     pos.x = p2.x + Math.cos(exitHeading) * extra
     pos.y = p2.y + Math.sin(exitHeading) * extra
@@ -249,16 +263,19 @@ function drawRoad(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = '#1e2933'
   ctx.fillRect(half, half, ROAD, ROAD)
 
-  // Lane markings — 3 lanes each direction
+  // Lane markings — dashed separators BETWEEN the three lanes of each
+  // carriageway. Vehicles drive centered in their lane, so markings must
+  // run in the gaps, never under the vehicles.
+  const SEP = LANE_W / 2 + LANE_GAP / 2 // midpoint between adjacent lane centers
   ctx.strokeStyle = 'rgba(232,224,200,0.45)'
   ctx.lineWidth = 2
   ctx.setLineDash([16, 14])
 
-  // Vertical road lanes
+  // Vertical road lane separators
   for (const dir of [-1, 1]) {
     const baseX = CENTER + dir * (ROAD / 4)
-    for (const laneOff of [-LANE_W - LANE_GAP, 0, LANE_W + LANE_GAP]) {
-      const x = baseX + laneOff
+    for (const off of [-SEP, SEP]) {
+      const x = baseX + off
       ctx.beginPath()
       ctx.moveTo(x, 0)
       ctx.lineTo(x, half)
@@ -268,11 +285,11 @@ function drawRoad(ctx: CanvasRenderingContext2D) {
     }
   }
 
-  // Horizontal road lanes
+  // Horizontal road lane separators
   for (const dir of [-1, 1]) {
     const baseY = CENTER + dir * (ROAD / 4)
-    for (const laneOff of [-LANE_W - LANE_GAP, 0, LANE_W + LANE_GAP]) {
-      const y = baseY + laneOff
+    for (const off of [-SEP, SEP]) {
+      const y = baseY + off
       ctx.beginPath()
       ctx.moveTo(0, y)
       ctx.lineTo(half, y)
@@ -356,26 +373,27 @@ function drawRoad(ctx: CanvasRenderingContext2D) {
   ctx.lineTo(SIZE, CENTER + 2)
   ctx.stroke()
 
-  // Crosswalks — zebra stripes
+  // Crosswalks — zebra stripes on the intersection side of the stop line,
+  // so stopped vehicles never stand on the zebra.
   ctx.fillStyle = 'rgba(244,239,230,0.75)'
   const cwStripe = 8
   const cwGap = 6
 
   // North crosswalk
   for (let i = 0; i < 8; i++) {
-    ctx.fillRect(half + 10 + i * (cwStripe + cwGap), half - 20, cwStripe, 16)
+    ctx.fillRect(half + 10 + i * (cwStripe + cwGap), half + 2, cwStripe, 16)
   }
   // South crosswalk
   for (let i = 0; i < 8; i++) {
-    ctx.fillRect(half + 10 + i * (cwStripe + cwGap), half + ROAD + 4, cwStripe, 16)
+    ctx.fillRect(half + 10 + i * (cwStripe + cwGap), half + ROAD - 18, cwStripe, 16)
   }
   // West crosswalk
   for (let i = 0; i < 8; i++) {
-    ctx.fillRect(half - 20, half + 10 + i * (cwStripe + cwGap), 16, cwStripe)
+    ctx.fillRect(half + 2, half + 10 + i * (cwStripe + cwGap), 16, cwStripe)
   }
   // East crosswalk
   for (let i = 0; i < 8; i++) {
-    ctx.fillRect(half + ROAD + 4, half + 10 + i * (cwStripe + cwGap), 16, cwStripe)
+    ctx.fillRect(half + ROAD - 18, half + 10 + i * (cwStripe + cwGap), 16, cwStripe)
   }
 
   // Stop lines
@@ -531,13 +549,15 @@ function drawLights(ctx: CanvasRenderingContext2D, state: SimState) {
   drawTrafficLight(ctx, half + ROAD + 16, half - 24, ewStraight, ewLeft, false)
   drawTrafficLight(ctx, half - 16, half + ROAD + 24, ewStraight, ewLeft, false)
 
-  // Pedestrian signals
+  // Pedestrian signals sit at the corner where those pedestrians wait.
+  // North/south walkers cross the NS roadway with EW traffic; east/west
+  // walkers cross the EW roadway with NS traffic.
   const nsPed = pedestrianSignal(phase, 'ns')
   const ewPed = pedestrianSignal(phase, 'ew')
-  drawPedestrianSignal(ctx, half - 40, half - 40, nsPed, crosswalkRequest.ns)
-  drawPedestrianSignal(ctx, half + ROAD + 40, half + ROAD + 40, nsPed, crosswalkRequest.ns)
-  drawPedestrianSignal(ctx, half + ROAD + 40, half - 40, ewPed, crosswalkRequest.ew)
-  drawPedestrianSignal(ctx, half - 40, half + ROAD + 40, ewPed, crosswalkRequest.ew)
+  drawPedestrianSignal(ctx, half - 40, half - 40, ewPed, crosswalkRequest.ew)
+  drawPedestrianSignal(ctx, half + ROAD + 40, half + ROAD + 40, ewPed, crosswalkRequest.ew)
+  drawPedestrianSignal(ctx, half + ROAD + 40, half - 40, nsPed, crosswalkRequest.ns)
+  drawPedestrianSignal(ctx, half - 40, half + ROAD + 40, nsPed, crosswalkRequest.ns)
 }
 
 function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
@@ -560,6 +580,9 @@ function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
     ctx.fillStyle = grad
     roundRect(ctx, -20, -11, 40, 22, 4)
     ctx.fill()
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)'
+    ctx.lineWidth = 1.2
+    ctx.stroke()
     ctx.restore()
     ctx.save()
     // Cab
@@ -578,6 +601,9 @@ function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle) {
     ctx.fillStyle = grad
     roundRect(ctx, -14, -8, 28, 16, 4)
     ctx.fill()
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'
+    ctx.lineWidth = 1.1
+    ctx.stroke()
     ctx.restore()
     ctx.save()
     // Roof
@@ -612,47 +638,53 @@ function shadeColor(hex: string, percent: number): string {
 
 function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian) {
   const half = (SIZE - ROAD) / 2
-  let x: number, y: number
+  let x = 0
+  let y = 0
+  const slot = p.id % 8
+  const spread = (slot % 4) * 9
+  const row = Math.floor(slot / 4) * 11
+  const lane = (p.id % 3) - 1
 
   if (p.crossing) {
-    // Crossing the road
+    // Crossing the road along the painted zebra band; offset so a group
+    // doesn't occupy a single pixel.
     const t = p.progress
     switch (p.approach) {
       case 'north':
         x = half + 30 + t * (ROAD - 60)
-        y = half - 12
+        y = half + 10 + lane * 5
         break
       case 'south':
         x = half + 30 + t * (ROAD - 60)
-        y = half + ROAD + 12
+        y = half + ROAD - 10 + lane * 5
         break
       case 'west':
-        x = half - 12
+        x = half + 10 + lane * 5
         y = half + 30 + t * (ROAD - 60)
         break
       case 'east':
-        x = half + ROAD + 12
+        x = half + ROAD - 10 + lane * 5
         y = half + 30 + t * (ROAD - 60)
         break
     }
   } else {
-    // Waiting at corner
+    // Waiting on the sidewalk, fanned out from the inner corner.
     switch (p.approach) {
       case 'north':
-        x = half - 30
-        y = half - 30
+        x = half - 22 - spread
+        y = half - 22 - row
         break
       case 'south':
-        x = half + ROAD + 30
-        y = half + ROAD + 30
+        x = half + ROAD + 22 + spread
+        y = half + ROAD + 22 + row
         break
       case 'west':
-        x = half - 30
-        y = half + ROAD + 30
+        x = half - 22 - spread
+        y = half + ROAD + 22 + row
         break
       case 'east':
-        x = half + ROAD + 30
-        y = half - 30
+        x = half + ROAD + 22 + spread
+        y = half - 22 - row
         break
     }
   }
@@ -667,8 +699,11 @@ function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian) {
   grad.addColorStop(1, p.crossing ? '#d9d0b4' : '#b8ae9a')
   ctx.fillStyle = grad
   ctx.beginPath()
-  ctx.arc(x, y, 5, 0, Math.PI * 2)
+  ctx.arc(x, y, 6, 0, Math.PI * 2)
   ctx.fill()
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'
+  ctx.lineWidth = 1
+  ctx.stroke()
   ctx.restore()
 
   // Waiting indicator

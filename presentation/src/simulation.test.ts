@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createInitialState,
   lightColor,
+  pressCrosswalkButton,
   stepSimulation,
   type SimState,
   type Vehicle,
@@ -111,3 +112,66 @@ describe('traffic light rules', () => {
     }
   })
 })
+
+function expirePhase(state: SimState): SimState {
+  return stepSimulation({ ...state, phaseTimer: 0.01 }, 0.05, () => 0.99)
+}
+
+describe('signal axis alternation', () => {
+  it('alternates NS → EW → NS instead of locking onto one axis', () => {
+    let state = createInitialState(false)
+    expect(state.phase).toBe('ns-green')
+    expect(state.nextAxis).toBe('ew')
+
+    state = expirePhase(state)
+    expect(state.phase).toBe('ns-yellow')
+    expect(state.nextAxis).toBe('ew')
+
+    state = expirePhase(state)
+    expect(state.phase).toBe('all-red')
+    expect(state.nextAxis).toBe('ew')
+
+    state = expirePhase(state)
+    expect(state.phase).toBe('ew-green')
+    expect(state.nextAxis).toBe('ns')
+
+    state = expirePhase(state)
+    expect(state.phase).toBe('ew-yellow')
+    expect(state.nextAxis).toBe('ns')
+
+    state = expirePhase(state)
+    expect(state.phase).toBe('all-red')
+    expect(state.nextAxis).toBe('ns')
+
+    state = expirePhase(state)
+    expect(state.phase).toBe('ns-green')
+    expect(state.nextAxis).toBe('ew')
+  })
+
+  it('resumes on the due axis after a pedestrian phase that interrupted NS', () => {
+    let state = createInitialState(false)
+    state = pressCrosswalkButton(state, 'ew')
+    state = { ...state, phase: 'ns-yellow', phaseTimer: 0.01, nextAxis: 'ew' }
+    state = stepSimulation(state, 0.05, () => 0.99)
+    expect(state.phase).toBe('pedestrian-crossing')
+    expect(state.nextAxis).toBe('ew')
+
+    state = expirePhase(state)
+    expect(state.phase).toBe('ew-green')
+    expect(state.nextAxis).toBe('ns')
+  })
+
+  it('resumes on the due axis after a pedestrian phase that interrupted EW', () => {
+    let state = createInitialState(false)
+    state = pressCrosswalkButton(state, 'ns')
+    state = { ...state, phase: 'ew-yellow', phaseTimer: 0.01, nextAxis: 'ns' }
+    state = stepSimulation(state, 0.05, () => 0.99)
+    expect(state.phase).toBe('pedestrian-crossing')
+    expect(state.nextAxis).toBe('ns')
+
+    state = expirePhase(state)
+    expect(state.phase).toBe('ns-green')
+    expect(state.nextAxis).toBe('ew')
+  })
+})
+

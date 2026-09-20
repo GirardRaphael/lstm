@@ -51,7 +51,7 @@ describe('traffic-flow fix verification', () => {
       for (const v of state.vehicles) {
         // distributed along the approach, never past the stop line region
         expect(v.progress, `seed ${seed} spawn above the box`).toBeLessThan(0.85)
-        expect(v.progress, `seed ${seed} spawn unreasonably far back`).toBeGreaterThan(-3)
+        expect(v.progress, `seed ${seed} spawn off the visible approach`).toBeGreaterThan(0)
       }
       // spawn gap is 0.09; allow small tolerance
       expectNoOverlap(state, 0.08, `seed ${seed} spawn`)

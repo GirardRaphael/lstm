@@ -47,7 +47,7 @@ export default function App() {
   const [lastAction, setLastAction] = useState('Ready — randomize traffic or force a jam.')
   const [traces, setTraces] = useState<NeuronTraceFile | null>(null)
   const [state, setState] = useState<SimState>(() =>
-    spawnAgents(createInitialState(true), { cars: 5, trucks: 1, pedestrians: 3 }),
+    spawnAgents(createInitialState(true), { cars: 12, trucks: 3, pedestrians: 6 }),
   )
   const lastTs = useRef<number | null>(null)
   const seededLive = useRef(false)

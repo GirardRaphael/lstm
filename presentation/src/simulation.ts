@@ -61,6 +61,8 @@ export type SimState = {
   adaptive: boolean
   crosswalkRequest: CrosswalkRequest
   pedestrianCrossing: boolean
+  /** Axis that gets the next green — the signal alternates NS ↔ EW. */
+  nextAxis: 'ns' | 'ew'
 }
 
 export type SpawnConfig = {
@@ -76,6 +78,12 @@ const MAX_GREEN = 16
 const MIN_LEFT_GREEN = 3
 const MAX_LEFT_GREEN = 8
 const PEDESTRIAN_TIME = 5
+/** Follow / spawn gaps in progress units — sized to car (~0.09) and truck (~0.13) drawing length. */
+const CAR_GAP = 0.10
+const TRUCK_GAP = 0.135
+const SPAWN_GAP = 0.11
+const APPROACHES: Approach[] = ['north', 'east', 'south', 'west']
+const LANES: Lane[] = ['straight', 'left', 'right']
 
 const CAR_COLORS = ['#e74c3c', '#3498db', '#f39c12', '#ecf0f1', '#9b59b6', '#1abc9c']
 
@@ -102,6 +110,7 @@ export function createInitialState(adaptive = true): SimState {
     adaptive,
     crosswalkRequest: { ns: false, ew: false },
     pedestrianCrossing: false,
+    nextAxis: 'ew',
   }
 }
 
@@ -126,9 +135,10 @@ function laneForIntent(intent: TurnIntent): Lane {
 
 function speedFor(kind: VehicleKind, rng: () => number): number {
   // Progress units per second (before the global 1.35× time scale).
-  // 0.24 ≈ three seconds from the canvas edge to the stop line.
-  if (kind === 'truck') return 0.16 + rng() * 0.05
-  return 0.22 + rng() * 0.09
+  // ~0.20 ≈ four seconds from the canvas edge to the stop line — fast enough
+  // to read as motion, slow enough that approaches stay populated.
+  if (kind === 'truck') return 0.14 + rng() * 0.05
+  return 0.18 + rng() * 0.07
 }
 
 function randomColor(rng: () => number): string {
@@ -137,9 +147,9 @@ function randomColor(rng: () => number): string {
 
 export function randomSpawnCounts(rng: () => number = Math.random): SpawnConfig {
   return {
-    cars: 4 + Math.floor(rng() * 16),
-    trucks: Math.floor(rng() * 6),
-    pedestrians: 1 + Math.floor(rng() * 8),
+    cars: 10 + Math.floor(rng() * 8),
+    trucks: 2 + Math.floor(rng() * 4),
+    pedestrians: 4 + Math.floor(rng() * 5),
   }
 }
 
@@ -157,14 +167,16 @@ export function spawnAgents(
 
   for (let i = 0; i < config.cars + config.trucks; i += 1) {
     const kind: VehicleKind = i < config.cars ? 'car' : 'truck'
-    const approach = randomApproach(rng)
-    const intent = randomIntent(rng)
-    const lane = laneForIntent(intent)
-    // Distribute along the whole approach so the intersection is alive at
-    // once, queueing behind whatever is already in this lane. The placement
-    // loop strictly decreases spawn each pass, so it always terminates.
-    let spawn = rng() * 0.85 - 0.05
-    const gap = 0.09
+    // Round-robin approaches and lanes so every arm of the intersection is
+    // populated instead of RNG dumping a platoon down one off-screen lane.
+    const approach = APPROACHES[i % APPROACHES.length]
+    const lane = LANES[Math.floor(i / APPROACHES.length) % LANES.length]
+    const intent: TurnIntent = lane
+    // Keep the whole seed on the visible approach (progress 0 is the canvas
+    // edge). The placement loop strictly decreases spawn each pass, so it
+    // always terminates.
+    let spawn = 0.18 + rng() * 0.62
+    const gap = kind === 'truck' ? TRUCK_GAP : SPAWN_GAP
     for (;;) {
       let next = spawn
       for (const v of vehicles) {
@@ -192,7 +204,7 @@ export function spawnAgents(
   for (let i = 0; i < config.pedestrians; i += 1) {
     pedestrians.push({
       id: nextId++,
-      approach: randomApproach(rng),
+      approach: APPROACHES[i % APPROACHES.length],
       progress: 0,
       crossing: false,
       waiting: true,
@@ -210,14 +222,15 @@ export function createTrafficJam(
 ): SimState {
   const vehicles = [...state.vehicles]
   const jamCount = 12 + Math.floor(rng() * 6)
-  // Pack a stopped queue backward from the stop line, respecting follow gaps.
-  // Track each lane's tail position so mixed car/truck gaps never overlap.
+  // Pack a stopped queue backward from the stop line, round-robin across
+  // lanes so the jam is a visible wall at the stop line, not one lane of
+  // cars stacked off-canvas. Track each lane's tail so mixed gaps never overlap.
   const laneTail: Record<Lane, number> = { left: 0.95, straight: 0.95, right: 0.95 }
   for (let i = 0; i < jamCount; i += 1) {
     const kind: VehicleKind = rng() < 0.2 ? 'truck' : 'car'
-    const intent = randomIntent(rng)
-    const lane = laneForIntent(intent)
-    const gap = kind === 'truck' ? 0.09 : 0.075
+    const lane = LANES[i % LANES.length]
+    const intent: TurnIntent = lane
+    const gap = kind === 'truck' ? TRUCK_GAP : CAR_GAP
     // Pack behind any pre-existing traffic the queue reaches this far back.
     // Strictly decreasing placement loop, so it always terminates.
     let progress = laneTail[lane]
@@ -295,11 +308,32 @@ function recountQueues(vehicles: Vehicle[]): {
 
 function nextPhase(state: SimState): Pick<
   SimState,
-  'phase' | 'phaseTimer' | 'nsGreen' | 'ewGreen' | 'nsLeftGreen' | 'ewLeftGreen' | 'pedestrianCrossing' | 'crosswalkRequest'
+  | 'phase'
+  | 'phaseTimer'
+  | 'nsGreen'
+  | 'ewGreen'
+  | 'nsLeftGreen'
+  | 'ewLeftGreen'
+  | 'pedestrianCrossing'
+  | 'crosswalkRequest'
+  | 'nextAxis'
 > {
-  const { phase, queues, leftQueues, adaptive, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, crosswalkRequest } = state
+  const {
+    phase,
+    queues,
+    leftQueues,
+    adaptive,
+    nsGreen,
+    ewGreen,
+    nsLeftGreen,
+    ewLeftGreen,
+    crosswalkRequest,
+    nextAxis,
+  } = state
 
-  // Check for pedestrian crossing request
+  // A pedestrian request diverts the upcoming axis change into an all-walk
+  // phase. nextAxis already points at the axis that did NOT just have green,
+  // so service resumes on the correct side afterwards.
   const wantsPedestrian = crosswalkRequest.ns || crosswalkRequest.ew
   if (wantsPedestrian && phase !== 'pedestrian-crossing' && (phase === 'ns-yellow' || phase === 'ew-yellow')) {
     return {
@@ -311,12 +345,19 @@ function nextPhase(state: SimState): Pick<
       ewLeftGreen,
       pedestrianCrossing: true,
       crosswalkRequest: { ns: false, ew: false },
+      nextAxis,
     }
+  }
+
+  const greenFor = (axis: 'ns' | 'ew'): number => {
+    if (!adaptive) return axis === 'ns' ? nsGreen : ewGreen
+    const pressure = axis === 'ns' ? queues.north + queues.south : queues.east + queues.west
+    return Math.min(MAX_GREEN, Math.max(MIN_GREEN, 4 + pressure * 0.5))
   }
 
   switch (phase) {
     case 'ns-green':
-      return { phase: 'ns-yellow', phaseTimer: YELLOW, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'ns-yellow', phaseTimer: YELLOW, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ew' }
 
     case 'ns-yellow': {
       // Check if left turn needed
@@ -325,19 +366,18 @@ function nextPhase(state: SimState): Pick<
         const green = adaptive
           ? Math.min(MAX_LEFT_GREEN, Math.max(MIN_LEFT_GREEN, 2 + nsLeftQueue * 0.8))
           : nsLeftGreen
-        return { phase: 'ns-left-green', phaseTimer: green, nsGreen, ewGreen, nsLeftGreen: green, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+        return { phase: 'ns-left-green', phaseTimer: green, nsGreen, ewGreen, nsLeftGreen: green, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ew' }
       }
-      return { phase: 'all-red', phaseTimer: ALL_RED, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'all-red', phaseTimer: ALL_RED, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ew' }
     }
 
     case 'ns-left-green':
-      return { phase: 'ns-left-yellow', phaseTimer: YELLOW, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'ns-left-yellow', phaseTimer: YELLOW, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ew' }
 
     case 'ns-left-yellow':
-      return { phase: 'all-red', phaseTimer: ALL_RED, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'all-red', phaseTimer: ALL_RED, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ew' }
 
     case 'all-red': {
-      // Transition to EW or pedestrian
       if (wantsPedestrian) {
         return {
           phase: 'pedestrian-crossing',
@@ -348,18 +388,20 @@ function nextPhase(state: SimState): Pick<
           ewLeftGreen,
           pedestrianCrossing: true,
           crosswalkRequest: { ns: false, ew: false },
+          nextAxis,
         }
       }
-      let green = ewGreen
-      if (adaptive) {
-        const pressure = queues.east + queues.west
-        green = Math.min(MAX_GREEN, Math.max(MIN_GREEN, 4 + pressure * 0.5))
+      // Serve whichever axis is due, then point nextAxis at the other side
+      // so the following cycle (including a walk phase) resumes correctly.
+      const green = greenFor(nextAxis)
+      if (nextAxis === 'ns') {
+        return { phase: 'ns-green', phaseTimer: green, nsGreen: green, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ew' }
       }
-      return { phase: 'ew-green', phaseTimer: green, nsGreen, ewGreen: green, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'ew-green', phaseTimer: green, nsGreen, ewGreen: green, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ns' }
     }
 
     case 'ew-green':
-      return { phase: 'ew-yellow', phaseTimer: YELLOW, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'ew-yellow', phaseTimer: YELLOW, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ns' }
 
     case 'ew-yellow': {
       const ewLeftQueue = leftQueues.east + leftQueues.west
@@ -367,25 +409,24 @@ function nextPhase(state: SimState): Pick<
         const green = adaptive
           ? Math.min(MAX_LEFT_GREEN, Math.max(MIN_LEFT_GREEN, 2 + ewLeftQueue * 0.8))
           : ewLeftGreen
-        return { phase: 'ew-left-green', phaseTimer: green, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen: green, pedestrianCrossing: false, crosswalkRequest }
+        return { phase: 'ew-left-green', phaseTimer: green, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen: green, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ns' }
       }
-      return { phase: 'all-red', phaseTimer: ALL_RED, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'all-red', phaseTimer: ALL_RED, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ns' }
     }
 
     case 'ew-left-green':
-      return { phase: 'ew-left-yellow', phaseTimer: YELLOW, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'ew-left-yellow', phaseTimer: YELLOW, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ns' }
 
     case 'ew-left-yellow':
-      return { phase: 'all-red', phaseTimer: ALL_RED, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'all-red', phaseTimer: ALL_RED, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ns' }
 
     case 'pedestrian-crossing': {
-      // After pedestrians, go to the axis that didn't just have green
-      let green = nsGreen
-      if (adaptive) {
-        const pressure = queues.north + queues.south
-        green = Math.min(MAX_GREEN, Math.max(MIN_GREEN, 4 + pressure * 0.5))
+      // Resume on the axis that was waiting, not a hard-coded NS green.
+      const green = greenFor(nextAxis)
+      if (nextAxis === 'ns') {
+        return { phase: 'ns-green', phaseTimer: green, nsGreen: green, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ew' }
       }
-      return { phase: 'ns-green', phaseTimer: green, nsGreen: green, ewGreen, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest }
+      return { phase: 'ew-green', phaseTimer: green, nsGreen, ewGreen: green, nsLeftGreen, ewLeftGreen, pedestrianCrossing: false, crosswalkRequest, nextAxis: 'ns' }
     }
   }
 }
@@ -400,6 +441,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   let throughput = state.throughput
   let pedestrianCrossing = state.pedestrianCrossing
   let crosswalkRequest = state.crosswalkRequest
+  let nextAxis = state.nextAxis
 
   if (phaseTimer <= 0) {
     const nxt = nextPhase(state)
@@ -411,6 +453,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     ewLeftGreen = nxt.ewLeftGreen
     pedestrianCrossing = nxt.pedestrianCrossing
     crosswalkRequest = nxt.crosswalkRequest
+    nextAxis = nxt.nextAxis
   }
 
   // Move vehicles — hard stop line on red, queue behind the car ahead
@@ -446,7 +489,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
 
     // Car following: never close past the bumper of the vehicle ahead
     if (aheadProgress < Infinity) {
-      const minGap = v.kind === 'truck' ? 0.08 : 0.062
+      const minGap = v.kind === 'truck' ? TRUCK_GAP : CAR_GAP
       const maxAllowed = aheadProgress - minGap
       if (newProgress > maxAllowed) {
         newProgress = Math.max(v.progress, maxAllowed)
@@ -483,14 +526,18 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
       p.crossing = true
       p.waiting = false
     }
-    if (p.crossing && !p.done) {
+    // Keep walking a little past the far curb (progress 1.2) so finished
+    // pedestrians step onto the sidewalk instead of vanishing mid-crosswalk —
+    // and so they actually leave the state instead of accumulating forever.
+    if (p.crossing && p.progress < 1.2) {
       p.progress += dt * 0.22
       if (p.progress >= 1) {
         p.done = true
       }
     }
-    // A waiting pedestrian presses the button after a short wait.
-    if (p.waiting && state.tick % 90 === 0) {
+    // A waiting pedestrian eventually presses the button — kept rare so the
+    // all-walk phase stays an event rather than running every cycle.
+    if (p.waiting && state.tick % 600 === 0) {
       if (p.approach === 'north' || p.approach === 'south') autoRequestEW = true
       else autoRequestNS = true
     }
@@ -510,16 +557,18 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   }
 
   for (const approach of Object.keys(demand) as Approach[]) {
-    const rate = demand[approach] * dt * 0.62
+    const rate = demand[approach] * dt * 0.55
     if (rng() < rate) {
       const kind: VehicleKind = rng() < 0.15 ? 'truck' : 'car'
       const intent = randomIntent(rng)
       const lane = laneForIntent(intent)
-      // Queue behind traffic already near the spawn point — never overlap.
-      let spawn = -0.03 - rng() * 0.04
+      const gap = kind === 'truck' ? TRUCK_GAP : SPAWN_GAP
+      // Appear at the canvas edge so new arrivals are visible immediately,
+      // then queue behind anyone already near the entry.
+      let spawn = 0.02 + rng() * 0.04
       for (const v of vehicles) {
-        if (v.approach === approach && v.lane === lane && v.progress < 0.3) {
-          spawn = Math.min(spawn, v.progress - 0.09)
+        if (v.approach === approach && v.lane === lane && v.progress < 0.35) {
+          spawn = Math.min(spawn, v.progress - gap)
         }
       }
       vehicles.push({
@@ -537,8 +586,8 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     }
   }
 
-  // Steady pedestrian arrivals — a living sidewalk.
-  if (rng() < 0.02 * dt * 60) {
+  // Steady pedestrian arrivals — a living sidewalk, not a flash mob.
+  if (rng() < 0.006 * dt * 60) {
     pedestrians.push({
       id: nextId++,
       approach: randomApproach(rng),
@@ -570,6 +619,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     tick: state.tick + 1,
     crosswalkRequest,
     pedestrianCrossing,
+    nextAxis,
   }
 }
 
