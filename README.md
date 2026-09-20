@@ -12,14 +12,17 @@ network up and look at what every neuron actually did.
 24 past hours  ->  LSTM 64  ->  LSTM 32  ->  Dense 16  ->  vehicles next hour
 ```
 
-Three ways to use it:
+Ways to use it:
 
 | | |
 | --- | --- |
+| **Presentation deck** | `cd presentation && npm install && npm run dev -- --port 43125` — slideshow + live 2D intersection (jam / cars / trucks / pedestrians) |
 | **Notebook** | `notebooks/traffic_lstm.ipynb` — run cell by cell, built for a presentation |
 | **App** | `streamlit run app/streamlit_app.py` — load any CSV, train it, inspect the neurons |
 | **Obsidian vault** | `obsidian_vault/Traffic_LSTM_Brain` — the trained network as a browsable set of canvases and notes |
 | **Written up** | [`reports/REPORT.md`](reports/REPORT.md) and [`reports/web/results.html`](reports/web/results.html), both generated from the stored run artifacts |
+
+The live intersection is a **simulation** for demos. It does not control real traffic signals.
 
 ---
 
