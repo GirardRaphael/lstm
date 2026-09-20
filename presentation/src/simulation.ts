@@ -105,6 +105,7 @@ const LANES: Lane[] = ['straight', 'left', 'right']
 const CAR_COLORS = ['#e74c3c', '#3498db', '#f39c12', '#ecf0f1', '#9b59b6', '#1abc9c']
 
 let nextId = 1
+let nextPedApproach = 0
 
 export function createInitialState(adaptive = true): SimState {
   return {
@@ -603,10 +604,13 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   }
 
   // Ambient arrivals high enough that a waiting cluster rebuilds between walks.
-  if (rng() < 0.016 * dt * 60) {
+  // Round-robin corners so the pile doesn't collapse onto one sidewalk.
+  if (rng() < 0.012 * dt * 60) {
+    const approach = APPROACHES[nextPedApproach % APPROACHES.length]
+    nextPedApproach += 1
     pedestrians.push({
       id: nextId++,
-      approach: randomApproach(rng),
+      approach,
       progress: 0,
       crossing: false,
       waiting: true,

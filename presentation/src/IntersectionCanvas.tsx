@@ -479,13 +479,13 @@ function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian, slot: numb
   let y = 0
   const col = slot % 4
   const row = Math.floor(slot / 4)
-  const dx = 14
-  const dy = 14
-  const curb = 18
+  const dx = 20
+  const dy = 18
+  const curb = 22
   const zebraLane = ((slot % 3) - 1) * 4
   // Tiny per-person jitter so a corner queue reads as a crowd, not a grid.
-  const jx = ((p.id * 13) % 7) - 3
-  const jy = ((p.id * 29) % 7) - 3
+  const jx = ((p.id * 13) % 5) - 2
+  const jy = ((p.id * 29) % 5) - 2
 
   if (p.crossing) {
     // Walk the painted zebra from the waiting curb to the far curb — never
