@@ -183,20 +183,36 @@ function drawRoad(ctx: CanvasRenderingContext2D) {
 
   const half = (SIZE - ROAD) / 2
 
-  // Corner blocks
-  const corner = ctx.createLinearGradient(0, 0, half, half)
-  corner.addColorStop(0, '#14251f')
-  corner.addColorStop(1, '#0d1a16')
-  ctx.fillStyle = corner
-  ctx.fillRect(0, 0, half, half)
-  ctx.fillRect(SIZE - half, 0, half, half)
-  ctx.fillRect(0, SIZE - half, half, half)
-  ctx.fillRect(SIZE - half, SIZE - half, half, half)
-
-  // Sidewalk edges
-  ctx.strokeStyle = 'rgba(244,239,230,0.08)'
-  ctx.lineWidth = 2
-  ctx.strokeRect(half - 4, half - 4, ROAD + 8, ROAD + 8)
+  // Corner blocks — sidewalk ring + inner grass
+  const corners: Array<[number, number]> = [
+    [0, 0],
+    [SIZE - half, 0],
+    [0, SIZE - half],
+    [SIZE - half, SIZE - half],
+  ]
+  for (const [cx, cy] of corners) {
+    // sidewalk
+    ctx.fillStyle = '#232b33'
+    ctx.fillRect(cx, cy, half, half)
+    // grass inset
+    const g = ctx.createLinearGradient(cx, cy, cx + half, cy + half)
+    g.addColorStop(0, '#163026')
+    g.addColorStop(1, '#0e1f19')
+    ctx.fillStyle = g
+    ctx.fillRect(cx + 10, cy + 10, half - 20, half - 20)
+    // sidewalk seam lines
+    ctx.strokeStyle = 'rgba(244,239,230,0.05)'
+    ctx.lineWidth = 1
+    for (let i = 1; i < 4; i += 1) {
+      const o = (half / 4) * i
+      ctx.beginPath()
+      ctx.moveTo(cx + o, cy + 4)
+      ctx.lineTo(cx + o, cy + half - 4)
+      ctx.moveTo(cx + 4, cy + o)
+      ctx.lineTo(cx + half - 4, cy + o)
+      ctx.stroke()
+    }
+  }
 
   // Road shadow
   ctx.fillStyle = 'rgba(0,0,0,0.4)'
@@ -217,6 +233,17 @@ function drawRoad(ctx: CanvasRenderingContext2D) {
   roadH.addColorStop(1, '#182028')
   ctx.fillStyle = roadH
   ctx.fillRect(0, half, SIZE, ROAD)
+
+  // Asphalt texture — deterministic sparse speckle
+  ctx.fillStyle = 'rgba(244,239,230,0.025)'
+  for (let i = 0; i < 130; i += 1) {
+    const sx = half + ((i * 137.5) % ROAD)
+    const sy = (i * 89.3) % SIZE
+    ctx.fillRect(sx, sy, 2, 2)
+    const hx = (i * 97.7) % SIZE
+    const hy = half + ((i * 61.3) % ROAD)
+    ctx.fillRect(hx, hy, 2, 2)
+  }
 
   // Center box
   ctx.fillStyle = '#1e2933'
@@ -255,6 +282,57 @@ function drawRoad(ctx: CanvasRenderingContext2D) {
     }
   }
   ctx.setLineDash([])
+
+  // Painted lane arrows on approach lanes (left / straight / right)
+  const arrow = (x: number, y: number, angle: number, kind: 'left' | 'straight' | 'right') => {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(angle)
+    ctx.strokeStyle = 'rgba(244,239,230,0.55)'
+    ctx.fillStyle = 'rgba(244,239,230,0.55)'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    if (kind === 'straight') {
+      ctx.beginPath()
+      ctx.moveTo(-10, 0)
+      ctx.lineTo(8, 0)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(4, -5)
+      ctx.lineTo(10, 0)
+      ctx.lineTo(4, 5)
+      ctx.closePath()
+      ctx.fill()
+    } else {
+      const dir = kind === 'left' ? -1 : 1
+      ctx.beginPath()
+      ctx.moveTo(-10, 0)
+      ctx.lineTo(2, 0)
+      ctx.quadraticCurveTo(8, 0, 8, dir * 6)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(8 - 4, dir * 2)
+      ctx.lineTo(8, dir * 8)
+      ctx.lineTo(8 + 4, dir * 2)
+      ctx.closePath()
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
+  const arrowDist = half - 46
+  const lanes: Array<'left' | 'straight' | 'right'> = ['left', 'straight', 'right']
+  for (const lane of lanes) {
+    const o = laneOffset(lane)
+    // north approach (heading south)
+    arrow(CENTER - ROAD / 4 + o, arrowDist, Math.PI / 2, lane)
+    // south approach (heading north)
+    arrow(CENTER + ROAD / 4 - o, SIZE - arrowDist, -Math.PI / 2, lane)
+    // west approach (heading east)
+    arrow(arrowDist, CENTER + ROAD / 4 - o, 0, lane)
+    // east approach (heading west)
+    arrow(SIZE - arrowDist, CENTER - ROAD / 4 + o, Math.PI, lane)
+  }
 
   // Center lines (double yellow)
   ctx.strokeStyle = 'rgba(240,162,2,0.5)'

@@ -199,21 +199,22 @@ export function createTrafficJam(
   const vehicles = [...state.vehicles]
   const jamCount = 12 + Math.floor(rng() * 6)
   // Pack a stopped queue backward from the stop line, respecting follow gaps.
-  const laneDepth: Record<Lane, number> = { left: 0, straight: 0, right: 0 }
+  // Track each lane's tail position so mixed car/truck gaps never overlap.
+  const laneTail: Record<Lane, number> = { left: 0.95, straight: 0.95, right: 0.95 }
   for (let i = 0; i < jamCount; i += 1) {
     const kind: VehicleKind = rng() < 0.2 ? 'truck' : 'car'
     const intent = randomIntent(rng)
     const lane = laneForIntent(intent)
     const gap = kind === 'truck' ? 0.09 : 0.075
-    const depth = laneDepth[lane]
-    laneDepth[lane] += 1
+    const progress = laneTail[lane]
+    laneTail[lane] = progress - gap
     vehicles.push({
       id: nextId++,
       kind,
       approach,
       lane,
       intent,
-      progress: 0.95 - depth * gap,
+      progress,
       speed: speedFor(kind, rng) * 0.6,
       waiting: true,
       crossed: false,
@@ -471,13 +472,21 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     if (rng() < rate) {
       const kind: VehicleKind = rng() < 0.15 ? 'truck' : 'car'
       const intent = randomIntent(rng)
+      const lane = laneForIntent(intent)
+      // Queue behind traffic already near the spawn point — never overlap.
+      let spawn = 0
+      for (const v of vehicles) {
+        if (v.approach === approach && v.lane === lane && v.progress < 0.15) {
+          spawn = Math.min(spawn, v.progress - 0.09)
+        }
+      }
       vehicles.push({
         id: nextId++,
         kind,
         approach,
-        lane: laneForIntent(intent),
+        lane,
         intent,
-        progress: 0,
+        progress: spawn,
         speed: speedFor(kind, rng),
         waiting: false,
         crossed: false,
