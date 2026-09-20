@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { IntersectionCanvas } from './IntersectionCanvas'
 import { SlideView } from './SlideView'
+import { ThinkingPanel } from './ThinkingPanel'
+import { thinkDecision, type NeuronTraceFile } from './decisionBrain'
 import { SLIDES } from './slides'
 import {
   createInitialState,
@@ -40,11 +42,19 @@ export default function App() {
   const [adaptive, setAdaptive] = useState(true)
   const [running, setRunning] = useState(true)
   const [lastAction, setLastAction] = useState('Ready — randomize traffic or force a jam.')
+  const [traces, setTraces] = useState<NeuronTraceFile | null>(null)
   const [state, setState] = useState<SimState>(() =>
     spawnAgents(createInitialState(true), { cars: 5, trucks: 1, pedestrians: 3 }),
   )
   const lastTs = useRef<number | null>(null)
   const seededLive = useRef(false)
+
+  useEffect(() => {
+    fetch('/neuron_traces.json')
+      .then((r) => r.json())
+      .then((data: NeuronTraceFile) => setTraces(data))
+      .catch(() => setTraces(null))
+  }, [])
 
   useEffect(() => {
     setState((prev) => ({ ...prev, adaptive }))
@@ -113,7 +123,7 @@ export default function App() {
         const approach = randomApproachChoice()
         setJamApproach(approach)
         setState((prev) => createTrafficJam(prev, approach))
-        setLastAction(`Random jam on the ${approach} approach — watch green time adapt.`)
+        setLastAction(`Random jam on the ${approach} approach — watch the decision brain.`)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -125,10 +135,7 @@ export default function App() {
     [state.queues],
   )
   const liveCounts = useMemo(() => countByKind(state), [state])
-  const congested = useMemo(() => {
-    const entries = Object.entries(state.queues) as [Approach, number][]
-    return entries.sort((a, b) => b[1] - a[1])[0]
-  }, [state.queues])
+  const thought = useMemo(() => thinkDecision(state, traces), [state, traces])
 
   const randomizeCounts = () => {
     const counts = randomSpawnCounts()
@@ -165,7 +172,7 @@ export default function App() {
           </button>
         </nav>
         <div className="top-hint">
-          {mode === 'slides' ? '← → navigate · L live' : 'R random spawn · J random jam · S slides'}
+          {mode === 'slides' ? '← → navigate · L live' : 'R spawn · J jam · watch the decision brain'}
         </div>
       </header>
 
@@ -193,28 +200,30 @@ export default function App() {
           </div>
         </main>
       ) : (
-        <main className="live-stage">
+        <main className="live-stage thinking-layout">
           <section className="live-visual">
             <IntersectionCanvas state={state} />
             <div className={`response-banner ${state.jamActive ? 'hot' : ''}`}>
               <strong>{state.jamActive ? 'Jam response active' : 'Steady traffic'}</strong>
               <span>
-                Heaviest queue: {congested[0]} ({congested[1]} PCU) · NS green{' '}
-                {state.nsGreen.toFixed(1)}s · EW green {state.ewGreen.toFixed(1)}s
-                {adaptive ? ' · adaptive ON' : ' · adaptive OFF'}
+                Heaviest: {thought.congested} ({thought.congestedQueue} PCU) · brain regime{' '}
+                {thought.regime} · forecast ~{Math.round(thought.forecastVehicles)} veh/h ·{' '}
+                {thought.recommendedAxis.toUpperCase()} green {thought.recommendedGreen.toFixed(1)}s
               </span>
             </div>
             <p className="sim-disclaimer">
-              Simulated 2D intersection — adaptive greens respond to queue pressure. Not connected to
-              real signals or city sensors.
+              Left: simulated intersection. Center: real LSTM gate/neuron thinking blended by live
+              demand. Not connected to city signals.
             </p>
           </section>
+
+          <ThinkingPanel thought={thought} traces={traces} />
 
           <aside className="live-panel">
             <h2>Intersection controls</h2>
             <p className="panel-lead">
-              Generate random cars, trucks, and pedestrians, force a jam, and watch phase timing
-              stretch toward the congested approach.
+              Force a jam and watch forget / input / output gates and the neuron grid shift before
+              green time moves.
             </p>
 
             <p className="action-log" role="status">
@@ -364,7 +373,7 @@ export default function App() {
                 onClick={() => {
                   setState((prev) => createTrafficJam(prev, jamApproach))
                   setLastAction(
-                    `Traffic jam on ${jamApproach} — compare NS/EW green timers as queues build.`,
+                    `Traffic jam on ${jamApproach} — watch gates and neurons before green moves.`,
                   )
                 }}
               >
@@ -407,11 +416,6 @@ export default function App() {
                 </div>
               ))}
             </div>
-
-            <p className="forecast-note">
-              In the full stack, hourly LSTM / XGBoost forecasts feed demand estimates. Here, queue
-              pressure stands in for that signal so the audience can see a response live.
-            </p>
           </aside>
         </main>
       )}

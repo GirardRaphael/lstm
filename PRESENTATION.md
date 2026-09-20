@@ -17,7 +17,8 @@ Open **[http://127.0.0.1:43125](http://127.0.0.1:43125)**
 3. **Live intersection**
    - Click **Randomize & spawn** (or press **R**) to generate random cars / trucks / pedestrians.
    - Click **Create traffic jam** or **Random jam** (or press **J**).
-   - Point at the response banner: heaviest queue + NS/EW green timers stretching when adaptive is on.
+   - Point at the **Decision brain** center panel: Forget / Input / Output gates, neuron grid, and the step-by-step decision trace.
+   - Show the forecast chip → green stretch on the jammed approach when adaptive is on.
    - Toggle **Adaptive green** off/on once to show the contrast.
 
 ## Keys
