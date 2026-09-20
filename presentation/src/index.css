@@ -1,16 +1,22 @@
 :root {
-  --asphalt: #0e141b;
-  --asphalt-2: #162029;
-  --lane: #243040;
-  --marking: #e8e0c8;
+  --bg-0: #070b0f;
+  --bg-1: #0b1117;
+  --bg-2: #101a22;
+  --surface: rgba(16, 26, 34, 0.72);
+  --surface-solid: #101a22;
+  --line: rgba(244, 239, 230, 0.08);
+  --line-strong: rgba(244, 239, 230, 0.14);
   --amber: #f0a202;
-  --signal-red: #e63946;
+  --signal-red: #ff5a5f;
   --signal-green: #2ec4b6;
   --signal-yellow: #ffd166;
   --steel: #8fa3b8;
   --paper: #f4efe6;
-  --ink: #101820;
+  --ink: #0b1117;
   --warn: #ff7a59;
+  --radius-lg: 1.25rem;
+  --radius-md: 0.85rem;
+  --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.3);
   --font-display: "Newsreader", Georgia, serif;
   --font-ui: "Instrument Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -25,9 +31,10 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
-  background: var(--asphalt);
+  background: var(--bg-0);
   color: var(--paper);
   font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
 }
 
 button,

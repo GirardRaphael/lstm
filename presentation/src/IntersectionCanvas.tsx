@@ -17,7 +17,6 @@ function approachOrigin(
   progress: number,
   laneOffset = 0,
 ): { x: number; y: number; angle: number } {
-  // progress 0 far away, 1 at center stop, >1 past center
   const stop = CENTER - ROAD / 2 - 8
   const travel = stop + Math.max(0, progress - 1) * (ROAD + 120)
   const approachDist = stop * (1 - Math.min(progress, 1))
@@ -51,67 +50,160 @@ function approachOrigin(
   }
 }
 
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
 function drawRoad(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = '#1a2330'
+  // deep backdrop
+  const bg = ctx.createLinearGradient(0, 0, 0, SIZE)
+  bg.addColorStop(0, '#0b1117')
+  bg.addColorStop(1, '#101a22')
+  ctx.fillStyle = bg
   ctx.fillRect(0, 0, SIZE, SIZE)
 
-  // grass corners
-  ctx.fillStyle = '#1c3a32'
-  ctx.fillRect(0, 0, (SIZE - ROAD) / 2, (SIZE - ROAD) / 2)
-  ctx.fillRect((SIZE + ROAD) / 2, 0, (SIZE - ROAD) / 2, (SIZE - ROAD) / 2)
-  ctx.fillRect(0, (SIZE + ROAD) / 2, (SIZE - ROAD) / 2, (SIZE - ROAD) / 2)
-  ctx.fillRect((SIZE + ROAD) / 2, (SIZE + ROAD) / 2, (SIZE - ROAD) / 2, (SIZE - ROAD) / 2)
+  const half = (SIZE - ROAD) / 2
 
-  // roads
-  ctx.fillStyle = '#2a3545'
-  ctx.fillRect((SIZE - ROAD) / 2, 0, ROAD, SIZE)
-  ctx.fillRect(0, (SIZE - ROAD) / 2, SIZE, ROAD)
+  // corner blocks with soft depth
+  const corner = ctx.createLinearGradient(0, 0, half, half)
+  corner.addColorStop(0, '#16302a')
+  corner.addColorStop(1, '#0f241f')
+  ctx.fillStyle = corner
+  ctx.fillRect(0, 0, half, half)
+  ctx.fillRect(SIZE - half, 0, half, half)
+  ctx.fillRect(0, SIZE - half, half, half)
+  ctx.fillRect(SIZE - half, SIZE - half, half, half)
+
+  // subtle texture on corners
+  ctx.strokeStyle = 'rgba(46,196,182,0.05)'
+  ctx.lineWidth = 1
+  for (let i = 0; i < 6; i += 1) {
+    ctx.beginPath()
+    ctx.moveTo(0, 30 + i * 26)
+    ctx.lineTo(half - 8, 30 + i * 26)
+    ctx.stroke()
+  }
+
+  // road shadow (underlay)
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'
+  ctx.fillRect(half - 6, 0, ROAD + 12, SIZE)
+  ctx.fillRect(0, half - 6, SIZE, ROAD + 12)
+
+  // asphalt with gradient
+  const road = ctx.createLinearGradient(half, 0, half + ROAD, 0)
+  road.addColorStop(0, '#1d2630')
+  road.addColorStop(0.5, '#232f3b')
+  road.addColorStop(1, '#1a232c')
+  ctx.fillStyle = road
+  ctx.fillRect(half, 0, ROAD, SIZE)
+
+  const roadH = ctx.createLinearGradient(0, half, 0, half + ROAD)
+  roadH.addColorStop(0, '#1d2630')
+  roadH.addColorStop(0.5, '#232f3b')
+  roadH.addColorStop(1, '#1a232c')
+  ctx.fillStyle = roadH
+  ctx.fillRect(0, half, SIZE, ROAD)
+
+  // center box
+  ctx.fillStyle = '#202b36'
+  ctx.fillRect(half, half, ROAD, ROAD)
+
+  // curbs
+  ctx.strokeStyle = 'rgba(232,224,200,0.14)'
+  ctx.lineWidth = 2
+  ctx.strokeRect(half + 1, half + 1, ROAD - 2, ROAD - 2)
 
   // lane markings
-  ctx.strokeStyle = '#d9d0b4'
-  ctx.setLineDash([18, 16])
+  ctx.strokeStyle = 'rgba(232,224,200,0.5)'
+  ctx.setLineDash([20, 18])
   ctx.lineWidth = 3
   ctx.beginPath()
   ctx.moveTo(CENTER, 0)
-  ctx.lineTo(CENTER, (SIZE - ROAD) / 2)
-  ctx.moveTo(CENTER, (SIZE + ROAD) / 2)
+  ctx.lineTo(CENTER, half)
+  ctx.moveTo(CENTER, half + ROAD)
   ctx.lineTo(CENTER, SIZE)
   ctx.moveTo(0, CENTER)
-  ctx.lineTo((SIZE - ROAD) / 2, CENTER)
-  ctx.moveTo((SIZE + ROAD) / 2, CENTER)
+  ctx.lineTo(half, CENTER)
+  ctx.moveTo(half + ROAD, CENTER)
   ctx.lineTo(SIZE, CENTER)
   ctx.stroke()
   ctx.setLineDash([])
 
-  // crosswalks
-  ctx.fillStyle = 'rgba(244,239,230,0.55)'
+  // crosswalks — crisp bars
+  ctx.fillStyle = 'rgba(244,239,230,0.72)'
   for (let i = 0; i < 6; i += 1) {
     const o = i * 14
-    ctx.fillRect((SIZE - ROAD) / 2 - 22, (SIZE - ROAD) / 2 + 20 + o, 18, 8)
-    ctx.fillRect((SIZE + ROAD) / 2 + 4, (SIZE - ROAD) / 2 + 20 + o, 18, 8)
-    ctx.fillRect((SIZE - ROAD) / 2 + 20 + o, (SIZE - ROAD) / 2 - 22, 8, 18)
-    ctx.fillRect((SIZE - ROAD) / 2 + 20 + o, (SIZE + ROAD) / 2 + 4, 8, 18)
+    ctx.fillRect(half - 24, half + 18 + o, 20, 8)
+    ctx.fillRect(half + ROAD + 4, half + 18 + o, 20, 8)
+    ctx.fillRect(half + 18 + o, half - 24, 8, 20)
+    ctx.fillRect(half + 18 + o, half + ROAD + 4, 8, 20)
   }
+
+  // stop lines
+  ctx.fillStyle = 'rgba(244,239,230,0.6)'
+  ctx.fillRect(half + 8, half - 8, LANE, 4)
+  ctx.fillRect(half + ROAD - LANE - 8, half + ROAD + 4, LANE, 4)
+  ctx.fillRect(half - 8, half + ROAD - LANE - 8, 4, LANE)
+  ctx.fillRect(half + ROAD + 4, half + 8, 4, LANE)
 }
 
-function drawLight(ctx: CanvasRenderingContext2D, x: number, y: number, color: 'red' | 'yellow' | 'green') {
-  ctx.fillStyle = '#0b0f14'
-  ctx.fillRect(x - 10, y - 28, 20, 56)
+function drawLight(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  color: 'red' | 'yellow' | 'green',
+) {
+  // housing with rounded corners + drop shadow
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.55)'
+  ctx.shadowBlur = 14
+  ctx.shadowOffsetY = 5
+  ctx.fillStyle = '#0a0e13'
+  roundRect(ctx, x - 11, y - 30, 22, 60, 6)
+  ctx.fill()
+  ctx.restore()
+
+  // housing highlight
+  ctx.strokeStyle = 'rgba(244,239,230,0.08)'
+  ctx.lineWidth = 1
+  roundRect(ctx, x - 11, y - 30, 22, 60, 6)
+  ctx.stroke()
+
   const lamps = [
-    { c: 'red', on: color === 'red', col: '#e63946' },
-    { c: 'yellow', on: color === 'yellow', col: '#ffd166' },
-    { c: 'green', on: color === 'green', col: '#2ec4b6' },
+    { on: color === 'red', col: '#ff5a5f' },
+    { on: color === 'yellow', col: '#ffd166' },
+    { on: color === 'green', col: '#2ec4b6' },
   ] as const
+
   lamps.forEach((lamp, i) => {
+    const cy = y - 17 + i * 17
     ctx.beginPath()
-    ctx.fillStyle = lamp.on ? lamp.col : '#2a323c'
-    ctx.arc(x, y - 16 + i * 16, 6, 0, Math.PI * 2)
+    ctx.fillStyle = lamp.on ? lamp.col : '#232b33'
+    ctx.arc(x, cy, 6.5, 0, Math.PI * 2)
     ctx.fill()
     if (lamp.on) {
       ctx.shadowColor = lamp.col
-      ctx.shadowBlur = 12
+      ctx.shadowBlur = 16
       ctx.fill()
       ctx.shadowBlur = 0
+      // inner highlight
+      ctx.beginPath()
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'
+      ctx.arc(x - 2, cy - 2, 2.2, 0, Math.PI * 2)
+      ctx.fill()
     }
   })
 }
@@ -119,10 +211,11 @@ function drawLight(ctx: CanvasRenderingContext2D, x: number, y: number, color: '
 function drawLights(ctx: CanvasRenderingContext2D, phase: Phase) {
   const ns = lightColor(phase, 'ns')
   const ew = lightColor(phase, 'ew')
-  drawLight(ctx, (SIZE - ROAD) / 2 - 28, (SIZE - ROAD) / 2 - 10, ns)
-  drawLight(ctx, (SIZE + ROAD) / 2 + 28, (SIZE + ROAD) / 2 + 10, ns)
-  drawLight(ctx, (SIZE + ROAD) / 2 + 10, (SIZE - ROAD) / 2 - 28, ew)
-  drawLight(ctx, (SIZE - ROAD) / 2 - 10, (SIZE + ROAD) / 2 + 28, ew)
+  const half = (SIZE - ROAD) / 2
+  drawLight(ctx, half - 30, half - 12, ns)
+  drawLight(ctx, half + ROAD + 30, half + ROAD + 12, ns)
+  drawLight(ctx, half + ROAD + 12, half - 30, ew)
+  drawLight(ctx, half - 12, half + ROAD + 30, ew)
 }
 
 function drawAgent(ctx: CanvasRenderingContext2D, agent: Agent, laneOffset: number) {
@@ -131,21 +224,50 @@ function drawAgent(ctx: CanvasRenderingContext2D, agent: Agent, laneOffset: numb
   ctx.translate(x, y)
   ctx.rotate(angle)
 
+  // soft shadow
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'
+  ctx.shadowBlur = 8
+  ctx.shadowOffsetY = 4
+
   if (agent.kind === 'pedestrian') {
-    ctx.fillStyle = agent.waiting ? '#ffd166' : '#f4efe6'
+    const grad = ctx.createRadialGradient(-1.5, -1.5, 0.5, 0, 0, 6)
+    grad.addColorStop(0, agent.waiting ? '#ffe3a3' : '#ffffff')
+    grad.addColorStop(1, agent.waiting ? '#f0a202' : '#d9d0b4')
+    ctx.fillStyle = grad
     ctx.beginPath()
-    ctx.arc(0, 0, 5, 0, Math.PI * 2)
+    ctx.arc(0, 0, 5.5, 0, Math.PI * 2)
     ctx.fill()
   } else if (agent.kind === 'truck') {
-    ctx.fillStyle = agent.waiting ? '#c45c26' : '#d97706'
-    ctx.fillRect(-18, -10, 36, 20)
-    ctx.fillStyle = '#1f2937'
-    ctx.fillRect(8, -8, 10, 16)
+    const grad = ctx.createLinearGradient(-18, -10, 18, 10)
+    grad.addColorStop(0, agent.waiting ? '#b45309' : '#f59e0b')
+    grad.addColorStop(1, agent.waiting ? '#7c2d12' : '#d97706')
+    ctx.fillStyle = grad
+    roundRect(ctx, -18, -10, 36, 20, 4)
+    ctx.fill()
+    ctx.restore()
+    ctx.save()
+    ctx.fillStyle = 'rgba(255,255,255,0.14)'
+    roundRect(ctx, -16, -8, 32, 4, 2)
+    ctx.fill()
+    ctx.fillStyle = '#111827'
+    roundRect(ctx, 8, -7, 9, 14, 2)
+    ctx.fill()
   } else {
-    ctx.fillStyle = agent.waiting ? '#94a3b8' : '#38bdf8'
-    ctx.fillRect(-12, -7, 24, 14)
-    ctx.fillStyle = '#0f172a'
-    ctx.fillRect(4, -5, 7, 10)
+    const grad = ctx.createLinearGradient(-12, -7, 12, 7)
+    grad.addColorStop(0, agent.waiting ? '#64748b' : '#7dd3fc')
+    grad.addColorStop(1, agent.waiting ? '#334155' : '#38bdf8')
+    ctx.fillStyle = grad
+    roundRect(ctx, -12, -7, 24, 14, 4)
+    ctx.fill()
+    ctx.restore()
+    ctx.save()
+    ctx.fillStyle = 'rgba(255,255,255,0.2)'
+    roundRect(ctx, -10, -5, 20, 3, 1.5)
+    ctx.fill()
+    ctx.fillStyle = '#0b1220'
+    roundRect(ctx, 4, -4, 7, 8, 2)
+    ctx.fill()
   }
   ctx.restore()
 }
@@ -161,13 +283,23 @@ function paint(ctx: CanvasRenderingContext2D, state: SimState) {
     drawAgent(ctx, agent, agent.kind === 'pedestrian' ? laneOffset * 1.4 : laneOffset * 0.55)
   }
 
-  // center plaque
-  ctx.fillStyle = 'rgba(14,20,27,0.72)'
-  ctx.fillRect(CENTER - 70, CENTER - 18, 140, 36)
+  // center status plaque — glassy
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.4)'
+  ctx.shadowBlur = 16
+  ctx.shadowOffsetY = 4
+  ctx.fillStyle = state.jamActive ? 'rgba(124,45,18,0.82)' : 'rgba(13,20,27,0.82)'
+  roundRect(ctx, CENTER - 78, CENTER - 17, 156, 34, 9)
+  ctx.fill()
+  ctx.restore()
+  ctx.strokeStyle = state.jamActive ? 'rgba(255,122,89,0.5)' : 'rgba(46,196,182,0.35)'
+  ctx.lineWidth = 1
+  roundRect(ctx, CENTER - 78, CENTER - 17, 156, 34, 9)
+  ctx.stroke()
   ctx.fillStyle = '#f4efe6'
-  ctx.font = '600 13px "Instrument Sans", sans-serif'
+  ctx.font = '600 12px "Instrument Sans", sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText(state.jamActive ? 'JAM RESPONSE' : 'SIMULATION', CENTER, CENTER + 5)
+  ctx.fillText(state.jamActive ? 'JAM RESPONSE' : 'LIVE SIMULATION', CENTER, CENTER + 4)
 }
 
 type Props = {
