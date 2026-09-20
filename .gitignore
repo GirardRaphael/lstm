@@ -11,3 +11,7 @@ obsidian_vault/*/.obsidian/cache
 
 # Scratch
 *.tmp
+
+# Presentation web app
+presentation/node_modules/
+presentation/dist/

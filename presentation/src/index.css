@@ -1,0 +1,45 @@
+:root {
+  --asphalt: #0e141b;
+  --asphalt-2: #162029;
+  --lane: #243040;
+  --marking: #e8e0c8;
+  --amber: #f0a202;
+  --signal-red: #e63946;
+  --signal-green: #2ec4b6;
+  --signal-yellow: #ffd166;
+  --steel: #8fa3b8;
+  --paper: #f4efe6;
+  --ink: #101820;
+  --warn: #ff7a59;
+  --font-display: "Newsreader", Georgia, serif;
+  --font-ui: "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background: var(--asphalt);
+  color: var(--paper);
+  font-family: var(--font-ui);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
