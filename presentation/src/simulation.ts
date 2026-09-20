@@ -95,7 +95,9 @@ export function createInitialState(adaptive = true): SimState {
     leftQueues: { north: 0, south: 0, east: 0, west: 0 },
     throughput: 0,
     jamActive: false,
-    demand: { north: 0.35, south: 0.35, east: 0.35, west: 0.35 },
+    // Ambient demand tuned so a normal intersection never sits empty:
+    // roughly one vehicle every 2–3 s per approach.
+    demand: { north: 0.95, south: 0.95, east: 0.95, west: 0.95 },
     tick: 0,
     adaptive,
     crosswalkRequest: { ns: false, ew: false },
@@ -123,8 +125,10 @@ function laneForIntent(intent: TurnIntent): Lane {
 }
 
 function speedFor(kind: VehicleKind, rng: () => number): number {
-  if (kind === 'truck') return 0.016 + rng() * 0.008
-  return 0.024 + rng() * 0.012
+  // Progress units per second (before the global 1.35× time scale).
+  // 0.24 ≈ three seconds from the canvas edge to the stop line.
+  if (kind === 'truck') return 0.16 + rng() * 0.05
+  return 0.22 + rng() * 0.09
 }
 
 function randomColor(rng: () => number): string {
@@ -156,12 +160,20 @@ export function spawnAgents(
     const approach = randomApproach(rng)
     const intent = randomIntent(rng)
     const lane = laneForIntent(intent)
-    // Queue behind whatever is already in this lane — never overlap.
-    let spawn = -0.03 - rng() * 0.05
-    for (const v of vehicles) {
-      if (v.approach === approach && v.lane === lane && v.progress < 0.35) {
-        spawn = Math.min(spawn, v.progress - 0.09)
+    // Distribute along the whole approach so the intersection is alive at
+    // once, queueing behind whatever is already in this lane. The placement
+    // loop strictly decreases spawn each pass, so it always terminates.
+    let spawn = rng() * 0.85 - 0.05
+    const gap = 0.09
+    for (;;) {
+      let next = spawn
+      for (const v of vehicles) {
+        if (v.approach === approach && v.lane === lane && Math.abs(v.progress - spawn) < gap) {
+          next = Math.min(next, v.progress - gap)
+        }
       }
+      if (next === spawn) break
+      spawn = next
     }
     vehicles.push({
       id: nextId++,
@@ -206,7 +218,19 @@ export function createTrafficJam(
     const intent = randomIntent(rng)
     const lane = laneForIntent(intent)
     const gap = kind === 'truck' ? 0.09 : 0.075
-    const progress = laneTail[lane]
+    // Pack behind any pre-existing traffic the queue reaches this far back.
+    // Strictly decreasing placement loop, so it always terminates.
+    let progress = laneTail[lane]
+    for (;;) {
+      let next = progress
+      for (const v of vehicles) {
+        if (v.approach === approach && v.lane === lane && Math.abs(v.progress - progress) < gap) {
+          next = Math.min(next, v.progress - gap)
+        }
+      }
+      if (next === progress) break
+      progress = next
+    }
     laneTail[lane] = progress - gap
     vehicles.push({
       id: nextId++,
@@ -442,24 +466,40 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     }
   }
 
-  // Move pedestrians
+  // Move pedestrians — they cross during the dedicated walk phase or with
+  // their parallel traffic's green, like a normal intersection.
   const pedestrians: Pedestrian[] = []
+  let autoRequestNS = false
+  let autoRequestEW = false
   for (const raw of state.pedestrians) {
     const p = { ...raw }
-    if (pedestrianCrossing && p.waiting) {
+    // Pedestrians at the north/south corners cross the vertical road, walking
+    // parallel to EW traffic; east/west corners walk parallel to NS traffic.
+    const parallelGreen =
+      p.approach === 'north' || p.approach === 'south'
+        ? phase === 'ew-green'
+        : phase === 'ns-green'
+    if (p.waiting && (pedestrianCrossing || parallelGreen)) {
       p.crossing = true
       p.waiting = false
     }
     if (p.crossing && !p.done) {
-      p.progress += dt * 0.25
+      p.progress += dt * 0.22
       if (p.progress >= 1) {
         p.done = true
       }
+    }
+    // A waiting pedestrian presses the button after a short wait.
+    if (p.waiting && state.tick % 90 === 0) {
+      if (p.approach === 'north' || p.approach === 'south') autoRequestEW = true
+      else autoRequestNS = true
     }
     if (!p.done || p.progress < 1.2) {
       pedestrians.push(p)
     }
   }
+  if (autoRequestNS) crosswalkRequest = { ...crosswalkRequest, ns: true }
+  if (autoRequestEW) crosswalkRequest = { ...crosswalkRequest, ew: true }
 
   // Ambient arrivals
   const demand = { ...state.demand }
@@ -470,15 +510,15 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   }
 
   for (const approach of Object.keys(demand) as Approach[]) {
-    const rate = demand[approach] * dt * 0.4
+    const rate = demand[approach] * dt * 0.62
     if (rng() < rate) {
       const kind: VehicleKind = rng() < 0.15 ? 'truck' : 'car'
       const intent = randomIntent(rng)
       const lane = laneForIntent(intent)
       // Queue behind traffic already near the spawn point — never overlap.
-      let spawn = 0
+      let spawn = -0.03 - rng() * 0.04
       for (const v of vehicles) {
-        if (v.approach === approach && v.lane === lane && v.progress < 0.15) {
+        if (v.approach === approach && v.lane === lane && v.progress < 0.3) {
           spawn = Math.min(spawn, v.progress - 0.09)
         }
       }
@@ -497,8 +537,8 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     }
   }
 
-  // Occasional pedestrian arrival
-  if (rng() < 0.008 * dt * 60) {
+  // Steady pedestrian arrivals — a living sidewalk.
+  if (rng() < 0.02 * dt * 60) {
     pedestrians.push({
       id: nextId++,
       approach: randomApproach(rng),

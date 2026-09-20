@@ -42,16 +42,20 @@ function expectNoOverlap(state: SimState, minGap: number, ctx: string) {
 }
 
 describe('traffic-flow fix verification', () => {
-  it('spawns vehicles off-screen without same-lane overlap', () => {
-    const rng = mulberry32(42)
-    let state = createInitialState()
-    state = spawnAgents(state, { cars: 18, trucks: 5, pedestrians: 2 }, rng)
-    expect(state.vehicles.length).toBe(23)
-    for (const v of state.vehicles) {
-      expect(v.progress, 'spawn must be off-screen (negative progress)').toBeLessThan(0)
+  it('spawns vehicles along the approach without same-lane overlap', () => {
+    for (let seed = 1; seed <= 25; seed += 1) {
+      const rng = mulberry32(seed * 42 + 1)
+      let state = createInitialState()
+      state = spawnAgents(state, { cars: 18, trucks: 5, pedestrians: 2 }, rng)
+      expect(state.vehicles.length).toBe(23)
+      for (const v of state.vehicles) {
+        // distributed along the approach, never past the stop line region
+        expect(v.progress, `seed ${seed} spawn above the box`).toBeLessThan(0.85)
+        expect(v.progress, `seed ${seed} spawn unreasonably far back`).toBeGreaterThan(-3)
+      }
+      // spawn gap is 0.09; allow small tolerance
+      expectNoOverlap(state, 0.08, `seed ${seed} spawn`)
     }
-    // spawn gap is 0.09; allow small tolerance
-    expectNoOverlap(state, 0.08, 'spawn')
   })
 
   it('traffic jam packs a stopped queue backward from the stop line', () => {
@@ -71,29 +75,31 @@ describe('traffic-flow fix verification', () => {
     expectNoOverlap(state, 0.07, 'jam')
   })
 
-  it('vehicles enter, cross, and exit over time without overlap or NaN', () => {
-    const rng = mulberry32(1234)
-    let state = createInitialState()
-    state = spawnAgents(state, { cars: 14, trucks: 4, pedestrians: 3 }, rng)
-    state = createTrafficJam(state, 'east', rng)
+  it('vehicles enter, cross, and exit over time without overlap or NaN', { timeout: 60000 }, () => {
+    for (let seed = 1; seed <= 25; seed += 1) {
+      const rng = mulberry32(seed * 1234 + 7)
+      let state = createInitialState()
+      state = spawnAgents(state, { cars: 14, trucks: 4, pedestrians: 3 }, rng)
+      state = createTrafficJam(state, 'east', rng)
 
-    let sawCrossing = false
-    for (let i = 0; i < 1200; i += 1) {
-      state = stepSimulation(state, 0.1, rng)
-      for (const v of state.vehicles) {
-        expect(Number.isNaN(v.progress)).toBe(false)
-        expect(v.progress).toBeLessThan(3.4)
+      let sawCrossing = false
+      for (let i = 0; i < 1200; i += 1) {
+        state = stepSimulation(state, 0.1, rng)
+        for (const v of state.vehicles) {
+          expect(Number.isNaN(v.progress)).toBe(false)
+          expect(v.progress).toBeLessThan(3.4)
+        }
+        // no same-lane overlap once everyone is past the spawn region
+        expectNoOverlap(
+          { ...state, vehicles: state.vehicles.filter((v) => v.progress > -0.5) },
+          0.04,
+          `seed ${seed} tick ${i}`,
+        )
+        if (state.throughput > 0) sawCrossing = true
       }
-      // no same-lane overlap once everyone is past the spawn region
-      expectNoOverlap(
-        { ...state, vehicles: state.vehicles.filter((v) => v.progress > -0.5) },
-        0.04,
-        `tick ${i}`,
-      )
-      if (state.throughput > 0) sawCrossing = true
+      expect(sawCrossing, `seed ${seed}: vehicles must cross the intersection`).toBe(true)
+      expect(state.throughput).toBeGreaterThan(5)
     }
-    expect(sawCrossing, 'vehicles must cross the intersection').toBe(true)
-    expect(state.throughput).toBeGreaterThan(5)
   })
 
   it('red light holds uncrossed vehicles at the stop line', () => {
