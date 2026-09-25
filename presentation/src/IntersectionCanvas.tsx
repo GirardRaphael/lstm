@@ -501,28 +501,31 @@ function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian, slot: numb
   const half = (SIZE - ROAD) / 2
   let x = 0
   let y = 0
-  const zebraLane = ((slot % 3) - 1) * 7
   const jx = ((p.id * 13) % 7) - 3
   const jy = ((p.id * 29) % 7) - 3
 
   if (p.crossing) {
-    const t = Math.min(Math.max(p.progress, 0), 1)
+    const col = slot % 3
+    const row = Math.floor(slot / 3)
+    const lane = (col - 1) * 8
+    // Trail rows so a snapshot cohort reads as a pack, not 3 stacked sprites.
+    const t = Math.min(Math.max(p.progress - row * 0.05, 0), 1)
     switch (p.approach) {
       case 'north':
-        x = half + 12 + t * (ROAD - 24)
-        y = half + 12 + zebraLane
+        x = half + 12 + t * (ROAD - 24) + jx
+        y = half + 12 + lane + jy
         break
       case 'south':
-        x = half + ROAD - 12 - t * (ROAD - 24)
-        y = half + ROAD - 12 + zebraLane
+        x = half + ROAD - 12 - t * (ROAD - 24) + jx
+        y = half + ROAD - 12 + lane + jy
         break
       case 'west':
-        x = half + 12 + zebraLane
-        y = half + ROAD - 12 - t * (ROAD - 24)
+        x = half + 12 + lane + jx
+        y = half + ROAD - 12 - t * (ROAD - 24) + jy
         break
       case 'east':
-        x = half + ROAD - 12 + zebraLane
-        y = half + 12 + t * (ROAD - 24)
+        x = half + ROAD - 12 + lane + jx
+        y = half + 12 + t * (ROAD - 24) + jy
         break
     }
   } else {
