@@ -2,12 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { IntersectionCanvas } from './IntersectionCanvas'
 import { SlideView } from './SlideView'
 import { ThinkingPanel } from './ThinkingPanel'
+import { DecisionLog } from './DecisionLog'
 import {
   congestionIntensity,
   thinkDecision,
   type HourLookupFile,
   type LiveModelOutput,
 } from './decisionBrain'
+import {
+  applyUserOverride,
+  emptyDecisionLog,
+  ingestSnapshot,
+  markRowCorrect,
+  snapshotFromLive,
+  type Axis,
+  type LogTrigger,
+} from './decisionLog'
 import { SLIDES } from './slides'
 import {
   createInitialState,
@@ -56,6 +66,7 @@ export default function App() {
   const [state, setState] = useState<SimState>(() =>
     spawnAgents(createInitialState(true), { cars: 12, trucks: 3, pedestrians: 20 }),
   )
+  const [log, setLog] = useState(emptyDecisionLog)
   const lastTs = useRef<number | null>(null)
   const seededLive = useRef(false)
 
@@ -203,7 +214,92 @@ export default function App() {
     return () => controller.abort()
   }, [mode, intensityBucket, lookup])
 
-  const thought = useMemo(() => thinkDecision(state, liveModel, lookup), [state, liveModel, lookup])
+  const thought = useMemo(
+    () => thinkDecision(state, liveModel, lookup, log.pendingAxisOverride),
+    [state, liveModel, lookup, log.pendingAxisOverride],
+  )
+  const latestLive = useRef({ state, thought, liveCounts })
+
+  useEffect(() => {
+    latestLive.current = { state, thought, liveCounts }
+  }, [state, thought, liveCounts])
+
+  const ingestTrigger = (trigger: LogTrigger) => {
+    setLog((prev) => {
+      const live = latestLive.current
+      return ingestSnapshot(
+        prev,
+        snapshotFromLive({
+          trigger,
+          phase: live.state.phase,
+          phaseLabel: phaseLabel(live.state.phase),
+          tick: live.state.tick,
+          jamActive: live.state.jamActive,
+          queues: live.state.queues,
+          liveCounts: live.liveCounts,
+          thought: live.thought,
+          adaptive: live.state.adaptive,
+        }),
+      )
+    })
+  }
+
+  const forecastKey = `${thought.matchedHour?.index ?? 'none'}:${
+    Number.isFinite(thought.forecastVehicles) ? Math.round(thought.forecastVehicles) : 'na'
+  }`
+
+  useEffect(() => {
+    if (mode !== 'live') return
+    ingestTrigger('phase')
+  }, [mode, state.phase])
+
+  useEffect(() => {
+    if (mode !== 'live') return
+    ingestTrigger('jam')
+  }, [mode, state.jamActive])
+
+  useEffect(() => {
+    if (mode !== 'live') return
+    ingestTrigger('forecast')
+  }, [mode, forecastKey])
+
+  const modelBanner = liveModel
+    ? 'sidecar'
+    : lookup
+      ? 'lookup'
+      : modelStatus.toLowerCase().includes('loading')
+        ? 'loading'
+        : 'unavailable'
+
+  const markDecisionCorrect = (rowId: number) => {
+    setLog((prev) => markRowCorrect(prev, rowId))
+    setLastAction('You marked that ledger row as looking right. The model did not learn from this.')
+  }
+
+  const overrideDecisionAxis = (rowId: number, axis: Axis) => {
+    setLog((prev) => {
+      const live = latestLive.current
+      return applyUserOverride(
+        prev,
+        rowId,
+        axis,
+        snapshotFromLive({
+          trigger: 'override',
+          phase: live.state.phase,
+          phaseLabel: phaseLabel(live.state.phase),
+          tick: live.state.tick,
+          jamActive: live.state.jamActive,
+          queues: live.state.queues,
+          liveCounts: live.liveCounts,
+          thought: live.thought,
+          adaptive: live.state.adaptive,
+        }),
+      )
+    })
+    setLastAction(
+      `You corrected the next heuristic: serve ${axis.toUpperCase()}. The LSTM did not learn from this.`,
+    )
+  }
 
   const randomizeCounts = () => {
     const counts = randomSpawnCounts()
@@ -281,6 +377,7 @@ export default function App() {
                   : 'unavailable'}{' '}
                 ({thought.source}) · heuristic {thought.recommendedAxis.toUpperCase()} green{' '}
                 {thought.recommendedGreen.toFixed(1)}s
+                {thought.userOverride ? ' · user correction (not learned)' : ''}
               </span>
             </div>
             <p className="sim-disclaimer">
@@ -514,6 +611,15 @@ export default function App() {
               ))}
             </div>
           </aside>
+
+          <DecisionLog
+            log={log}
+            modelBanner={modelBanner}
+            modelStatus={modelStatus}
+            pendingOverride={log.pendingAxisOverride}
+            onMarkCorrect={markDecisionCorrect}
+            onOverrideAxis={overrideDecisionAxis}
+          />
         </main>
       )}
     </div>

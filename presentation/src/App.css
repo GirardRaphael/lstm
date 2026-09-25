@@ -1,5 +1,7 @@
 .app-shell {
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background:
@@ -84,6 +86,8 @@
 
 .slides-stage {
   flex: 1;
+  min-height: 0;
+  overflow: auto;
   display: grid;
   grid-template-rows: 1fr auto;
   padding: 1.75rem clamp(1rem, 4vw, 3rem) 1.5rem;
@@ -351,6 +355,8 @@ button.warn {
 
 .live-stage {
   flex: 1;
+  min-height: 0;
+  overflow: auto;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
   gap: 1.5rem;
@@ -814,7 +820,239 @@ button.warn {
   border-color: rgba(255, 90, 95, 0.3);
 }
 
-/* Crosswalk buttons */
+/* ---------------- Decision ledger ---------------- */
+
+.decision-ledger {
+  grid-column: 1 / -1;
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: min(42vh, 24rem);
+  overflow: auto;
+  padding: 0.95rem 1.1rem 1.05rem;
+  border-radius: 1.1rem 1.1rem 0 0;
+  background: rgba(7, 11, 15, 0.94);
+  border: 1px solid rgba(244, 239, 230, 0.1);
+  border-bottom: 0;
+  box-shadow:
+    0 -16px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(244, 239, 230, 0.04);
+  backdrop-filter: blur(16px);
+}
+
+.ledger-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  align-items: flex-start;
+}
+
+.ledger-kicker {
+  margin: 0;
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.ledger-header h2 {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.ledger-claim {
+  margin: 0;
+  max-width: 34rem;
+  color: var(--steel);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.ledger-claim em {
+  color: rgba(244, 239, 230, 0.88);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.ledger-model {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: rgba(244, 239, 230, 0.82);
+  background: rgba(46, 196, 182, 0.08);
+  border: 1px solid rgba(46, 196, 182, 0.22);
+}
+
+.ledger-model[data-banner='lookup'] {
+  background: rgba(240, 162, 2, 0.1);
+  border-color: rgba(240, 162, 2, 0.28);
+}
+
+.ledger-model[data-banner='loading'],
+.ledger-model[data-banner='unavailable'] {
+  background: rgba(255, 90, 95, 0.1);
+  border-color: rgba(255, 90, 95, 0.28);
+}
+
+.ledger-pending {
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.55rem;
+  font-size: 0.78rem;
+  color: var(--amber);
+  background: rgba(240, 162, 2, 0.1);
+  border: 1px solid rgba(240, 162, 2, 0.28);
+}
+
+.ledger-empty {
+  margin: 0;
+  padding: 0.85rem 0.2rem 0.4rem;
+  color: var(--steel);
+  font-size: 0.88rem;
+}
+
+.ledger-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.ledger-row {
+  padding: 0.7rem 0.8rem 0.8rem;
+  border-radius: 0.8rem;
+  background: rgba(244, 239, 230, 0.03);
+  border: 1px solid rgba(244, 239, 230, 0.07);
+}
+
+.ledger-row.status-needs_review {
+  border-color: rgba(240, 162, 2, 0.28);
+}
+
+.ledger-row.status-you_corrected {
+  border-color: rgba(255, 122, 89, 0.32);
+}
+
+.ledger-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--steel);
+}
+
+.ledger-phase {
+  color: rgba(244, 239, 230, 0.9);
+  font-weight: 600;
+}
+
+.ledger-status {
+  margin-left: auto;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.ledger-status.status-looks_right {
+  background: rgba(46, 196, 182, 0.16);
+  color: var(--signal-green);
+}
+
+.ledger-status.status-needs_review {
+  background: rgba(240, 162, 2, 0.16);
+  color: var(--amber);
+}
+
+.ledger-status.status-you_corrected {
+  background: rgba(255, 122, 89, 0.16);
+  color: #ffb19f;
+}
+
+.ledger-narrative {
+  margin: 0.45rem 0 0.4rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: rgba(244, 239, 230, 0.92);
+}
+
+.ledger-facts {
+  margin: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.ledger-facts > div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.ledger-facts dt {
+  margin: 0;
+  color: var(--steel);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ledger-facts dd {
+  margin: 0;
+  color: rgba(244, 239, 230, 0.82);
+}
+
+.ledger-correct {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.65rem;
+}
+
+.ledger-correct button {
+  border: 1px solid rgba(244, 239, 230, 0.12);
+  background: rgba(10, 15, 20, 0.85);
+  color: var(--paper);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.ledger-correct button:hover:not(:disabled) {
+  border-color: rgba(46, 196, 182, 0.4);
+}
+
+.ledger-correct button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ledger-next-label {
+  margin-left: 0.25rem;
+  color: var(--steel);
+  font-size: 0.7rem;
+}
+
+/* ---------------- Crosswalk buttons ---------------- */
 .crosswalk-row {
   display: flex;
   align-items: center;
@@ -860,6 +1098,10 @@ button.warn {
   .live-panel {
     grid-column: 1 / -1;
   }
+
+  .decision-ledger {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 900px) {
@@ -870,6 +1112,17 @@ button.warn {
 
   .thinking-panel {
     max-height: none;
+  }
+
+  .decision-ledger {
+    position: sticky;
+    bottom: 0;
+    max-height: min(48vh, 28rem);
+  }
+
+  .ledger-facts > div {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
   }
 
   .top-hint {

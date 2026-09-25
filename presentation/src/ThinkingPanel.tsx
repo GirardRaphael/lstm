@@ -87,7 +87,9 @@ export function ThinkingPanel({ thought }: Props) {
         <div className="flow-step">
           <span className="flow-num">3</span>
           <span>
-            Heuristic {thought.recommendedAxis.toUpperCase()} green → {thought.recommendedGreen.toFixed(1)}s
+            Heuristic {thought.recommendedAxis.toUpperCase()} green →{' '}
+            {thought.recommendedGreen.toFixed(1)}s
+            {thought.userOverride ? ' · user correction (not learned)' : ''}
           </span>
         </div>
       </div>

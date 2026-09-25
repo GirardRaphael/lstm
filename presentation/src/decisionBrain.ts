@@ -55,6 +55,8 @@ export type DecisionThought = {
   source: ModelSource
   sourceNote: string
   matchedHour: { index: number; timestamp: string; actual: number } | null
+  /** Present when the operator forced the next heuristic axis. Not learned. */
+  userOverride: 'ns' | 'ew' | null
 }
 
 /** Real Metro Interstate test-hour actuals used to map cartoon congestion. */
@@ -126,13 +128,21 @@ export function thinkDecision(
   state: SimState,
   live: LiveModelOutput | null,
   lookup: HourLookupFile | null,
+  axisOverride: 'ns' | 'ew' | null = null,
 ): DecisionThought {
   const intensity = congestionIntensity(state)
   const { approach, queue } = heaviestApproach(state)
+  const userOverride: 'ns' | 'ew' | null =
+    axisOverride === 'ns' || axisOverride === 'ew' ? axisOverride : null
   const recommendedAxis: 'ns' | 'ew' =
-    approach === 'north' || approach === 'south' ? 'ns' : 'ew'
+    userOverride ?? (approach === 'north' || approach === 'south' ? 'ns' : 'ew')
+  const queueForGreen = userOverride
+    ? recommendedAxis === 'ns'
+      ? Math.max(state.queues.north, state.queues.south)
+      : Math.max(state.queues.east, state.queues.west)
+    : queue
   const recommendedGreen = state.adaptive
-    ? Math.min(14, Math.max(3.5, 3.5 + queue * 0.55))
+    ? Math.min(14, Math.max(3.5, 3.5 + queueForGreen * 0.55))
     : recommendedAxis === 'ns'
       ? state.nsGreen
       : state.ewGreen
@@ -188,6 +198,12 @@ export function thinkDecision(
     ? `closest real hour ${matchedHour.timestamp} (test index ${matchedHour.index}, actual ${Math.round(matchedHour.actual)} veh/h)`
     : 'no real hour matched'
 
+  const heuristicStep = userOverride
+    ? `User correction (not learned): force ${axisLabel} green toward ${recommendedGreen.toFixed(1)}s. Model weights unchanged.`
+    : state.adaptive
+      ? `Heuristic (not the LSTM): stretch ${axisLabel} green toward ${recommendedGreen.toFixed(1)}s from the forecast/queue.`
+      : `Heuristic held off — fixed ${axisLabel} green stays ${recommendedGreen.toFixed(1)}s.`
+
   const steps = [
     `Sense ${queue} PCU waiting on ${approach} (simulated intersection).`,
     source === 'unavailable'
@@ -197,13 +213,12 @@ export function thinkDecision(
       ? 'Forecast withheld.'
       : `Forget ${(gates.f * 100).toFixed(0)}% / input ${(gates.i * 100).toFixed(0)}% / output ${(gates.o * 100).toFixed(0)}% from that Keras-weight replay.`,
     `Forecast demand ≈ ${forecastText} veh/h (${source === 'sidecar' ? 'live sidecar forward pass' : source === 'lookup' ? 'replayed Keras output for the closest real hour' : 'unavailable'}).`,
-    state.adaptive
-      ? `Heuristic (not the LSTM): stretch ${axisLabel} green toward ${recommendedGreen.toFixed(1)}s from the forecast/queue.`
-      : `Heuristic held off — fixed ${axisLabel} green stays ${recommendedGreen.toFixed(1)}s.`,
+    heuristicStep,
   ]
 
-  const why =
-    source === 'unavailable'
+  const why = userOverride
+    ? `An operator overrode the next heuristic axis to ${axisLabel}. That is a correction in this log, not training — the LSTM did not learn from it.`
+    : source === 'unavailable'
       ? 'The live panel has no real model artifact, so it will not invent a quiet/rush blend. Cartoon lights are not a closed-loop controller.'
       : regime === 'jam'
         ? `Replay is a high-demand Metro Interstate hour. The forecast is real; the green stretch is a simulator heuristic driven by that number — the LSTM did not choose the light.`
@@ -228,5 +243,6 @@ export function thinkDecision(
     source,
     sourceNote,
     matchedHour,
+    userOverride,
   }
 }

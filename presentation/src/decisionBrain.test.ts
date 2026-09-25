@@ -75,6 +75,19 @@ describe('real model lookup — not a quiet/rush blend', () => {
     expect(Number.isFinite(thought.forecastVehicles)).toBe(false)
     expect(thought.forecastVehicles).not.toBe(800 + thought.intensity * 5000)
     expect(thought.sourceNote.toLowerCase()).toMatch(/unavailable|heuristic/)
+    expect(thought.userOverride).toBeNull()
+  })
+
+  it('applies a user axis override to the heuristic without changing the Keras hour', () => {
+    const liveState = stateWith({ east: 20, north: 3 }, true)
+    const baseline = thinkDecision(liveState, null, LOOKUP)
+    expect(baseline.recommendedAxis).toBe('ew')
+    const corrected = thinkDecision(liveState, null, LOOKUP, 'ns')
+    expect(corrected.recommendedAxis).toBe('ns')
+    expect(corrected.userOverride).toBe('ns')
+    expect(corrected.forecastVehicles).toBe(baseline.forecastVehicles)
+    expect(corrected.matchedHour).toEqual(baseline.matchedHour)
+    expect(corrected.why).toMatch(/did not learn/i)
   })
 
   it('treats only finite Keras rows as real model output', () => {

@@ -20,6 +20,7 @@ function thought(overrides: Partial<DecisionThought>): DecisionThought {
     source: 'lookup',
     sourceNote: 'test',
     matchedHour: { index: 0, timestamp: '2018-01-01 00:00:00', actual: 800 },
+    userOverride: null,
     ...overrides,
   }
 }
