@@ -65,6 +65,10 @@ export type SimState = {
   pedestrianCrossing: boolean
   /** Axis that gets the next green — the signal alternates NS ↔ EW. */
   nextAxis: 'ns' | 'ew'
+  /** True after this walk released the curb snapshot; newcomers wait for the next walk. */
+  walkCrowdReleased: boolean
+  /** Seconds remaining before auto-press is allowed after a walk. Manual buttons ignore this. */
+  pedWalkCooldown: number
 }
 
 export type SpawnConfig = {
@@ -79,12 +83,17 @@ const MIN_GREEN = 4
 const MAX_GREEN = 16
 const MIN_LEFT_GREEN = 3
 const MAX_LEFT_GREEN = 8
+/** Progress units per second on the zebra. 1 / 0.22 ≈ 4.55s to clear; PEDESTRIAN_TIME covers that. */
+const PED_WALK_SPEED = 0.22
+/** Fixed exclusive-walk length. Long enough for the snapshot cohort at PED_WALK_SPEED. */
 const PEDESTRIAN_TIME = 6
 /** Seconds a waiting pedestrian stands at the curb before auto-pressing.
  *  Long enough that a spawned crowd is visible before the exclusive walk. */
 const PED_AUTO_PRESS_WAIT = 12
-/** Don't auto-request walk until this many people are waiting, so corners pile up. */
+/** Don't auto-request walk until this many people have been waiting that long. */
 const PED_AUTO_PRESS_MIN = 6
+/** After a walk, wait this long before auto-press can fire again so NS/EW greens still run. */
+const PED_AUTO_PRESS_COOLDOWN = 18
 /** Hard barrier at the stop line for vehicles that may not enter the box. */
 export const STOP_LINE = 0.97
 /** Progress range that occupies the intersection box (after the stop line, before the exit). */
@@ -132,6 +141,8 @@ export function createInitialState(adaptive = true): SimState {
     crosswalkRequest: { ns: false, ew: false },
     pedestrianCrossing: false,
     nextAxis: 'ew',
+    walkCrowdReleased: false,
+    pedWalkCooldown: 0,
   }
 }
 
@@ -451,13 +462,16 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   let pedestrianCrossing = state.pedestrianCrossing
   let crosswalkRequest = state.crosswalkRequest
   let nextAxis = state.nextAxis
+  let walkCrowdReleased = state.walkCrowdReleased
+  let pedWalkCooldown = Math.max(0, state.pedWalkCooldown - dt)
 
   if (phaseTimer <= 0) {
     const wantsPed = state.crosswalkRequest.ns || state.crosswalkRequest.ew
     const boxBusy = state.vehicles.some(vehicleOccupiesBox)
     const pedsInRoad = state.pedestrians.some(pedestrianInCrosswalk)
-    // Walk never starts while a vehicle is still in the box, and never ends
-    // while a pedestrian is still on the zebra.
+    // Walk never starts while a vehicle is still in the box. Hold only while
+    // the snapshot cohort is still on the zebra — newcomers wait at the curb
+    // and must not extend this walk.
     if (phase === 'all-red' && wantsPed && boxBusy) {
       phaseTimer = ALL_RED
     } else if (phase === 'pedestrian-crossing' && pedsInRoad) {
@@ -474,6 +488,13 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
       crosswalkRequest = nxt.crosswalkRequest
       nextAxis = nxt.nextAxis
     }
+  }
+
+  if (phase !== 'pedestrian-crossing') {
+    if (state.phase === 'pedestrian-crossing') {
+      pedWalkCooldown = PED_AUTO_PRESS_COOLDOWN
+    }
+    walkCrowdReleased = false
   }
 
   // Move vehicles — hard stop line on red, queue behind the car ahead
@@ -532,14 +553,15 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   }
 
   // Move pedestrians — they ONLY enter the zebra during the dedicated
-  // all-vehicle-red walk. During every other phase they wait at the corners
-  // and accumulate so a cluster is visible before the walk fires.
+  // all-vehicle-red walk, and only if they were already waiting when that
+  // walk started. New arrivals during walk stay at the curb for the next one.
   const pedestrians: Pedestrian[] = []
   let autoRequestNS = false
   let autoRequestEW = false
+  const admitWaitingCrowd = phase === 'pedestrian-crossing' && !walkCrowdReleased
   for (const raw of state.pedestrians) {
     const p = { ...raw }
-    if (p.waiting && pedestrianCrossing) {
+    if (p.waiting && admitWaitingCrowd) {
       p.crossing = true
       p.waiting = false
     }
@@ -547,7 +569,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     // pedestrians step onto the sidewalk instead of vanishing mid-crosswalk —
     // and so they actually leave the state instead of accumulating forever.
     if (p.crossing && p.progress < 1.2) {
-      p.progress += dt * 0.22
+      p.progress += dt * PED_WALK_SPEED
       if (p.progress >= 1) {
         p.done = true
       }
@@ -561,8 +583,17 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
       pedestrians.push(p)
     }
   }
-  const waitingCount = pedestrians.filter((p) => p.waiting).length
-  if (state.tick > 0 && waitingCount >= PED_AUTO_PRESS_MIN) {
+  if (admitWaitingCrowd) walkCrowdReleased = true
+
+  const readyWaiters = pedestrians.filter(
+    (p) => p.waiting && (p.waitTime ?? 0) >= PED_AUTO_PRESS_WAIT,
+  ).length
+  const autoPressAllowed =
+    state.tick > 0 &&
+    phase !== 'pedestrian-crossing' &&
+    pedWalkCooldown <= 0 &&
+    readyWaiters >= PED_AUTO_PRESS_MIN
+  if (autoPressAllowed) {
     for (const p of pedestrians) {
       if (p.waiting && (p.waitTime ?? 0) >= PED_AUTO_PRESS_WAIT) {
         if (p.approach === 'north' || p.approach === 'south') autoRequestEW = true
@@ -649,6 +680,8 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     crosswalkRequest,
     pedestrianCrossing,
     nextAxis,
+    walkCrowdReleased,
+    pedWalkCooldown,
   }
 }
 

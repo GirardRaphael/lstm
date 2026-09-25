@@ -357,5 +357,172 @@ describe('exclusive pedestrian crossing', () => {
       expect(state.pedestrians.filter((p) => p.waiting).length).toBeGreaterThanOrEqual(16)
     }
   })
+
+  it('releases every waiting pedestrian onto the zebra on the same walk tick', () => {
+    const approaches = ['north', 'south', 'east', 'west'] as const
+    const crowd = Array.from({ length: 12 }, (_, i) =>
+      makePedestrian({ id: i + 1, approach: approaches[i % 4], waitTime: 9 }),
+    )
+    let state = createInitialState(false)
+    state = {
+      ...state,
+      phase: 'pedestrian-crossing',
+      phaseTimer: 6,
+      pedestrianCrossing: true,
+      pedestrians: crowd,
+    }
+
+    state = stepSimulation(state, 0.05, () => 0.99)
+    const cohort = state.pedestrians.filter((p) => p.id >= 1 && p.id <= 12)
+    expect(cohort).toHaveLength(12)
+    expect(cohort.every((p) => p.crossing && !p.waiting)).toBe(true)
+    const progresses = cohort.map((p) => p.progress)
+    expect(Math.min(...progresses)).toBeGreaterThan(0)
+    expect(Math.max(...progresses) - Math.min(...progresses)).toBeLessThan(1e-9)
+  })
+
+  it('keeps a pedestrian who arrives during walk waiting until the next walk', () => {
+    let state = createInitialState(false)
+    state = {
+      ...state,
+      phase: 'pedestrian-crossing',
+      phaseTimer: 6,
+      pedestrianCrossing: true,
+      pedestrians: [makePedestrian({ id: 1, approach: 'north', waitTime: 8 })],
+    }
+    state = stepSimulation(state, 0.05, () => 0.99)
+    expect(state.pedestrians.find((p) => p.id === 1)?.crossing).toBe(true)
+
+    const latecomer = makePedestrian({ id: 99, approach: 'west', waitTime: 0 })
+    state = { ...state, pedestrians: [...state.pedestrians, latecomer] }
+    for (let i = 0; i < 20; i += 1) {
+      state = stepSimulation(state, 0.05, () => 0.99)
+      expect(state.phase).toBe('pedestrian-crossing')
+      const late = state.pedestrians.find((p) => p.id === 99)
+      expect(late).toBeDefined()
+      expect(late!.waiting).toBe(true)
+      expect(late!.crossing).toBe(false)
+      expect(late!.progress).toBe(0)
+      expect(pedestrianInCrosswalk(late!)).toBe(false)
+    }
+
+    while (state.phase === 'pedestrian-crossing') {
+      state = stepSimulation(state, 0.05, () => 0.99)
+    }
+    expect(state.pedestrians.find((p) => p.id === 99)?.waiting).toBe(true)
+
+    state = pressCrosswalkButton(state, 'ns')
+    let admittedOnNextWalk = false
+    for (let i = 0; i < 400; i += 1) {
+      state = stepSimulation(state, 0.05, () => 0.99)
+      if (state.phase === 'pedestrian-crossing') {
+        const late = state.pedestrians.find((p) => p.id === 99)
+        expect(late?.crossing).toBe(true)
+        expect(late?.waiting).toBe(false)
+        admittedOnNextWalk = true
+        break
+      }
+    }
+    expect(admittedOnNextWalk).toBe(true)
+  })
+
+  it('returns to a vehicle green after walk instead of locking into another walk', () => {
+    const approaches = ['north', 'south', 'east', 'west'] as const
+    const crowd = Array.from({ length: 16 }, (_, i) =>
+      makePedestrian({ id: 100 + i, approach: approaches[i % 4], waitTime: 30 }),
+    )
+    const car = makeVehicle({ id: 1, approach: 'east', progress: STOP_LINE, speed: 0.25 })
+    let state = createInitialState(false)
+    state = pressCrosswalkButton(state, 'ns')
+    state = {
+      ...state,
+      phase: 'all-red',
+      phaseTimer: 0.01,
+      nextAxis: 'ew',
+      vehicles: [car],
+      pedestrians: crowd,
+    }
+
+    state = stepSimulation(state, 0.05, () => 0.99)
+    expect(state.phase).toBe('pedestrian-crossing')
+    expect(state.pedestrians.filter((p) => p.id >= 100 && p.id < 116).every((p) => p.crossing)).toBe(
+      true,
+    )
+
+    for (let i = 0; i < 8; i += 1) {
+      state = {
+        ...state,
+        pedestrians: [
+          ...state.pedestrians,
+          makePedestrian({ id: 700 + i, approach: 'south', waitTime: 40 }),
+        ],
+      }
+      state = stepSimulation(state, 0.05, () => 0.99)
+      const late = state.pedestrians.find((p) => p.id === 700 + i)
+      expect(late?.waiting && !late.crossing, `latecomer ${700 + i} joined the zebra`).toBe(true)
+      const inBox = state.vehicles.some(vehicleOccupiesBox)
+      const walking = state.pedestrians.some(pedestrianInCrosswalk)
+      expect(inBox && walking).toBe(false)
+    }
+
+    const extras = Array.from({ length: 10 }, (_, i) =>
+      makePedestrian({ id: 800 + i, approach: 'west', waitTime: 40 }),
+    )
+    state = { ...state, pedestrians: [...state.pedestrians, ...extras] }
+
+    let greenPhase: SimState['phase'] | null = null
+    for (let i = 0; i < 250; i += 1) {
+      state = stepSimulation(state, 0.05, () => 0.99)
+      const inBox = state.vehicles.some(vehicleOccupiesBox)
+      const walking = state.pedestrians.some(pedestrianInCrosswalk)
+      expect(inBox && walking, `tick ${i} phase ${state.phase}`).toBe(false)
+      if (state.phase === 'ns-green' || state.phase === 'ew-green') {
+        greenPhase = state.phase
+        break
+      }
+    }
+    expect(greenPhase).toBe('ew-green')
+
+    const atGreen = state.vehicles.find((v) => v.id === 1)
+    expect(atGreen).toBeDefined()
+    const progressAtGreen = atGreen!.progress
+    for (let i = 0; i < 12; i += 1) {
+      state = stepSimulation(state, 0.05, () => 0.99)
+      expect(state.phase).toBe('ew-green')
+    }
+    const moving = state.vehicles.find((v) => v.id === 1)
+    expect(moving).toBeDefined()
+    expect(moving!.progress).toBeGreaterThan(progressAtGreen)
+    expect(moving!.progress).toBeGreaterThan(STOP_LINE)
+
+    let sawNsGreen = false
+    for (let i = 0; i < 400; i += 1) {
+      state = stepSimulation(state, 0.05, () => 0.99)
+      const inBox = state.vehicles.some(vehicleOccupiesBox)
+      const walking = state.pedestrians.some(pedestrianInCrosswalk)
+      expect(inBox && walking, `post-walk tick ${i} phase ${state.phase}`).toBe(false)
+      expect(state.phase).not.toBe('pedestrian-crossing')
+      if (state.phase === 'ns-green') {
+        sawNsGreen = true
+        break
+      }
+    }
+    expect(sawNsGreen).toBe(true)
+  })
+
+  it('still honours a manual crosswalk press during auto-press cooldown', () => {
+    let state = createInitialState(false)
+    state = {
+      ...state,
+      pedWalkCooldown: 12,
+      phase: 'all-red',
+      phaseTimer: 0.01,
+      pedestrians: [makePedestrian({ id: 1, approach: 'north' })],
+    }
+    state = pressCrosswalkButton(state, 'ns')
+    state = stepSimulation(state, 0.05, () => 0.99)
+    expect(state.phase).toBe('pedestrian-crossing')
+    expect(state.pedestrians[0]?.crossing).toBe(true)
+  })
 })
 
