@@ -365,7 +365,8 @@ export default function App() {
         </main>
       ) : (
         <main className="live-stage thinking-layout">
-          <section className="live-visual">
+          <div className="live-windows">
+            <section className="live-visual">
             <IntersectionCanvas state={state} />
             <div className={`response-banner ${state.jamActive ? 'hot' : ''}`}>
               <strong>{state.jamActive ? 'Jam response active' : 'Steady traffic'}</strong>
@@ -611,6 +612,7 @@ export default function App() {
               ))}
             </div>
           </aside>
+          </div>
 
           <DecisionLog
             log={log}

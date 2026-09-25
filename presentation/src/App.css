@@ -1,7 +1,5 @@
 .app-shell {
   min-height: 100vh;
-  height: 100vh;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   background:
@@ -86,8 +84,6 @@
 
 .slides-stage {
   flex: 1;
-  min-height: 0;
-  overflow: auto;
   display: grid;
   grid-template-rows: 1fr auto;
   padding: 1.75rem clamp(1rem, 4vw, 3rem) 1.5rem;
@@ -355,8 +351,6 @@ button.warn {
 
 .live-stage {
   flex: 1;
-  min-height: 0;
-  overflow: auto;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
   gap: 1.5rem;
@@ -364,21 +358,18 @@ button.warn {
 }
 
 .live-stage.thinking-layout {
-  grid-template-columns: minmax(520px, 1.65fr) minmax(300px, 0.9fr) minmax(235px, 0.7fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   align-items: stretch;
-  overflow: hidden;
+  gap: 1.5rem;
 }
 
-.live-stage.thinking-layout > .live-visual,
-.live-stage.thinking-layout > .thinking-panel,
-.live-stage.thinking-layout > .live-panel {
-  min-height: 0;
-  overflow: auto;
-}
-
-.live-stage.thinking-layout .thinking-panel {
-  max-height: none;
+.live-windows {
+  display: grid;
+  grid-template-columns: minmax(520px, 1.65fr) minmax(300px, 0.9fr) minmax(235px, 0.7fr);
+  align-items: start;
+  gap: 1.5rem;
+  min-width: 0;
 }
 
 .live-visual {
@@ -631,7 +622,6 @@ button.warn {
     inset 0 1px 0 rgba(244, 239, 230, 0.03);
   max-height: calc(100vh - 7rem);
   overflow: auto;
-  animation: rise 550ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .thinking-header {
@@ -836,23 +826,28 @@ button.warn {
 /* ---------------- Decision ledger ---------------- */
 
 .decision-ledger {
-  grid-column: 1 / -1;
   position: relative;
   z-index: 8;
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  max-height: min(46vh, 28rem);
-  overflow: auto;
-  padding: 0.95rem 1.1rem 1.05rem;
-  border-radius: 1.1rem 1.1rem 0 0;
+  flex: none;
+  border-radius: 1.1rem;
   background: rgba(7, 11, 15, 0.94);
   border: 1px solid rgba(244, 239, 230, 0.1);
-  border-bottom: 0;
   box-shadow:
     0 -16px 40px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(244, 239, 230, 0.04);
   backdrop-filter: blur(16px);
+}
+
+.decision-ledger details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.95rem 1.1rem 1.05rem;
+}
+
+.decision-ledger details[open] {
+  max-height: min(46vh, 28rem);
+  overflow: auto;
 }
 
 .ledger-header {
@@ -861,6 +856,47 @@ button.warn {
   justify-content: space-between;
   gap: 0.75rem 1.5rem;
   align-items: flex-start;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ledger-header::marker {
+  content: '';
+  display: none;
+}
+
+.ledger-header::-webkit-details-marker {
+  display: none;
+}
+
+.ledger-header::after {
+  content: '▾';
+  margin-left: auto;
+  color: var(--amber);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.decision-ledger details:not([open]) .ledger-header::after {
+  content: '▸';
+}
+
+.ledger-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  animation: ledger-roll 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes ledger-roll {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .ledger-kicker {
@@ -1103,37 +1139,26 @@ button.warn {
 /* ---------------- Responsive ---------------- */
 
 @media (max-width: 1200px) {
-  .live-stage.thinking-layout {
+  .live-windows {
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: none;
-    overflow: auto;
   }
 
   .live-panel {
     grid-column: 1 / -1;
   }
-
-  .decision-ledger {
-    grid-column: 1 / -1;
-    position: sticky;
-    bottom: 0;
-  }
 }
 
 @media (max-width: 900px) {
   .live-stage,
-  .live-stage.thinking-layout {
+  .live-windows {
     grid-template-columns: 1fr;
-    overflow: auto;
   }
 
   .thinking-panel {
     max-height: none;
   }
 
-  .decision-ledger {
-    position: sticky;
-    bottom: 0;
+  .decision-ledger details[open] {
     max-height: min(48vh, 28rem);
   }
 
