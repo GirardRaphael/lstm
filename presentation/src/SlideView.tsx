@@ -13,6 +13,29 @@ export function SlideView({ slide, index, total }: Props) {
         {slide.kicker ? <p className="slide-kicker">{slide.kicker}</p> : null}
         <h1 className="slide-title">{slide.title}</h1>
         {slide.body ? <p className="slide-body">{slide.body}</p> : null}
+        {slide.tables?.map((table) => (
+          <figure key={table.caption} className="compare-table">
+            <figcaption>{table.caption}</figcaption>
+            <table>
+              <thead>
+                <tr>
+                  {table.headers.map((header) => (
+                    <th key={header}>{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {table.rows.map((row) => (
+                  <tr key={row.join('|')}>
+                    {row.map((cell, ci) => (
+                      <td key={`${ci}-${cell}`}>{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </figure>
+        ))}
         {slide.bullets ? (
           <ul className="slide-bullets">
             {slide.bullets.map((item) => (

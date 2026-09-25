@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { IntersectionCanvas } from './IntersectionCanvas'
 import { SlideView } from './SlideView'
 import { ThinkingPanel } from './ThinkingPanel'
-import { thinkDecision, type NeuronTraceFile } from './decisionBrain'
+import {
+  congestionIntensity,
+  thinkDecision,
+  type HourLookupFile,
+  type LiveModelOutput,
+} from './decisionBrain'
 import { SLIDES } from './slides'
 import {
   createInitialState,
@@ -45,7 +50,9 @@ export default function App() {
   const [adaptive, setAdaptive] = useState(true)
   const [running, setRunning] = useState(true)
   const [lastAction, setLastAction] = useState('Ready — randomize traffic or force a jam.')
-  const [traces, setTraces] = useState<NeuronTraceFile | null>(null)
+  const [lookup, setLookup] = useState<HourLookupFile | null>(null)
+  const [liveModel, setLiveModel] = useState<LiveModelOutput | null>(null)
+  const [modelStatus, setModelStatus] = useState('Loading Keras hour lookup…')
   const [state, setState] = useState<SimState>(() =>
     spawnAgents(createInitialState(true), { cars: 12, trucks: 3, pedestrians: 20 }),
   )
@@ -53,10 +60,22 @@ export default function App() {
   const seededLive = useRef(false)
 
   useEffect(() => {
-    fetch('/neuron_traces.json')
-      .then((r) => r.json())
-      .then((data: NeuronTraceFile) => setTraces(data))
-      .catch(() => setTraces(null))
+    fetch('/hour_lookup.json')
+      .then((r) => {
+        if (!r.ok) throw new Error(`lookup ${r.status}`)
+        return r.json()
+      })
+      .then((data: HourLookupFile) => {
+        if (!Array.isArray(data.hours) || data.hours.length === 0) {
+          throw new Error('empty lookup')
+        }
+        setLookup(data)
+        setModelStatus('Replayed Keras output for the closest real hour (static lookup loaded).')
+      })
+      .catch(() => {
+        setLookup(null)
+        setModelStatus('Model lookup failed to load — forecast hidden; green stays heuristic.')
+      })
   }, [])
 
   useEffect(() => {
@@ -138,7 +157,53 @@ export default function App() {
     [state.queues],
   )
   const liveCounts = useMemo(() => countByKind(state), [state])
-  const thought = useMemo(() => thinkDecision(state, traces), [state, traces])
+  const intensityBucket = Math.round(congestionIntensity(state) * 40)
+
+  useEffect(() => {
+    if (mode !== 'live') return
+    const intensity = intensityBucket / 40
+    const controller = new AbortController()
+    fetch(`/api/forecast?intensity=${intensity.toFixed(3)}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`api ${r.status}`))))
+      .then((data) => {
+        if (!data?.ok || !Number.isFinite(data.predicted_vehicles)) {
+          throw new Error('invalid forecast')
+        }
+        setLiveModel({
+          index: data.index,
+          timestamp: data.timestamp,
+          actual_vehicles: data.actual_vehicles,
+          predicted_vehicles: data.predicted_vehicles,
+          gates: data.gates,
+          neurons: data.neurons,
+          dense: data.dense,
+          top_neurons: data.top_neurons ?? [],
+          source: 'sidecar',
+          demand_query: data.demand_query,
+          label: data.label,
+          model: data.model,
+        })
+        setModelStatus(
+          'Live sidecar: NumPy forward pass of baseline_univariate.keras on the closest real hour.',
+        )
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return
+        setLiveModel(null)
+        if (lookup) {
+          setModelStatus(
+            'Sidecar offline — using static replayed Keras output for the closest real hour.',
+          )
+        } else {
+          setModelStatus(
+            `Model unavailable${err instanceof Error ? ` (${err.message})` : ''} — forecast hidden.`,
+          )
+        }
+      })
+    return () => controller.abort()
+  }, [mode, intensityBucket, lookup])
+
+  const thought = useMemo(() => thinkDecision(state, liveModel, lookup), [state, liveModel, lookup])
 
   const randomizeCounts = () => {
     const counts = randomSpawnCounts()
@@ -209,24 +274,29 @@ export default function App() {
             <div className={`response-banner ${state.jamActive ? 'hot' : ''}`}>
               <strong>{state.jamActive ? 'Jam response active' : 'Steady traffic'}</strong>
               <span>
-                Heaviest: {thought.congested} ({thought.congestedQueue} PCU) · brain regime{' '}
-                {thought.regime} · forecast ~{Math.round(thought.forecastVehicles)} veh/h ·{' '}
-                {thought.recommendedAxis.toUpperCase()} green {thought.recommendedGreen.toFixed(1)}s
+                Heaviest: {thought.congested} ({thought.congestedQueue} PCU) · regime {thought.regime} ·
+                forecast{' '}
+                {Number.isFinite(thought.forecastVehicles)
+                  ? `~${Math.round(thought.forecastVehicles)} veh/h`
+                  : 'unavailable'}{' '}
+                ({thought.source}) · heuristic {thought.recommendedAxis.toUpperCase()} green{' '}
+                {thought.recommendedGreen.toFixed(1)}s
               </span>
             </div>
             <p className="sim-disclaimer">
-              Left: simulated intersection. Center: real LSTM gate/neuron thinking blended by live
-              demand. Not connected to city signals.
+              Simulation only — not city signals. Cartoon lights are not a closed-loop controller.
+              Forecast is a real Keras-weight replay for the closest Metro Interstate hour.{' '}
+              {modelStatus}
             </p>
           </section>
 
-          <ThinkingPanel thought={thought} traces={traces} />
+          <ThinkingPanel thought={thought} />
 
           <aside className="live-panel">
             <h2>Intersection controls</h2>
             <p className="panel-lead">
-              Force a jam and watch forget / input / output gates and the neuron grid shift before
-              green time moves.
+              Force a jam. Gates and neurons come from the closest real test hour. Green time is a
+              queue heuristic driven by that forecast — the LSTM did not choose the light.
             </p>
 
             <p className="action-log" role="status">
@@ -342,7 +412,7 @@ export default function App() {
                 checked={adaptive}
                 onChange={(e) => setAdaptive(e.target.checked)}
               />
-              Adaptive green (queue-aware)
+              Adaptive green (heuristic from forecast / queue — not LSTM-chosen lights)
             </label>
 
             <div className="crosswalk-row">

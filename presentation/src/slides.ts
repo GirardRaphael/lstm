@@ -5,6 +5,11 @@ export type Slide = {
   body?: string
   bullets?: string[]
   metricRows?: { label: string; value: string; note?: string }[]
+  tables?: {
+    caption: string
+    headers: string[]
+    rows: string[][]
+  }[]
   footer?: string
   variant?: 'hero' | 'content' | 'dark-metric' | 'warning'
 }
@@ -14,8 +19,8 @@ export const SLIDES: Slide[] = [
     id: 'title',
     variant: 'hero',
     kicker: 'Traffic Observatory · LSTM demo',
-    title: 'Forecast the next hour.\nSee every neuron fire.',
-    body: 'A stacked LSTM trained on Metro Interstate traffic — plus a live 2D intersection that reacts when demand spikes.',
+    title: 'Forecast the next hour.\nOpen the network.\nCompare the tree.',
+    body: 'A stacked LSTM on Metro Interstate traffic, scored next to XGBoost, plus a 2D intersection that is a simulation — not city signals.',
     footer: 'Raphael Girard · presentation deck · simulation labelled read-only',
   },
   {
@@ -31,9 +36,21 @@ export const SLIDES: Slide[] = [
     ],
   },
   {
+    id: 'why-lstm',
+    variant: 'content',
+    kicker: '02 · Why LSTM was still studied',
+    title: 'Sequential hours, gates, inspectable state.',
+    body: 'Not “LSTM is the winner.” XGBoost was stronger on the motorway. The LSTM stays because the mechanism is visible.',
+    bullets: [
+      'Ordered hours: rush builds over a day; a cell state can keep or discard that history at each step',
+      'Gates are explicit valves (forget / input / output) — introspect.py replays them from trained weights',
+      'The live panel shows that state; it does not prove the LSTM should run a city’s lights',
+    ],
+  },
+  {
     id: 'pipeline',
     variant: 'content',
-    kicker: '02 · Pipeline honesty',
+    kicker: '03 · Pipeline honesty',
     title: 'Chronological split. Scaler never sees the future.',
     bullets: [
       'No shuffled train/test — production only has the past',
@@ -43,73 +60,91 @@ export const SLIDES: Slide[] = [
     ],
   },
   {
+    id: 'xgb-vs-lstm',
+    variant: 'dark-metric',
+    kicker: '04 · Say this out loud',
+    title: 'The verdict flips by dataset. Keep both.',
+    body: 'XGBoost won on motorway MAE. LSTM won (narrowly) on bikes. That is why both stay.',
+    tables: [
+      {
+        caption: 'UCI Metro Interstate (vehicles / hour) — XGBoost won',
+        headers: ['Model', 'MAE', 'Note'],
+        rows: [
+          ['XGBoost + calendar', '154.3', 'best on this set'],
+          ['LSTM + calendar', '201.4', 'best LSTM on this set'],
+          ['LSTM univariate', '228.8', 'past traffic only'],
+          ['Naive last-hour', '585.6', 'floor to beat'],
+        ],
+      },
+      {
+        caption: 'UCI Bike Sharing (rentals / hour) — LSTM won, narrowly',
+        headers: ['Setup', 'LSTM', 'XGBoost', 'Winner'],
+        rows: [
+          ['Univariate', '41.3', '43.1', 'LSTM by 4.1%'],
+          ['+ weather & calendar', '38.5', '38.6', 'LSTM by 0.3%'],
+        ],
+      },
+    ],
+    footer:
+      'Sources: reports/model_comparison.json, reports/REPORT.md. MAE units differ across datasets — compare within a row only.',
+  },
+  {
     id: 'results',
     variant: 'dark-metric',
-    kicker: '03 · Motorway results (MAE, vehicles/h)',
-    title: 'Calendar helps. Weather mostly costs.',
+    kicker: '05 · Motorway MAE (vehicles/h)',
+    title: 'Calendar helps the LSTM. Weather mostly costs.',
     metricRows: [
       { label: 'XGBoost + calendar', value: '154.3', note: 'best on this dataset' },
       { label: 'LSTM + calendar', value: '201.4', note: '−12% vs univariate LSTM' },
       { label: 'LSTM traffic only', value: '228.8', note: 'documented vault run' },
       { label: 'Naive “last hour”', value: '585.6', note: 'must beat this' },
     ],
-    footer: 'Verdict flips on bike-sharing: LSTM wins by 0.3%. One dataset cannot settle the tool choice.',
+    footer:
+      'XGBoost won on the motorway. On bike-sharing the LSTM won (41.3 vs 43.1 univariate; 38.5 vs 38.6 multivariate). Verdict flips. Keep both.',
   },
   {
     id: 'neurons',
     variant: 'content',
-    kicker: '04 · Interpretability',
+    kicker: '06 · Interpretability',
     title: 'The decision is visible neuron by neuron.',
     bullets: [
       'introspect.py replays every LSTM gate in NumPy from the trained weights',
       'Checked against Keras each export — max abs error ~1e-7',
-      'Rush-hour vs quiet-night: different units light up',
-      'In the live demo, those real traces drive the decision brain as traffic changes',
+      'Live panel: nearest real Metro Interstate hour, then a real forward pass — not a quiet/rush blend',
+      'That is inspection of a forecast, not closed-loop control of signals',
     ],
-  },
-  {
-    id: 'thinking',
-    variant: 'dark-metric',
-    kicker: '04b · What you will see live',
-    title: 'Gates open. Neurons fire. Then green moves.',
-    bullets: [
-      'Forget / Input / Candidate / Output — the four LSTM decisions at the last hour',
-      'LSTM-2 neuron grid blended between real quiet-night and rush-hour traces',
-      'Step-by-step decision trace: sense queue → update memory → forecast → stretch green',
-    ],
-    footer: 'This is the same mechanism documented in the Obsidian Traffic_LSTM_Brain vault.',
   },
   {
     id: 'product',
     variant: 'warning',
-    kicker: '05 · Product boundary',
-    title: 'Traffic Observatory — observation, not control.',
-    body: 'This demo can adapt green time inside a simulator. It does not connect to signal cabinets, roadside hardware, or a city feed.',
+    kicker: '07 · Product boundary',
+    title: 'Simulation only. Not city signals.',
+    body: 'This intersection is a visual. The cartoon lights are not a closed-loop controller and are not connected to signal cabinets, roadside hardware, or a city feed.',
     bullets: [
-      'Street-data preflight: cadence, gaps, duplicates, freshness',
-      'Forecast packages are versioned and hash-verified',
-      'Any live corridor work needs an authorized partner dataset',
+      'The LSTM forecasts next-hour demand on stored motorway hours',
+      'Recommended green in the demo is a queue heuristic driven by that forecast — the LSTM did not choose the light',
+      'Street-data preflight and versioned forecast packages exist for later corridor work, with an authorized partner dataset',
     ],
   },
   {
     id: 'live',
     variant: 'hero',
-    kicker: '06 · Live demo',
-    title: 'Jam the intersection.\nWatch the network think.',
-    body: 'Randomize cars, trucks, and pedestrians. Force a jam. The decision brain shows gates, neurons, and the green-time choice as demand rises.',
-    footer: 'Press Live intersection → in the top bar',
+    kicker: '08 · Live demo',
+    title: 'Jam the intersection.\nWatch a real hour replay.',
+    body: 'Randomize cars, trucks, and pedestrians. Force a jam. The brain shows gates and neurons from baseline_univariate.keras on the closest real test hour.',
+    footer: 'Press Live intersection → in the top bar · simulation only',
   },
   {
     id: 'talk-track',
     variant: 'content',
-    kicker: '07 · 3-minute talk track',
+    kicker: '09 · 3-minute talk track',
     title: 'Say this, then click Live.',
     bullets: [
-      '“We forecast next-hour volume with a causal LSTM — and we can open every gate.”',
-      '“On motorway data, calendar features help; weather mostly overfits the LSTM.”',
-      '“Now watch a jam: forget/input/output gates shift, rush neurons light up, then green stretches.”',
-      '“Simulation only — the network explains the decision; it does not control real signals.”',
+      '“Simulation only — these cartoon lights are not a closed-loop controller and are not connected to city signals.”',
+      '“On Metro Interstate, XGBoost+calendar MAE 154.3 beat LSTM+calendar 201.4 and univariate LSTM 228.8. Last-hour was 585.6.”',
+      '“On bike-sharing the LSTM won narrowly: 41.3 vs XGBoost 43.1, and 38.5 vs 38.6 with weather+calendar. The verdict flips. That is why both stay.”',
+      '“We still studied the LSTM for sequential hours and inspectable gates — not because it is the universal winner.”',
     ],
-    footer: 'Keep the product boundary slide in reserve if someone asks about real signals.',
+    footer: 'Keep the product-boundary slide if someone asks about real signals.',
   },
 ]

@@ -17,6 +17,9 @@ function thought(overrides: Partial<DecisionThought>): DecisionThought {
     dense: Array.from({ length: 16 }, () => 0),
     steps: [],
     why: '',
+    source: 'lookup',
+    sourceNote: 'test',
+    matchedHour: { index: 0, timestamp: '2018-01-01 00:00:00', actual: 800 },
     ...overrides,
   }
 }

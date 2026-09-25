@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { DecisionThought, GateKey, NeuronTraceFile } from './decisionBrain'
+import type { DecisionThought, GateKey } from './decisionBrain'
 import { NeuralGraph } from './NeuralGraph'
 
 const GATE_META: Record<GateKey, { label: string; hint: string }> = {
@@ -11,17 +11,25 @@ const GATE_META: Record<GateKey, { label: string; hint: string }> = {
 
 type Props = {
   thought: DecisionThought
-  traces: NeuronTraceFile | null
 }
 
-export function ThinkingPanel({ thought, traces }: Props) {
+export function ThinkingPanel({ thought }: Props) {
   const topNeurons = useMemo(() => thought.topNeurons.slice(0, 5), [thought.topNeurons])
+  const forecastText = Number.isFinite(thought.forecastVehicles)
+    ? `~${Math.round(thought.forecastVehicles).toLocaleString()} veh/h`
+    : 'unavailable'
+  const sourceLabel =
+    thought.source === 'sidecar'
+      ? 'sidecar · Keras replay'
+      : thought.source === 'lookup'
+        ? 'closest real hour'
+        : 'model unavailable'
 
   return (
     <section className="thinking-panel" aria-label="Neural decision thinking">
       <header className="thinking-header">
         <div>
-          <p className="thinking-kicker">Decision brain · live</p>
+          <p className="thinking-kicker">Decision brain · simulation</p>
           <h2>Neural decision network</h2>
         </div>
         <div className={`regime-pill regime-${thought.regime}`}>
@@ -71,18 +79,25 @@ export function ThinkingPanel({ thought, traces }: Props) {
         </div>
         <div className="flow-step">
           <span className="flow-num">2</span>
-          <span>Forecast ~{Math.round(thought.forecastVehicles).toLocaleString()} veh/h</span>
+          <span>
+            Forecast {forecastText}
+            {thought.matchedHour ? ` · hour ${thought.matchedHour.timestamp}` : ''}
+          </span>
         </div>
         <div className="flow-step">
           <span className="flow-num">3</span>
           <span>
-            {thought.recommendedAxis.toUpperCase()} green → {thought.recommendedGreen.toFixed(1)}s
+            Heuristic {thought.recommendedAxis.toUpperCase()} green → {thought.recommendedGreen.toFixed(1)}s
           </span>
         </div>
       </div>
 
+      <p className="source-pill" data-source={thought.source}>
+        {sourceLabel}
+      </p>
+      <p className="thinking-note">{thought.sourceNote}</p>
       <p className="thinking-note">
-        {traces?.claim ?? 'Gates replayed from trained Keras weights in NumPy.'}
+        Cartoon lights are not a closed-loop controller. The LSTM did not choose the light.
       </p>
     </section>
   )

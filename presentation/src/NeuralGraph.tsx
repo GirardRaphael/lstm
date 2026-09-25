@@ -88,7 +88,11 @@ export function buildGraph(thought: DecisionThought): { nodes: GraphNode[]; edge
         x: layer.x,
         y: layer.count > 1 ? yStart + i * yStep : 0.5,
         activation: Math.max(0, Math.min(1, activation)),
-        label: li === 4 ? `${Math.round(thought.forecastVehicles)}` : undefined,
+        label: li === 4
+          ? Number.isFinite(thought.forecastVehicles)
+            ? `${Math.round(thought.forecastVehicles)}`
+            : '—'
+          : undefined,
       })
     }
   })

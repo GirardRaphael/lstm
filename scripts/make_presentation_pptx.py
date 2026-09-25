@@ -197,19 +197,18 @@ bullets(s, [
 ], y=2.2, size=17, gap=14)
 footer(s, "Supervised regression · target = vehicles per hour", pg())
 
-# ================= 3 · WHY LSTM =================
+# ================= 3 · WHY LSTM WAS STUDIED =================
 s = add_slide()
 accent_bar(s)
-kicker(s, "02 · Why LSTM is the right algorithm here")
-title(s, "Traffic has memory. LSTM is built for memory.")
+kicker(s, "02 · Why LSTM was still studied")
+title(s, "Sequential hours, gates, inspectable state.")
 bullets(s, [
-    ("Ordered dependence", "rush hour builds over hours — 8h ago still matters. A feed-forward net sees a flat vector; an LSTM carries a cell state through the sequence and decides what to keep."),
-    ("Selective memory is inspectable", "forget / input / output gates are explicit multiplicative valves. We can read them — and this project does, neuron by neuron."),
-    ("Long-range without explosion", "the cell state's additive update (c = f·c + i·g) avoids the vanishing gradient that kills plain RNNs on 24-step sequences."),
-    ("Multivariate & multi-horizon ready", "weather, calendar, and horizons 1/3/6 drop in as extra channels — no feature re-engineering."),
-    ("Proven on this data", "beats both naive baselines by ~61% and wins outright on the second dataset (bike sharing)."),
+    ("Not the blanket winner", "XGBoost+calendar MAE 154.3 beat LSTM+calendar 201.4 on Metro Interstate. We did not study LSTM because it is “the right algorithm”."),
+    ("Ordered dependence", "rush hour builds over hours. A cell state walks the sequence and decides what to keep — that mechanism is the reason to open the box."),
+    ("Selective memory is inspectable", "forget / input / output gates are explicit valves. introspect.py replays them from trained weights, checked against Keras to ~1e-7."),
+    ("The live panel is inspection", "nearest real test hour, then a real forward pass. It is not proof that an LSTM should run a city’s lights."),
 ], y=2.15, size=15.5, gap=11)
-footer(s, "Hochreiter & Schmidhuber, 1997 — applied to hourly traffic counts", pg())
+footer(s, "Hochreiter & Schmidhuber, 1997 — used here as an inspectable sequence model, not as a championship claim", pg())
 
 # ================= 4 · WHY NOT THE ALTERNATIVES =================
 s = add_slide()
@@ -224,8 +223,8 @@ table(s, 0.9, 2.0, 11.5, [
     ["Stacked LSTM", "Native sequence memory, inspectable gates", "MAE 201.4 — wins on bike sharing"],
 ], [3.2, 5.0, 3.3], size=12.5)
 text(s, 0.9, 5.4, 11.5, 1.2,
-     "Engineering stance: XGBoost is the champion baseline; the LSTM is the challenger that explains itself.\n"
-     "Where temporal structure dominates (bike rentals), the LSTM wins. The tool choice is empirical — measured, not argued.",
+     "Say this out loud: XGBoost won on motorway MAE (154.3 vs LSTM 201.4). LSTM won narrowly on bikes\n"
+     "(41.3 vs 43.1 univariate; 38.5 vs 38.6 with weather+calendar). The verdict flips. Keep both.",
      size=14, color=STEEL, line_spacing=1.3)
 footer(s, "Both families evaluated on identical chronological tensors", pg())
 
@@ -303,8 +302,8 @@ footer(s, "Identical chronological split · identical eligible windows", pg())
 # ================= 9 · RESULTS — BIKE =================
 s = add_slide()
 accent_bar(s)
-kicker(s, "08 · The verdict flips")
-title(s, "Second dataset, opposite winner.")
+kicker(s, "08 · The verdict flips — say it out loud")
+title(s, "XGBoost won on motorway. LSTM won on bikes.")
 table(s, 0.9, 2.1, 11.5, [
     ["Bike-sharing (hourly rentals)", "LSTM", "XGBoost", "Winner"],
     ["Univariate", "41.3", "43.1", "LSTM by 4.2%"],
@@ -312,7 +311,7 @@ table(s, 0.9, 2.1, 11.5, [
 ], [4.6, 2.2, 2.2, 2.5], size=14)
 bullets(s, [
     ("Same code, same evaluation", "the only thing that changed is the dataset."),
-    ("The lesson", "one dataset cannot settle “LSTM vs boosting” — the question is empirical, and this project measures it instead of asserting it."),
+    ("The lesson", "one dataset cannot settle “LSTM vs boosting”. Verdict flips. That is why both stay."),
 ], y=4.3, size=15.5, gap=12)
 footer(s, "Capital Bikeshare hourly · identical pipeline", pg())
 
@@ -357,10 +356,10 @@ bullets(s, [
     ("2D intersection, real rules", "three lanes per approach — left / straight / right; cars stop at red, queue behind each other, and wait for their arrow."),
     ("Pedestrian crosswalks", "press NS or EW — the button lights up and the next all-red becomes a walk phase."),
     ("Traffic jams on demand", "inject 15–25 vehicles into one approach and watch queues form."),
-    ("The decision brain", "live LSTM gates (forget / input / output), a neural graph that lights up, and a step-by-step decision trace: sense queue → update memory → forecast → stretch green."),
-    ("Adaptive green", "green time follows queue pressure — 4 s minimum up to 16 s under a jam."),
+    ("The decision brain", "gates and neurons from a real Keras-weight replay of the closest Metro Interstate hour — not a quiet/rush blend, not closed-loop control."),
+    ("Adaptive green", "heuristic from queue/forecast — the LSTM did not choose the light. 4 s minimum up to 16 s under a jam."),
 ], y=2.15, size=15, gap=11)
-footer(s, "Simulation only — no connection to real signals or city sensors", pg())
+footer(s, "Simulation only — cartoon lights are not a closed-loop controller and are not connected to city signals", pg())
 
 # ================= 13 · LIMITS =================
 s = add_slide()
@@ -368,7 +367,7 @@ accent_bar(s)
 kicker(s, "12 · What it cannot do")
 title(s, "The honest limits.")
 bullets(s, [
-    ("It forecasts; it does not control", "the output is a number a controller could consume — this project never touches signal hardware."),
+    ("It forecasts; it does not control", "the cartoon lights are not a closed-loop controller. This project never touches signal hardware."),
     ("First-time events are invisible", "a model trained on history cannot predict the unprecedented."),
     ("XGBoost is stronger on the motorway data", "the LSTM is the interpretable challenger, not the universal champion — and the vault says so in writing."),
     ("Gaps are real", "28.7% of training windows span breaks in the series; disclosed, measured, and guarded — not hidden."),
@@ -381,10 +380,10 @@ rect(s, 0, 7.38, 13.333, 0.12, TEAL)
 text(s, 0.9, 1.5, 11, 0.5, "SUMMARY", size=14, color=AMBER, bold=True, font=FONT_MONO)
 text(s, 0.9, 2.1, 11.5, 1.6, "A forecaster you can interrogate.", size=44, color=PAPER, bold=True, font=FONT_DISPLAY)
 bullets(s, [
-    "Stacked LSTM, 24 hours → next-hour vehicles, 61–66% better than naive rules.",
+    "Stacked LSTM vs XGBoost: motorway MAE 154.3 (XGB) vs 201.4 (LSTM); bikes 41.3 vs 43.1 — verdict flips.",
     "Causal v2 pipeline: split before fit, zero future leakage, hash-verified packages.",
     "The mechanism is the deliverable: gates and neurons replayed and verified to 1e-7.",
-    "Live demo: an intersection that obeys real traffic rules while the network's thinking stays on screen.",
+    "Live demo: simulation only; real Keras-hour replay in the brain; heuristic greens — not city signals.",
 ], y=3.6, size=16, gap=12)
 text(s, 0.9, 6.2, 11, 0.5, "github.com/GirardRaphael/lstm", size=14, color=TEAL, font=FONT_MONO)
 pg()

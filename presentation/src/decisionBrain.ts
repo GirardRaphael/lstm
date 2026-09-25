@@ -2,37 +2,40 @@ import type { Approach, SimState } from './simulation'
 
 export type GateKey = 'i' | 'f' | 'g' | 'o'
 
-export type NeuronTraceWindow = {
-  label: string
-  actual_vehicles: number
-  predicted_vehicles: number
-  max_abs_error_vs_keras?: number
-  layers: Array<{
-    name: string
-    units: number
-    gates_final: Record<GateKey, number>
-    gate_series: Record<GateKey, number[]>
-    hidden_final: number[]
-    top_neurons: Array<{
-      unit: number
-      mean_abs: number
-      final: number
-      role: string
-      mean_forget: number
-    }>
-  }>
-  dense_hidden: number[] | null
-  gate_names: Record<string, string>
+export type ModelNeuron = {
+  unit: number
+  mean_abs: number
+  final: number
+  role: string
+  mean_forget: number
 }
 
-export type NeuronTraceFile = {
+export type ModelHourRow = {
+  index: number
+  timestamp: string
+  actual_vehicles: number
+  predicted_vehicles: number
+  gates: Record<GateKey, number>
+  neurons: number[]
+  dense: number[]
+  top_neurons: ModelNeuron[]
+}
+
+export type HourLookupFile = {
   model: string
   claim: string
-  architecture: Array<{ id: string; label: string; units: number }>
-  windows: {
-    rush: NeuronTraceWindow
-    quiet: NeuronTraceWindow
-  }
+  hours: ModelHourRow[]
+  quiet_actual?: number
+  rush_actual?: number
+}
+
+export type ModelSource = 'sidecar' | 'lookup' | 'unavailable'
+
+export type LiveModelOutput = ModelHourRow & {
+  source: Exclude<ModelSource, 'unavailable'>
+  demand_query?: number
+  label?: string
+  model?: string
 }
 
 export type DecisionThought = {
@@ -45,20 +48,18 @@ export type DecisionThought = {
   congestedQueue: number
   gates: Record<GateKey, number>
   neurons: number[]
-  topNeurons: NeuronTraceWindow['layers'][0]['top_neurons']
+  topNeurons: ModelNeuron[]
   dense: number[]
   steps: string[]
   why: string
+  source: ModelSource
+  sourceNote: string
+  matchedHour: { index: number; timestamp: string; actual: number } | null
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t
-}
-
-function lerpArr(a: number[], b: number[], t: number): number[] {
-  const n = Math.min(a.length, b.length)
-  return Array.from({ length: n }, (_, i) => lerp(a[i], b[i], t))
-}
+/** Real Metro Interstate test-hour actuals used to map cartoon congestion. */
+export const QUIET_ACTUAL = 151
+export const RUSH_ACTUAL = 7213
 
 export function congestionIntensity(state: SimState): number {
   const queues = Object.values(state.queues)
@@ -74,7 +75,58 @@ export function heaviestApproach(state: SimState): { approach: Approach; queue: 
   return { approach: entries[0][0], queue: entries[0][1] }
 }
 
-export function thinkDecision(state: SimState, traces: NeuronTraceFile | null): DecisionThought {
+export function demandFromCongestion(intensity: number): number {
+  const t = Math.max(0, Math.min(1, intensity))
+  return QUIET_ACTUAL + t * (RUSH_ACTUAL - QUIET_ACTUAL)
+}
+
+export function pickNearestHour(demand: number, hours: ModelHourRow[]): ModelHourRow | null {
+  if (!hours.length) return null
+  let best = hours[0]
+  let bestDist = Math.abs(best.actual_vehicles - demand)
+  for (let i = 1; i < hours.length; i += 1) {
+    const dist = Math.abs(hours[i].actual_vehicles - demand)
+    if (dist < bestDist) {
+      best = hours[i]
+      bestDist = dist
+    }
+  }
+  return best
+}
+
+export function isRealModelRow(row: ModelHourRow | LiveModelOutput | null | undefined): boolean {
+  return Boolean(
+    row &&
+      Number.isFinite(row.predicted_vehicles) &&
+      row.gates &&
+      Array.isArray(row.neurons) &&
+      row.neurons.length > 0,
+  )
+}
+
+function applyRow(row: ModelHourRow): Pick<
+  DecisionThought,
+  'forecastVehicles' | 'gates' | 'neurons' | 'topNeurons' | 'dense' | 'matchedHour'
+> {
+  return {
+    forecastVehicles: row.predicted_vehicles,
+    gates: { ...row.gates },
+    neurons: row.neurons.slice(),
+    topNeurons: row.top_neurons.slice(0, 6),
+    dense: row.dense.slice(),
+    matchedHour: {
+      index: row.index,
+      timestamp: row.timestamp,
+      actual: row.actual_vehicles,
+    },
+  }
+}
+
+export function thinkDecision(
+  state: SimState,
+  live: LiveModelOutput | null,
+  lookup: HourLookupFile | null,
+): DecisionThought {
   const intensity = congestionIntensity(state)
   const { approach, queue } = heaviestApproach(state)
   const recommendedAxis: 'ns' | 'ew' =
@@ -85,63 +137,79 @@ export function thinkDecision(state: SimState, traces: NeuronTraceFile | null): 
       ? state.nsGreen
       : state.ewGreen
 
-  const quiet = traces?.windows.quiet
-  const rush = traces?.windows.rush
-  const t = intensity
+  const demand = demandFromCongestion(intensity)
+  let source: ModelSource = 'unavailable'
+  let sourceNote =
+    'Model output unavailable — forecast hidden. Green time is still a local heuristic, not an LSTM control signal.'
+  let forecastVehicles = Number.NaN
+  let gates: Record<GateKey, number> = { i: 0, f: 0, g: 0, o: 0 }
+  let neurons: number[] = []
+  let topNeurons: ModelNeuron[] = []
+  let dense: number[] = []
+  let matchedHour: DecisionThought['matchedHour'] = null
 
-  let gates: Record<GateKey, number> = { i: 0.4, f: 0.5, g: 0.1, o: 0.4 }
-  let neurons: number[] = Array.from({ length: 32 }, (_, i) => Math.sin(i + intensity * 4) * 0.2)
-  let topNeurons: DecisionThought['topNeurons'] = []
-  let dense: number[] = Array.from({ length: 16 }, (_, i) => Math.max(0, intensity - i * 0.03))
-  let forecastVehicles = 800 + intensity * 5000
-
-  if (quiet && rush) {
-    const qL = quiet.layers[0]
-    const rL = rush.layers[0]
-    gates = {
-      i: lerp(qL.gates_final.i, rL.gates_final.i, t),
-      f: lerp(qL.gates_final.f, rL.gates_final.f, t),
-      g: lerp(qL.gates_final.g, rL.gates_final.g, t),
-      o: lerp(qL.gates_final.o, rL.gates_final.o, t),
+  if (isRealModelRow(live) && live) {
+    const applied = applyRow(live)
+    forecastVehicles = applied.forecastVehicles
+    gates = applied.gates
+    neurons = applied.neurons
+    topNeurons = applied.topNeurons
+    dense = applied.dense
+    matchedHour = applied.matchedHour
+    source = 'sidecar'
+    sourceNote =
+      live.label ??
+      'Live NumPy replay of baseline_univariate.keras on the closest real Metro Interstate hour. Replayed Keras output — not a closed-loop controller.'
+  } else {
+    const picked = pickNearestHour(demand, lookup?.hours ?? [])
+    if (isRealModelRow(picked) && picked) {
+      const applied = applyRow(picked)
+      forecastVehicles = applied.forecastVehicles
+      gates = applied.gates
+      neurons = applied.neurons
+      topNeurons = applied.topNeurons
+      dense = applied.dense
+      matchedHour = applied.matchedHour
+      source = 'lookup'
+      sourceNote =
+        lookup?.claim ??
+        'Replayed Keras output for the closest real hour. Not a blend of quiet/rush traces; not city signals.'
     }
-    // Prefer second LSTM hidden (32) for compact neuron grid
-    const qH = quiet.layers[1]?.hidden_final ?? quiet.layers[0].hidden_final
-    const rH = rush.layers[1]?.hidden_final ?? rush.layers[0].hidden_final
-    neurons = lerpArr(qH, rH, t)
-    const qTop = quiet.layers[1]?.top_neurons ?? quiet.layers[0].top_neurons
-    const rTop = rush.layers[1]?.top_neurons ?? rush.layers[0].top_neurons
-    topNeurons = (t > 0.45 ? rTop : qTop).slice(0, 6)
-    if (quiet.dense_hidden && rush.dense_hidden) {
-      dense = lerpArr(quiet.dense_hidden, rush.dense_hidden, t)
-    }
-    forecastVehicles = lerp(quiet.predicted_vehicles, rush.predicted_vehicles, t)
   }
 
   const regime: DecisionThought['regime'] =
     intensity < 0.28 ? 'calm' : intensity < 0.62 ? 'building' : 'jam'
 
   const axisLabel = recommendedAxis === 'ns' ? 'North–South' : 'East–West'
+  const forecastText = Number.isFinite(forecastVehicles)
+    ? `${Math.round(forecastVehicles)}`
+    : 'unavailable'
+  const hourText = matchedHour
+    ? `closest real hour ${matchedHour.timestamp} (test index ${matchedHour.index}, actual ${Math.round(matchedHour.actual)} veh/h)`
+    : 'no real hour matched'
+
   const steps = [
-    `Sense ${queue} PCU waiting on ${approach} (live intersection).`,
-    `Forget gate ${(gates.f * 100).toFixed(0)}% — ${
-      gates.f > 0.55 ? 'keep recent demand memory' : 'discard stale calm pattern'
-    }.`,
-    `Input gate ${(gates.i * 100).toFixed(0)}% — ${
-      gates.i > 0.45 ? 'write the jam evidence into cell state' : 'little new information'
-    }.`,
-    `Output gate ${(gates.o * 100).toFixed(0)}% — expose hidden state to the decision head.`,
-    `Forecast demand ≈ ${Math.round(forecastVehicles)} vehicles/h from the trained LSTM blend.`,
+    `Sense ${queue} PCU waiting on ${approach} (simulated intersection).`,
+    source === 'unavailable'
+      ? 'No real model row loaded — gates stay dark rather than a fake blend.'
+      : `Map live congestion to demand ≈ ${Math.round(demand)} veh/h and select ${hourText}.`,
+    source === 'unavailable'
+      ? 'Forecast withheld.'
+      : `Forget ${(gates.f * 100).toFixed(0)}% / input ${(gates.i * 100).toFixed(0)}% / output ${(gates.o * 100).toFixed(0)}% from that Keras-weight replay.`,
+    `Forecast demand ≈ ${forecastText} veh/h (${source === 'sidecar' ? 'live sidecar forward pass' : source === 'lookup' ? 'replayed Keras output for the closest real hour' : 'unavailable'}).`,
     state.adaptive
-      ? `Decision: stretch ${axisLabel} green toward ${recommendedGreen.toFixed(1)}s.`
-      : `Decision: fixed timing held (adaptive OFF) — green stays ${recommendedGreen.toFixed(1)}s.`,
+      ? `Heuristic (not the LSTM): stretch ${axisLabel} green toward ${recommendedGreen.toFixed(1)}s from the forecast/queue.`
+      : `Heuristic held off — fixed ${axisLabel} green stays ${recommendedGreen.toFixed(1)}s.`,
   ]
 
   const why =
-    regime === 'jam'
-      ? `Rush-like neuron pattern is active. Top units are firing hard, so the controller borrows green time for ${approach}.`
-      : regime === 'building'
-        ? `Demand is climbing — gates are opening and more LSTM units leave the quiet regime.`
-        : `Quiet-night neuron pattern dominates — short balanced greens are enough.`
+    source === 'unavailable'
+      ? 'The live panel has no real model artifact, so it will not invent a quiet/rush blend. Cartoon lights are not a closed-loop controller.'
+      : regime === 'jam'
+        ? `Replay is a high-demand Metro Interstate hour. The forecast is real; the green stretch is a simulator heuristic driven by that number — the LSTM did not choose the light.`
+        : regime === 'building'
+          ? `Demand maps onto a mid-range real hour. Sequential state is inspectable here; this is still a simulation, not city signals.`
+          : `Replay is a quiet-night Metro Interstate hour. Short balanced greens are a heuristic, not an LSTM control output.`
 
   return {
     intensity,
@@ -157,5 +225,8 @@ export function thinkDecision(state: SimState, traces: NeuronTraceFile | null): 
     dense,
     steps,
     why,
+    source,
+    sourceNote,
+    matchedHour,
   }
 }
