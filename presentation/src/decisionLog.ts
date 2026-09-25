@@ -437,11 +437,16 @@ export function applyUserOverride(
     ),
     pendingAxisOverride: nextAxis,
   }
+  const queueForGreen = peakOnAxis(live.queues, nextAxis)
+  const recommendedGreen = live.adaptive
+    ? Math.min(14, Math.max(3.5, 3.5 + queueForGreen * 0.55))
+    : live.recommendedGreen
   const snap: DecisionSnapshot = {
     ...live,
     trigger: 'override',
     userOverride: nextAxis,
     recommendedAxis: nextAxis,
+    recommendedGreen,
     atMs: live.atMs,
   }
   return ingestSnapshot(marked, snap)
