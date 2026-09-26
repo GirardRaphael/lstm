@@ -42,5 +42,7 @@
     "narrowing": false,
     "gap_at_shortest": 104.88,
     "gap_at_longest": 120.17
-  }
+  },
+  "evidence_status": "aborted_two_epoch_run_not_for_selection",
+  "pipeline_version": "v1"
 }

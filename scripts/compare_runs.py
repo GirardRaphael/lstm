@@ -129,7 +129,7 @@ def build_table(runs, benchmarks) -> dict:
                      "mae": mae, "rmse": None, "mape": None, "features": 0,
                      "train_sequences": None, "seconds": 0, "epochs": 0})
     rows.sort(key=lambda r: (r["dataset"], r["mae"]))
-    return {"rows": rows}
+    return {"rows": rows, "pipeline_version": "v1", "evidence_status": "v1_exploratory"}
 
 
 def group_by_dataset(rows) -> dict:
@@ -169,18 +169,9 @@ def _cross_dataset_section(grouped: dict) -> str:
             ds=DATASET_LABELS.get(key, key), lstm=best_lstm["mae"], xgb=best_xgb["mae"],
             w=winner, m=margin, u=DATASET_UNITS.get(key, "units per hour")))
 
-    verdict = (
-        "**The verdict flips between the two datasets.** That is the single most\n"
-        "useful thing this project found, and it is only visible because the same\n"
-        "pipeline was run on a second, unrelated series.\n\n"
-        "Anyone who concludes \"gradient boosting beats LSTMs on time series\" from\n"
-        "the traffic result alone would be wrong on the bike data, and vice versa.\n"
-        "The right conclusion is narrower and more useful: *this* comparison is\n"
-        "cheap to run, so run it on your data instead of inheriting someone else's\n"
-        "answer."
-        if len(flips) > 1 else
-        "The same family wins on both datasets, which is weak evidence that the\n"
-        "result is about the method rather than about one particular series.")
+    verdict = ("These are exploratory v1 point estimates selected after test inspection. "
+               "The bike MAE gap does not establish a winner; MAPE favors XGBoost. "
+               "Use the v2 report for matched-window diagnostics and uncertainty.")
 
     return """
 ## Does the verdict hold on a second dataset?
@@ -189,7 +180,7 @@ The same code, the same architecture, the same evaluation - pointed at hourly
 **bike rentals in Washington DC** instead of motorway traffic. Only two
 command-line arguments changed.
 
-| Dataset | Best LSTM | Best XGBoost | Winner | Unit |
+| Dataset | Best LSTM | Best XGBoost | Lower point estimate | Unit |
 | --- | --- | --- | --- | --- |
 {rows}
 
@@ -235,7 +226,7 @@ def vault_note(grouped: dict, primary: str, horizons, maes) -> str:
                 "24-hour window is close to the ideal case for a tree ensemble: the useful\n"
                 "signal is almost entirely in `t-1h`, `t-2h` and `t-24h`, and a tree can\n"
                 "split on those directly without learning a recurrence.\n\n"
-                "**When the LSTM would start to win:**\n\n"
+                "**Unverified research hypotheses, not demonstrated LSTM advantages:**\n\n"
                 "- dependencies longer than the input window, where lag columns run out\n"
                 "- many correlated series (several junctions) sharing one model\n"
                 "- irregular or variable-length sequences, which a fixed lag table cannot express\n"
@@ -268,7 +259,7 @@ tags: [results, comparison]
 ---
 # 09 Model Comparison
 
-Every model tried on the motorway dataset, scored on **the same test windows**.
+Archived v1 exploratory comparisons. Eligibility differs for gap-guarded and multi-horizon runs; these rows are not a controlled ablation.
 
 ![[10_model_comparison.png]]
 

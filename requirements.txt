@@ -1,4 +1,4 @@
-# Python 3.12 recommended (TensorFlow does not yet ship wheels for 3.13 on Windows)
+# Python 3.12 is the tested runtime. Install requirements.lock for reproducibility.
 numpy
 pandas
 matplotlib
@@ -8,3 +8,5 @@ streamlit
 plotly
 jupyterlab
 ipykernel
+xgboost
+pytest

@@ -1,0 +1,38 @@
+.venv/Scripts/python.exe : WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+At line:2 char:55
++ ... _LEVEL='3'; .venv/Scripts/python.exe -u -m traffic_lstm.backtest --da ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: All lo...itten to STDERR:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+I0000 00:00:1790362695.502997   32300 port.cc:153] oneDNN custom operations are on. You may see slightly different 
+numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the 
+environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790362696.854454   32300 port.cc:153] oneDNN custom operations are on. You may see slightly different 
+numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the 
+environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+bikes fold=1 seed=7
+WARNING:tensorflow:From 
+C:\Users\xxrap\OneDrive\Documents\GitHub\lstm\.venv\Lib\site-packages\keras\src\backend\common\global_state.py:82: The 
+name tf.reset_default_graph is deprecated. Please use tf.compat.v1.reset_default_graph instead.
+
+WARNING:tensorflow:TensorFlow GPU support is not available on native Windows for TensorFlow >= 2.11. Even if 
+CUDA/cuDNN are installed, GPU will not be used. Please use WSL2 or the TensorFlow-DirectML plugin.
+Restoring model weights from the end of the best epoch: 20.
+bikes fold=1 seed=42
+Restoring model weights from the end of the best epoch: 19.
+bikes fold=1 seed=123
+Restoring model weights from the end of the best epoch: 20.
+bikes fold=2 seed=7
+Restoring model weights from the end of the best epoch: 20.
+bikes fold=2 seed=42
+Restoring model weights from the end of the best epoch: 20.
+bikes fold=2 seed=123
+Restoring model weights from the end of the best epoch: 20.
+bikes fold=3 seed=7
+Restoring model weights from the end of the best epoch: 19.
+bikes fold=3 seed=42
+Restoring model weights from the end of the best epoch: 20.
+bikes fold=3 seed=123
+Restoring model weights from the end of the best epoch: 19.

@@ -376,5 +376,7 @@
       "seconds": 0,
       "epochs": 0
     }
-  ]
+  ],
+  "evidence_status": "v1_exploratory",
+  "pipeline_version": "v1"
 }

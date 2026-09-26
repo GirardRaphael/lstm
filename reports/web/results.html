@@ -310,7 +310,7 @@ pre code { background: none; padding: 0; }
 }
 </style>
 
-<div class="wrap">
+<div class="wrap"><aside style="padding:20px;background:#fff0cc;color:#222"><strong>Archived v1 exploratory evidence.</strong> These historical scores have preprocessing and model-selection limitations. They do not establish production readiness. See reports/REPORT.md.</aside>
 
 <header class="masthead">
   <div class="eyebrow">Machine learning coursework &middot; hourly time series &middot; regression</div>
@@ -581,7 +581,7 @@ pre code { background: none; padding: 0; }
   <div class="col">
     <p>The headline version sees <strong>only past traffic</strong>. Snow, a closed lane, a stadium emptying out &mdash; all invisible, and all precisely the hours when a forecast would earn its keep. It cannot predict a first-time event, because it extrapolates patterns it has already seen. It is harder to interpret than a decision tree; the vault narrows that gap without closing it. And on this dataset it is both slower and less accurate than gradient boosting.</p>
     <p>One claim deserves care, because overstating it is the easiest mistake to make: <strong>this model does not control traffic lights.</strong> It produces a forecast that a controller could consume.</p>
-    <pre><code>sensors → hourly history → model → forecast → controller → adaptive lights</code></pre>
+    <pre><code>stored hourly observations → forecast → offline evaluation</code></pre>
     <p>The most useful next step is not a bigger network. Every experiment above shares one architecture and one 24-hour window; the open question is whether an LSTM starts to pay for itself where a lag table cannot follow &mdash; several junctions sharing one model, dependencies longer than the window, variable-length sequences. That is a different experiment, not a bigger one.</p>
   </div>
 </section>

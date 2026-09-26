@@ -1,0 +1,750 @@
+{
+  "code_revision": "4d7e284fda0c73ce8a7b191380d6d34937ce4bdf",
+  "source_sha256": {
+    "pipeline_v2.py": "5ca36061eb04edb2585445730b67d6075a7fa32b59f578431f62dc34953d66a2",
+    "evaluation_v2.py": "af3f5c1de4d8d742428a75c630c4602f5b3d2a00ee67cde34321ba4eabf75c6e",
+    "model.py": "d6f18dd0941a2e3b420ce7af4ab74881492ec56a9064595681f9896fa15c3e51",
+    "config.py": "42b58f2fa97ab44a1824909a5138d682abc2dc53a8fe726ad0d5792d9cbf9b22"
+  },
+  "evidence_status": "retrospective_reanalysis_not_untouched_confirmatory_test",
+  "selected_on_validation": "xgboost",
+  "pipeline_version": "v2",
+  "preprocessing_version": "v2-causal-1",
+  "run_name": "bikes_v2_20260925",
+  "created_utc": "2026-09-25T18:43:51+00:00",
+  "site_scope": "washington-dc-bike-aggregate",
+  "cadence": "1h",
+  "cadence_seconds": 3600.0,
+  "timestamp_convention": "dataset clock labels preserved; interval start/end and timezone not independently verified; not a live-feed contract",
+  "units": {
+    "rentals": "rentals/hour"
+  },
+  "schema": {
+    "datetime_column": "date_time",
+    "target_column": "rentals",
+    "exogenous_columns": [],
+    "feature_names": [
+      "rentals",
+      "hour_sin",
+      "hour_cos",
+      "weekday_sin",
+      "weekday_cos"
+    ],
+    "xgboost_layout": "direct_lags",
+    "xgboost_direct_features": [
+      "target_t-1h",
+      "target_t-24h",
+      "target_t-168h",
+      "target_hour_sin",
+      "target_hour_cos",
+      "target_weekday_sin",
+      "target_weekday_cos"
+    ],
+    "calendar_features": true,
+    "derived_features": [
+      "hour_sin",
+      "hour_cos",
+      "weekday_sin",
+      "weekday_cos"
+    ],
+    "known_future_inputs": "calendar sin/cos features are functions of the timestamp only and are legitimately known at forecast time"
+  },
+  "sequence_length": 24,
+  "horizons": [
+    1
+  ],
+  "seed": 42,
+  "config": {
+    "pipeline_version": "v2",
+    "data_path": "C:\\Users\\xxrap\\OneDrive\\Documents\\GitHub\\lstm\\data\\samples\\bike_sharing_hourly.csv",
+    "datetime_column": "date_time",
+    "target_column": "rentals",
+    "exogenous_columns": [],
+    "units": {
+      "rentals": "rentals/hour"
+    },
+    "cadence": "1h",
+    "site_scope": "washington-dc-bike-aggregate",
+    "calendar_features": true,
+    "sequence_length": 24,
+    "horizons": [
+      1
+    ],
+    "fit_ratio": 0.64,
+    "validation_ratio": 0.16,
+    "fit_end": null,
+    "validation_end": null,
+    "duplicate_policy": "mean",
+    "seasonal_period": "24h",
+    "mape_min_actual": 1.0,
+    "seed": 42,
+    "run_name": "bikes_v2_20260925",
+    "output_dir": "C:\\Users\\xxrap\\OneDrive\\Documents\\GitHub\\lstm\\models\\v2",
+    "lstm_units": [
+      64,
+      32
+    ],
+    "dense_units": 16,
+    "dropout": 0.2,
+    "learning_rate": 0.001,
+    "epochs": 50,
+    "batch_size": 128,
+    "patience": 8,
+    "xgb_n_estimators": 1000,
+    "xgb_max_depth": 6,
+    "xgb_learning_rate": 0.05,
+    "xgb_subsample": 0.8,
+    "xgb_colsample": 0.8,
+    "xgb_early_stopping": 40,
+    "xgb_layout": "direct_lags"
+  },
+  "duplicate_policy": "mean",
+  "splits": {
+    "rule": "ratios_over_cleaned_rows",
+    "fit": {
+      "start": "2011-01-01T00:00:00",
+      "end": "2012-04-13T14:00:00",
+      "rows": 11122
+    },
+    "validation": {
+      "start": "2012-04-13T15:00:00",
+      "end": "2012-08-07T10:00:00",
+      "rows": 2780
+    },
+    "test": {
+      "start": "2012-08-07T11:00:00",
+      "end": "2012-12-31T23:00:00",
+      "rows": 3477
+    },
+    "boundary_purge_rule": "an example whose target horizon crosses a partition boundary is dropped entirely; rows from an earlier partition may still serve as input context"
+  },
+  "coverage": {
+    "candidate_windows": 17355,
+    "eligible": {
+      "fit": 9518,
+      "validation": 2780,
+      "test": 3359
+    },
+    "excluded": {
+      "non_cadence_step": 1698,
+      "missing_input": 0,
+      "missing_target": 0,
+      "boundary_purge": 0
+    },
+    "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+  },
+  "data_quality": {
+    "rows_raw": 17379,
+    "rows_clean": 17379,
+    "duplicate_rows_collapsed": 0,
+    "start": "2011-01-01T00:00:00",
+    "end": "2012-12-31T23:00:00",
+    "cadence": "1h",
+    "expected_intervals": 17544,
+    "missing_intervals": 165,
+    "missing_values_by_column": {
+      "rentals": 0
+    }
+  },
+  "series_sha256": "ea08d87337fac816545fbdf9eda798efa9e490f1662044e85b086eba04d77b5b",
+  "scalers": {
+    "target": {
+      "data_min": [
+        1.0
+      ],
+      "data_max": [
+        957.0
+      ],
+      "feature_range": [
+        0.0,
+        1.0
+      ]
+    },
+    "features": {
+      "data_min": [
+        1.0,
+        -1.0,
+        -1.0,
+        -0.9749279121818236,
+        -0.9009688679024191
+      ],
+      "data_max": [
+        957.0,
+        1.0,
+        1.0,
+        0.9749279121818236,
+        1.0
+      ],
+      "feature_range": [
+        0.0,
+        1.0
+      ]
+    }
+  },
+  "models": {
+    "lstm": {
+      "path": "model.keras",
+      "kind": "keras-stacked-lstm",
+      "sha256": "7381e3513c3e0bb1f175cbb47ac8056cd98a9f185918e47a11800a9358e030f5"
+    },
+    "xgboost": {
+      "h1": {
+        "path": "xgb_h1.json",
+        "kind": "xgboost-regressor",
+        "trees_used": 232,
+        "sha256": "3ddb7025c8a87cb56b3d23611741f8b4039515ca8401613d1d6459c71f67ec07"
+      }
+    }
+  },
+  "weights_path": "model.keras",
+  "dependencies": {
+    "python": "3.12.10",
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "scikit-learn": "1.9.1",
+    "tensorflow": "2.21.0",
+    "keras": "3.15.1",
+    "xgboost": "3.4.1"
+  },
+  "training": {
+    "lstm_objective": "MAE on fit-only MinMax target scale",
+    "epochs_run": 50,
+    "training_seconds": {
+      "lstm": 48.2,
+      "xgboost": 0.6
+    },
+    "history": {
+      "loss": [
+        0.07886185497045517,
+        0.08538680523633957,
+        0.08663318306207657,
+        0.07818770408630371,
+        0.07366800308227539,
+        0.06982511281967163,
+        0.0674171894788742,
+        0.06851566582918167,
+        0.061480093747377396,
+        0.05970389395952225,
+        0.05862988531589508,
+        0.056878238916397095,
+        0.05689340457320213,
+        0.05260143801569939,
+        0.05027854070067406,
+        0.050534289330244064,
+        0.04709696024656296,
+        0.04608535394072533,
+        0.04411422833800316,
+        0.04359437897801399,
+        0.04302862286567688,
+        0.04307129234075546,
+        0.04097193107008934,
+        0.041185442358255386,
+        0.039482370018959045,
+        0.03885171562433243,
+        0.03818574920296669,
+        0.038275785744190216,
+        0.0379604771733284,
+        0.03688928112387657,
+        0.036390047520399094,
+        0.03608619421720505,
+        0.03559218719601631,
+        0.03528643772006035,
+        0.03374725580215454,
+        0.032583240419626236,
+        0.03221709653735161,
+        0.032099492847919464,
+        0.03141435608267784,
+        0.031988464295864105,
+        0.03150443732738495,
+        0.031264469027519226,
+        0.03160105273127556,
+        0.03062216192483902,
+        0.0308589655905962,
+        0.03130727633833885,
+        0.030408469960093498,
+        0.030324053019285202,
+        0.030234728008508682,
+        0.02985226735472679
+      ],
+      "mae": [
+        0.07886185497045517,
+        0.08538680523633957,
+        0.08663318306207657,
+        0.07818770408630371,
+        0.07366800308227539,
+        0.06982511281967163,
+        0.0674171894788742,
+        0.06851566582918167,
+        0.061480093747377396,
+        0.05970389395952225,
+        0.05862988531589508,
+        0.056878238916397095,
+        0.05689340457320213,
+        0.05260143801569939,
+        0.05027854070067406,
+        0.050534289330244064,
+        0.04709696024656296,
+        0.04608535394072533,
+        0.04411422833800316,
+        0.04359437897801399,
+        0.04302862286567688,
+        0.04307129234075546,
+        0.04097193107008934,
+        0.041185442358255386,
+        0.039482370018959045,
+        0.03885171562433243,
+        0.03818574920296669,
+        0.038275785744190216,
+        0.0379604771733284,
+        0.03688928112387657,
+        0.036390047520399094,
+        0.03608619421720505,
+        0.03559218719601631,
+        0.03528643772006035,
+        0.03374725580215454,
+        0.032583240419626236,
+        0.03221709653735161,
+        0.032099492847919464,
+        0.03141435608267784,
+        0.031988464295864105,
+        0.03150443732738495,
+        0.031264469027519226,
+        0.03160105273127556,
+        0.03062216192483902,
+        0.0308589655905962,
+        0.03130727633833885,
+        0.030408469960093498,
+        0.030324053019285202,
+        0.030234728008508682,
+        0.02985226735472679
+      ],
+      "val_loss": [
+        0.11232730001211166,
+        0.10597434639930725,
+        0.1053353101015091,
+        0.10789863765239716,
+        0.10679853707551956,
+        0.09847919642925262,
+        0.08476848155260086,
+        0.0901792123913765,
+        0.07995247840881348,
+        0.0752415880560875,
+        0.07130134850740433,
+        0.07099772989749908,
+        0.06932971626520157,
+        0.060261789709329605,
+        0.05644256994128227,
+        0.06088542938232422,
+        0.05771169811487198,
+        0.055718693882226944,
+        0.05407198518514633,
+        0.05959083512425423,
+        0.06059875339269638,
+        0.05585490167140961,
+        0.05282276123762131,
+        0.05988680198788643,
+        0.05220711976289749,
+        0.05380525812506676,
+        0.05042733997106552,
+        0.04889725521206856,
+        0.04749820753931999,
+        0.04459754750132561,
+        0.04589168727397919,
+        0.050493210554122925,
+        0.04455395042896271,
+        0.04621259868144989,
+        0.04701629653573036,
+        0.04485629126429558,
+        0.043227843940258026,
+        0.044310666620731354,
+        0.04353179782629013,
+        0.04250749573111534,
+        0.0420449934899807,
+        0.04201624169945717,
+        0.04432669281959534,
+        0.04221608489751816,
+        0.04260387271642685,
+        0.04414363577961922,
+        0.0429280661046505,
+        0.04331962764263153,
+        0.0421324260532856,
+        0.04331410676240921
+      ],
+      "val_mae": [
+        0.11232730001211166,
+        0.10597434639930725,
+        0.1053353101015091,
+        0.10789863765239716,
+        0.10679853707551956,
+        0.09847919642925262,
+        0.08476848155260086,
+        0.0901792123913765,
+        0.07995247840881348,
+        0.0752415880560875,
+        0.07130134850740433,
+        0.07099772989749908,
+        0.06932971626520157,
+        0.060261789709329605,
+        0.05644256994128227,
+        0.06088542938232422,
+        0.05771169811487198,
+        0.055718693882226944,
+        0.05407198518514633,
+        0.05959083512425423,
+        0.06059875339269638,
+        0.05585490167140961,
+        0.05282276123762131,
+        0.05988680198788643,
+        0.05220711976289749,
+        0.05380525812506676,
+        0.05042733997106552,
+        0.04889725521206856,
+        0.04749820753931999,
+        0.04459754750132561,
+        0.04589168727397919,
+        0.050493210554122925,
+        0.04455395042896271,
+        0.04621259868144989,
+        0.04701629653573036,
+        0.04485629126429558,
+        0.043227843940258026,
+        0.044310666620731354,
+        0.04353179782629013,
+        0.04250749573111534,
+        0.0420449934899807,
+        0.04201624169945717,
+        0.04432669281959534,
+        0.04221608489751816,
+        0.04260387271642685,
+        0.04414363577961922,
+        0.0429280661046505,
+        0.04331962764263153,
+        0.0421324260532856,
+        0.04331410676240921
+      ],
+      "learning_rate": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0001250000059371814
+      ]
+    },
+    "lstm": {
+      "lstm_units": [
+        64,
+        32
+      ],
+      "dense_units": 16,
+      "dropout": 0.2,
+      "learning_rate": 0.001,
+      "batch_size": 128,
+      "patience": 8
+    },
+    "xgboost": {
+      "n_estimators": 1000,
+      "max_depth": 6,
+      "learning_rate": 0.05,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "early_stopping": 40
+    }
+  },
+  "evaluation": {
+    "protocol": {
+      "metrics": [
+        "mae",
+        "rmse",
+        "mape",
+        "bias",
+        "peak_hour_mae",
+        "mae_ci"
+      ],
+      "peak_hours": "weekdays 07-09 and 16-18 inclusive, dataset clock",
+      "uncertainty": "95% percentile bootstrap of calendar-day blocks; 500 replicates; conditional on fitted model; not prediction intervals or seed variability",
+      "undefined_policy": "percentage metrics with no actual above mape_min_actual, and improvements over a zero-error baseline, are undefined and serialise as JSON null",
+      "mape_min_actual": 1.0,
+      "baselines": [
+        "hour_of_week_mean (fit only; fit mean for unseen slots)",
+        "naive_persistence",
+        "naive_seasonal (24h, timestamp-based, persistence fallback)"
+      ],
+      "partition_rule": "chronological fit/validation/test; scalers fitted on fit rows only; windows with missing or non-cadence steps excluded; examples whose targets cross a partition boundary purged"
+    },
+    "validation": {
+      "h1": {
+        "lstm": {
+          "mae": 40.16752884332811,
+          "rmse": 61.72283348327163,
+          "mape": 27.48962573737932,
+          "n": 2780,
+          "mape_n": 2777,
+          "bias": -13.653376069373666,
+          "peak_hour_mae": 65.87640350938933,
+          "peak_hour_n": 492,
+          "mae_ci": {
+            "low": 37.65403615007519,
+            "high": 43.05279549199272,
+            "confidence": 0.95,
+            "blocks": 117,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "xgboost": {
+          "mae": 37.056769700888246,
+          "rmse": 57.16412389765337,
+          "mape": 24.16068962040602,
+          "n": 2780,
+          "mape_n": 2777,
+          "bias": -9.301281132997458,
+          "peak_hour_mae": 71.39605117752787,
+          "peak_hour_n": 492,
+          "mae_ci": {
+            "low": 34.78508300246229,
+            "high": 39.49589383594621,
+            "confidence": 0.95,
+            "blocks": 117,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "naive_persistence": {
+          "mae": 87.06474787525903,
+          "rmse": 128.20874928981857,
+          "mape": 54.61904957621564,
+          "n": 2780,
+          "mape_n": 2777,
+          "bias": 0.035251686099423335,
+          "peak_hour_mae": 217.44105752266762,
+          "peak_hour_n": 492,
+          "mae_ci": {
+            "low": 82.58691527429667,
+            "high": 92.29931344756368,
+            "confidence": 0.95,
+            "blocks": 117,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "naive_seasonal": {
+          "mae": 85.72446030259631,
+          "rmse": 140.4002064872318,
+          "mape": 69.83659140006448,
+          "n": 2780,
+          "mape_n": 2777,
+          "bias": -0.5510792491523757,
+          "peak_hour_mae": 125.80284486499016,
+          "peak_hour_n": 492,
+          "mae_ci": {
+            "low": 75.2703566168894,
+            "high": 96.25850328560387,
+            "confidence": 0.95,
+            "blocks": 117,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "hour_of_week_mean": {
+          "mae": 124.71488424423622,
+          "rmse": 166.50223194150627,
+          "mape": 48.54007943362403,
+          "n": 2780,
+          "mape_n": 2777,
+          "bias": -117.95103950162368,
+          "peak_hour_mae": 234.58130890979868,
+          "peak_hour_n": 492,
+          "mae_ci": {
+            "low": 119.05007860128065,
+            "high": 130.9431367288844,
+            "confidence": 0.95,
+            "blocks": 117,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "paired_xgboost_minus_lstm_mae": {
+          "mean": -3.1107591424398655,
+          "ci": {
+            "low": -5.26886070487657,
+            "high": -0.7567749385536042,
+            "confidence": 0.95,
+            "blocks": 117,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "improvement_over_best_naive_pct": {
+          "lstm": 53.14,
+          "xgboost": 56.77
+        }
+      }
+    },
+    "test": {
+      "h1": {
+        "lstm": {
+          "mae": 38.35185579709813,
+          "rmse": 59.65404185218101,
+          "mape": 28.557602143800125,
+          "n": 3359,
+          "mape_n": 3352,
+          "bias": -9.093518989934218,
+          "peak_hour_mae": 73.04427601108772,
+          "peak_hour_n": 588,
+          "mae_ci": {
+            "low": 36.23692833546659,
+            "high": 40.749863120130144,
+            "confidence": 0.95,
+            "blocks": 145,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "xgboost": {
+          "mae": 36.82669367643068,
+          "rmse": 60.20335906477226,
+          "mape": 24.129645090370847,
+          "n": 3359,
+          "mape_n": 3352,
+          "bias": -8.888840131315506,
+          "peak_hour_mae": 77.80204780869263,
+          "peak_hour_n": 588,
+          "mae_ci": {
+            "low": 34.278010532286366,
+            "high": 39.111094761181064,
+            "confidence": 0.95,
+            "blocks": 145,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "naive_persistence": {
+          "mae": 86.20750216447287,
+          "rmse": 130.52184272336888,
+          "mape": 53.04413691463671,
+          "n": 3359,
+          "mape_n": 3352,
+          "bias": 0.12473946066484597,
+          "peak_hour_mae": 219.93877565624433,
+          "peak_hour_n": 588,
+          "mae_ci": {
+            "low": 80.38225834882861,
+            "high": 92.23307816241909,
+            "confidence": 0.95,
+            "blocks": 145,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "naive_seasonal": {
+          "mae": 79.85829116480997,
+          "rmse": 133.93984508147977,
+          "mape": 66.54199419631192,
+          "n": 3359,
+          "mape_n": 3352,
+          "bias": 1.0431675642671077,
+          "peak_hour_mae": 122.28571435862987,
+          "peak_hour_n": 588,
+          "mae_ci": {
+            "low": 70.99517692789989,
+            "high": 89.85668930009233,
+            "confidence": 0.95,
+            "blocks": 145,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "hour_of_week_mean": {
+          "mae": 118.45819232407374,
+          "rmse": 166.97789328598495,
+          "mape": 52.75712048561504,
+          "n": 3359,
+          "mape_n": 3352,
+          "bias": -102.31854619316071,
+          "peak_hour_mae": 246.09436384005147,
+          "peak_hour_n": 588,
+          "mae_ci": {
+            "low": 111.50008821745016,
+            "high": 126.28920466478567,
+            "confidence": 0.95,
+            "blocks": 145,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "paired_xgboost_minus_lstm_mae": {
+          "mean": -1.5251621206674446,
+          "ci": {
+            "low": -3.8337697448001435,
+            "high": 0.7628505984406215,
+            "confidence": 0.95,
+            "blocks": 145,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "improvement_over_best_naive_pct": {
+          "lstm": 51.98,
+          "xgboost": 53.88
+        }
+      }
+    }
+  }
+}

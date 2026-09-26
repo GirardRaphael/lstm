@@ -44,7 +44,8 @@ def scaler_from_dict(payload: dict):
 
 
 # -------------------------------------------------------------- training ----
-def train(cfg: TrainingConfig, bundle: DataBundle | None = None, verbose: int = 1) -> dict:
+def train(cfg: TrainingConfig, bundle: DataBundle | None = None, verbose: int = 1,
+          callbacks: list | None = None) -> dict:
     """Train one model and return a dictionary of everything worth keeping."""
     set_seeds(cfg.seed)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,7 +68,7 @@ def train(cfg: TrainingConfig, bundle: DataBundle | None = None, verbose: int = 
         epochs=cfg.epochs,
         batch_size=cfg.batch_size,
         validation_split=cfg.validation_split,
-        callbacks=default_callbacks(cfg),
+        callbacks=default_callbacks(cfg) + list(callbacks or []),
         shuffle=False,   # keep the temporal order inside the validation split
         verbose=verbose,
     )

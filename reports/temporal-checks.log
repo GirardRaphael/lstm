@@ -1,0 +1,56 @@
+.venv/Scripts/python.exe : WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+At line:2 char:87
++ ... _LEVEL='2'; .venv/Scripts/python.exe tests/test_temporal.py > reports ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: All lo...itten to STDERR:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+I0000 00:00:1790361500.288947   18500 port.cc:153] oneDNN custom operations are on. You may see slightly different 
+numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the 
+environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790361548.873432   18500 port.cc:153] oneDNN custom operations are on. You may see slightly different 
+numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the 
+environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING:tensorflow:TensorFlow GPU support is not available on native Windows for TensorFlow >= 2.11. Even if 
+CUDA/cuDNN are installed, GPU will not be used. Please use WSL2 or the TensorFlow-DirectML plugin.
+  PASS  chronology: fit/validation/test partitions are strictly ordered
+  PASS  chronology: scalers are fitted on fit rows only, never validation/test
+  PASS  future mutation: rows after the fit boundary cannot change fitted transforms
+  PASS  future mutation: editing test rows leaves validation windows untouched
+  PASS  missing: non-hourly steps exclude windows, counted by reason
+  PASS  missing: NaN inputs/targets are excluded and never scored as zero
+  PASS  units: undeclared units are rejected
+  PASS  units: a column named temp is not assumed to be kelvin
+  PASS  boundary purge: multi-horizon targets never cross a partition
+  PASS  seasonal baseline: wall-clock timestamps, persistence fallback
+Restoring model weights from the end of the best epoch: 1.
+  PASS  training: tiny LSTM + XGBoost produce a complete versioned package
+  PASS  parity: save/reload reproduces predictions (univariate)
+Restoring model weights from the end of the best epoch: 1.
+WARNING:tensorflow:5 out of the last 13 calls to <function 
+TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000024D18C01B20> triggered 
+tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating 
+@tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of 
+tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True 
+option that can avoid unnecessary retracing. For (3), please refer to 
+https://www.tensorflow.org/guide/function#controlling_retracing and 
+https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+WARNING:tensorflow:5 out of the last 13 calls to <function 
+TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x0000024D18CF2700> triggered 
+tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating 
+@tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of 
+tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True 
+option that can avoid unnecessary retracing. For (3), please refer to 
+https://www.tensorflow.org/guide/function#controlling_retracing and 
+https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+  PASS  parity: save/reload reproduces predictions (multivariate)
+  PASS  forecast: multivariate inference is correctly timestamped and matches the model
+  PASS  corruption: tampered or mismatched artifacts are rejected by hash
+Restoring model weights from the end of the best epoch: 1.
+  PASS  metrics: undefined percentage metrics serialise as JSON null
+  PASS  refusal: run-name collision and gapped history are refused
+  PASS  legacy: nine archived v1 artifacts parse; window_* are metrics-only
+
+18 passed, 0 failed
+

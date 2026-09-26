@@ -1,6 +1,9 @@
 ---
 tags: [results, comparison]
 ---
+
+> **Archived v1 exploratory evidence.** Preprocessing includes validation contamination; some runs bridge gaps or use future-informed weather fills. Test results informed historical choices. These scores do not validate a deployed product. See the current `reports/REPORT.md`.
+
 # 09 Model Comparison
 
 Every model tried on the motorway dataset, scored on **the same test windows**.
@@ -65,7 +68,7 @@ command-line arguments changed.
 | Motorway traffic (UCI Metro Interstate) | 201.4 | 154.3 | **XGBoost** by 23.4% | vehicles per hour |
 | Bike rentals (UCI Bike Sharing) | 38.5 | 38.6 | **LSTM** by 0.3% | rentals per hour |
 
-**The verdict flips between the two datasets.** That is the single most
+**Historical MAE ordering differed; this does not establish a winner on bikes.** That is the single most
 useful thing this project found, and it is only visible because the same
 pipeline was run on a second, unrelated series.
 

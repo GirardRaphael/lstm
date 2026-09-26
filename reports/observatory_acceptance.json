@@ -1,0 +1,67 @@
+{
+  "status": "passed",
+  "workspace": "var\\acceptance-49f1d3fad38b416bb51394d93a0d0165",
+  "scope": "bundled historical replay; clock-as-UTC is artificial, not source certification",
+  "dataset": "12f43802dce24422b4b1c3da35e6b8f8",
+  "job": "01f74290cecd4ba5a0a5d6c2965aaae5",
+  "model": "d94f2388d0db459ead2b5f2d1f3686f2",
+  "selected": "xgboost",
+  "evaluation": {
+    "bias": 0.8639414310455322,
+    "interval": {
+      "coverage": 0.9467171717171717,
+      "mean_width": 808.5475525249134,
+      "n": 3960,
+      "nominal_coverage": 0.9
+    },
+    "mae": 139.31211555172698,
+    "mae_ci": {
+      "block_hours": 24,
+      "blocks": 170,
+      "confidence": 0.95,
+      "high": 147.09279211748427,
+      "low": 132.2945796058035,
+      "replicates": 500,
+      "seed": 42
+    },
+    "mape": 5.720487692505342,
+    "mape_n": 3960,
+    "n": 3960,
+    "peak_hour_mae": 204.30772399902344,
+    "peak_hour_n": 706,
+    "rmse": 214.90160493312231
+  },
+  "forecast": {
+    "id": "dd3de0bce81d46cd89ae1bda1d42cc4e",
+    "status": "available",
+    "mode": "historical_replay",
+    "reasons": [],
+    "out_of_training_range_fraction": 0.0,
+    "timestamp": "2018-09-30T00:00:00+00:00",
+    "value": 1828.533203125,
+    "lower": 1421.51806640625,
+    "upper": 2235.54833984375,
+    "nominal_coverage": 0.9
+  },
+  "actual_review": {
+    "id": "dd3de0bce81d46cd89ae1bda1d42cc4e",
+    "stream": "historical-replay/i94-clock-as-utc",
+    "model": "d94f2388d0db459ead2b5f2d1f3686f2",
+    "target": "2018-09-30T00:00:00+00:00",
+    "status": "available",
+    "actual": 1826,
+    "mode": "historical_replay",
+    "reasons": [],
+    "out_of_training_range_fraction": 0.0,
+    "timestamp": "2018-09-30T00:00:00+00:00",
+    "value": 1828.533203125,
+    "lower": 1421.51806640625,
+    "upper": 2235.54833984375,
+    "nominal_coverage": 0.9,
+    "error": 2.533203125,
+    "covered": true
+  },
+  "restart_backup_restore_prediction_parity": true,
+  "deactivation_and_reactivation": true,
+  "credentials": "isolated test token not exported; initialize your own workspace for use"
+}

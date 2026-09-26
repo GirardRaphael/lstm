@@ -1,5 +1,20 @@
 # Pick up here
 
+## Current continuation - 2026-09-25
+
+The September 13 recovery notes below are historical. The missing-v2 blocker is resolved, and the local observatory and 12-slide project briefing are implemented in this working tree.
+
+- Current implementation and verification record: [reports/IMPLEMENTATION_LOG.md](reports/IMPLEMENTATION_LOG.md).
+- Research evidence: [reports/REPORT.md](reports/REPORT.md) and [reports/BACKTEST_REPORT.md](reports/BACKTEST_REPORT.md).
+- Local setup, launch, worker and recovery instructions: [docs/OPERATIONS.md](docs/OPERATIONS.md).
+- Run `./test.ps1` from the repository to verify the current checkout; run `./run_app.ps1` to open the observatory.
+- Remaining external work: authorized field data and certified source semantics, untouched future/site evaluation, operator utility validation, and shared-hosting controls. Remote CI and external-browser visual review remain unverified.
+- Changes remain local and uncommitted. No push, merge or deployment has been performed.
+
+Do not resume the obsolete missing-branch recovery steps below.
+
+---
+
 Current continuation — 2026-09-13 (M0 recovery)
 
 **Authoritative build state** lives in the Obsidian project-context vault, not in this file:

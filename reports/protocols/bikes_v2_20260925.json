@@ -1,0 +1,50 @@
+{
+  "config": {
+    "pipeline_version": "v2",
+    "data_path": "C:\\Users\\xxrap\\OneDrive\\Documents\\GitHub\\lstm\\data\\samples\\bike_sharing_hourly.csv",
+    "datetime_column": "date_time",
+    "target_column": "rentals",
+    "exogenous_columns": [],
+    "units": {
+      "rentals": "rentals/hour"
+    },
+    "cadence": "1h",
+    "site_scope": "washington-dc-bike-aggregate",
+    "calendar_features": true,
+    "sequence_length": 24,
+    "horizons": [
+      1
+    ],
+    "fit_ratio": 0.64,
+    "validation_ratio": 0.16,
+    "fit_end": null,
+    "validation_end": null,
+    "duplicate_policy": "mean",
+    "seasonal_period": "24h",
+    "mape_min_actual": 1.0,
+    "seed": 42,
+    "run_name": "bikes_v2_20260925",
+    "output_dir": "C:\\Users\\xxrap\\OneDrive\\Documents\\GitHub\\lstm\\models\\v2",
+    "lstm_units": [
+      64,
+      32
+    ],
+    "dense_units": 16,
+    "dropout": 0.2,
+    "learning_rate": 0.001,
+    "epochs": 50,
+    "batch_size": 128,
+    "patience": 8,
+    "xgb_n_estimators": 1000,
+    "xgb_max_depth": 6,
+    "xgb_learning_rate": 0.05,
+    "xgb_subsample": 0.8,
+    "xgb_colsample": 0.8,
+    "xgb_early_stopping": 40,
+    "xgb_layout": "direct_lags"
+  },
+  "selection": "lowest validation MAE including baselines",
+  "status": "retrospective reanalysis; historical test period previously inspected",
+  "uncertainty": "paired calendar-day bootstrap; one training seed",
+  "scope": "hourly counts with calendar; no weather ablation; no traffic control"
+}

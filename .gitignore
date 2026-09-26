@@ -11,3 +11,4 @@ obsidian_vault/*/.obsidian/cache
 
 # Scratch
 *.tmp
+var/

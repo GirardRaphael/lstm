@@ -31,8 +31,7 @@ from .config import TrainingConfig
 
 def set_seeds(seed: int = 42) -> None:
     """Make a run reproducible enough to be defended in a presentation."""
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
+    tf.keras.utils.set_random_seed(seed)
 
 
 def build_model(cfg: TrainingConfig, n_features: int = 1) -> Sequential:

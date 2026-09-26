@@ -1,259 +1,96 @@
-# Traffic LSTM
+# Traffic Observatory and Forecast Workbench
 
-Forecast the next hour of motorway traffic from the last 24 — and then open the
-network up and look at what every neuron actually did.
+A local, authenticated observatory for importing vehicle counts, running durable training jobs, storing forecasts and reviewing later actuals. The research workbench compares hourly I-94 counts and Washington DC bike rentals. Compare a seasonal baseline, XGBoost and an inspectable LSTM. This is not a traffic controller, a live sensor platform or a congestion detector.
 
-```
-24 past hours  ->  LSTM 64  ->  LSTM 32  ->  Dense 16  ->  vehicles next hour
-```
+**Delivery status:** the local observation-to-error workflow is implemented and tested, including backup/restore. Field validation and shared-hosting readiness remain open. The legacy scores are exploratory; clean reanalysis of previously inspected data is still not an untouched confirmatory test.
 
-Three ways to use it:
+## Evidence and model choice
 
-| | |
-| --- | --- |
-| **Notebook** | `notebooks/traffic_lstm.ipynb` — run cell by cell, built for a presentation |
-| **App** | `streamlit run app/streamlit_app.py` — load any CSV, train it, inspect the neurons |
-| **Obsidian vault** | `obsidian_vault/Traffic_LSTM_Brain` — the trained network as a browsable set of canvases and notes |
-| **Written up** | [`reports/REPORT.md`](reports/REPORT.md) and [`reports/web/results.html`](reports/web/results.html), both generated from the stored run artifacts |
+Read [the generated current report](reports/REPORT.md) and its linked `models/v2/<run>/manifest.json` packages. Those manifests are the source of truth for new results. Select candidates on validation MAE, including baselines, before reporting test metrics. Do not assume the LSTM wins.
 
----
+The v1 motorway results favored XGBoost plus calendar. The tiny historical bike MAE difference does not establish an LSTM advantage; its MAPE was worse. [Legacy results](reports/LEGACY_REPORT.md) retain the original numbers and limitations. The two-epoch `window_sweep.json` is explicitly invalid for selection. Archived 12-hour/24-hour records are metrics-only, not loadable models.
 
-## The project in one paragraph
+## Reproducible setup
 
-Traffic volume is a time series: the number of vehicles in the next hour
-depends on the hours before it. An LSTM is a recurrent network built for
-exactly that — it walks through a sequence carrying a memory it can choose to
-keep or overwrite. This project trains one on ~48,000 hourly measurements from
-the UCI *Metro Interstate Traffic Volume* dataset, evaluates it honestly
-against two naive baselines, and then reconstructs every gate of every unit so
-the mechanism can be seen rather than asserted.
-
-| | |
-| --- | --- |
-| Learning type | Supervised |
-| Task | Regression — the output is a count of vehicles |
-| Algorithm | Stacked LSTM (64 → 32 units) |
-| Input | 24 timesteps × 1 feature |
-| Metric | MAE, in vehicles per hour |
-| Baselines | "last hour" and "same hour yesterday" |
-
----
-
-## Install
-
-TensorFlow needs **Python 3.12** (no Windows wheels for 3.13 yet).
+Tested runtime: Python 3.12 on Windows. Install [uv](https://docs.astral.sh/uv/), then from this directory:
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+./setup.ps1
+./test.ps1
+./observatory.ps1 init
+./run_app.ps1
 ```
 
-The bundled venv for this machine already lives at `~\.venvs\traffic_lstm`
-(kept outside OneDrive so 1.5 GB of TensorFlow is not synced to the cloud).
-The `.ps1` scripts below use it directly.
+Initialization prints an administrator token once; save it securely and enter it in the app. The app now opens the authenticated operational workflow. Follow [the operations runbook](docs/OPERATIONS.md) for bundled replay, worker startup, activation, tokens and backup/restore. The older evidence viewer and neuron tools remain accessible with `.venv/Scripts/python.exe -m streamlit run app/streamlit_app.py`; they are educational v1 paths. All launchers use the project `.venv`.
 
-## Run
+The landing page and signed-in Overview include a 12-slide project briefing: purpose, workflow, dataset coverage, candidate models, evaluation protocols, source-backed results, uncertainty, safeguards and delivery limits. Use Previous/Next or the section selector; download the complete briefing as Markdown. Only committed project evidence is shown before sign-in—operational workspace records remain protected.
+
+## Local workflow
 
 ```powershell
-.\train.ps1              # train, draw the figures, rebuild the vault
-.\run_app.ps1            # the interactive workbench
-.\notebook.ps1           # JupyterLab, for the presentation
-.\test.ps1               # verify the claims made below
+# In a terminal with OBSERVATORY_TOKEN set (see the runbook):
+./observatory.ps1 bundled --dataset motorway --hold-back 24
+./observatory.ps1 enqueue SNAPSHOT_ID
+./observatory.ps1 worker --once
+./observatory.ps1 list models
+./observatory.ps1 activate MODEL_ID
+./observatory.ps1 forecast SNAPSHOT_ID --replay
+./observatory.ps1 bundled --dataset motorway --hold-back 0
+./observatory.ps1 errors
 ```
 
-`test.ps1` checks the three things this project asserts about itself: that the
-scaler never sees the test set, that every `(X, y)` pair lines up with the
-timestamps it claims, and that the NumPy replay of the LSTM cell reproduces
-Keras exactly. If anyone challenges the no-leakage claim, that is the answer.
+This is historical replay. UTC is assigned to bundled clock labels only for the replay adapter; source timezone and interval-end semantics are not certified. The worker's simple tree/weekly-mean candidates use separate validation, calibration and evaluation periods. Activation and serving enforce quality gates. The operational schema is hourly vehicle counts, not bike rentals.
 
-Or without the wrappers:
+## Research training
+
+```powershell
+./train.ps1 --dataset motorway --run-name motorway_new
+./train.ps1 --dataset bikes --run-name bikes_new
+.venv/Scripts/python.exe scripts/report_v2.py
+```
+
+Every name must be new. An experiment contract is written to `reports/protocols/` before training. Defaults: 64/16/20 chronological fit/validation/test, 24-hour complete windows, one-hour horizon, seed 42, 50 maximum epochs, patience 8. Hyperparameter exploration must use validation; do not rerun choices to improve the displayed test score.
+
+- Split timestamps before fitting scalers; never fill missing targets or bridge outages.
+- Compare on identical eligible timestamps: fit-only hour-of-week mean, timestamp-true yesterday, persistence, direct XGBoost and LSTM.
+- Direct XGBoost uses t-1, t-24 and t-168 count lags plus the target hour/weekday clock. Missing historical lags stay missing. `--tree-layout flattened` retains the original tensor comparator.
+- Direct-tree and LSTM information sets differ: this compares practical candidates, not recurrence alone. No weather ablation is claimed.
+- LSTM optimizes scaled MAE, proportional to physical-unit MAE; early stopping uses validation. XGBoost uses squared-error fitting and validation MAE for stopping.
+- Report MAE, RMSE, MAPE and its denominator count, signed bias, peak-hour MAE, and paired daily-block bootstrap uncertainty. A one-seed bootstrap does not measure training variability or forecast interval coverage.
+- Packages retain model checksums, scalers, schema, units, site scope, split/coverage records, dependency versions, revision and source hashes. Invalid/gapped recent windows are refused.
+
+The source datasets use historical clock labels. Their timezone and interval start/end semantics have not been independently certified for live ingestion. Previous observations in validation/test may become input history for later forecasts: this is rolling one-step evaluation, not a forecast of the entire test period from a single origin.
+
+## Rolling-origin evaluation
+
+[BACKTEST_REPORT.md](reports/BACKTEST_REPORT.md) records three folds and three seeds on both datasets, separate interval calibration, retained predictions, and bootstrap block-length sensitivity. Nominal 90% tree intervals covered 89.7?93.1% on motorway and 76.9?90.2% on bikes. The bike undercoverage remains a limitation, not an implementation claim to hide.
 
 ```powershell
 $env:PYTHONPATH = "src"
-
-# train
-python -m traffic_lstm.train --export-vault
-python -m traffic_lstm.train --data data/raw/my_file.csv --target my_column --epochs 30
-
-# the variants
-python -m traffic_lstm.train --run-name multivariate --calendar `
-       --exogenous temp rain_1h snow_1h clouds_all
-python -m traffic_lstm.train --run-name gap_guarded --drop-gapped-windows
-python -m traffic_lstm.train --run-name multi_horizon --horizons 1 3 6
-
-# is the LSTM worth it? measure, do not argue
-python -m traffic_lstm.benchmark --run-name baseline_univariate
-python scripts/compare_runs.py          # ranks every model, writes the vault note
-
-# use it
-python -m traffic_lstm.predict --last-hours
-streamlit run app/streamlit_app.py
-python scripts/rebuild_vault.py         # regenerate the vault without retraining
+.venv/Scripts/python.exe -m traffic_lstm.backtest --dataset motorway --output reports/backtests/NEW_NAME
+.venv/Scripts/python.exe scripts/report_backtests.py
 ```
 
----
+## Project layout
 
-## Using your own dataset
-
-Any CSV with **a timestamp column and a numeric column** works — energy
-consumption, website traffic, sales per hour. Either:
-
-* drop it in `data/raw/` and pass `--data` / `--target` to the training
-  command, or
-* upload it on the **Data** tab of the Streamlit app and pick the two columns
-  from the dropdowns.
-
-The pipeline sorts chronologically, collapses duplicate timestamps by
-averaging, and never interpolates missing periods.
-
----
-
-## What is in `src/traffic_lstm/`
-
-| Module | Responsibility |
+| Path | Purpose |
 | --- | --- |
-| `config.py` | every hyper-parameter in one dataclass, with the reasoning attached |
-| `data.py` | CSV → cleaned series → chronological split → scaling → sequences |
-| `features.py` | weather + cyclical calendar features; the target stays column 0 |
-| `benchmark.py` | XGBoost on the **same tensors**, flattened — the honest comparison |
-| `model.py` | the stacked LSTM, the optimiser, the callbacks |
-| `train.py` | orchestration, artifacts, the CLI |
-| `evaluate.py` | MAE / RMSE / MAPE **and** the two naive baselines |
-| `predict.py` | load a saved model and forecast from 24 values |
-| `introspect.py` | replays the LSTM cell in NumPy to recover every gate |
-| `plots.py` | the figures used by the report and the slides |
-| `obsidian_canvas.py` | JSON Canvas builders |
-| `obsidian_export.py` | generates the whole vault from a trained model |
+| `src/traffic_lstm/observatory.py` | Durable workspace, access, jobs, models, forecasts, actuals and recovery |
+| `src/traffic_lstm/operations.py` | CLI and bounded worker process |
+| `src/traffic_lstm/observations.py` | Strict UTC interval-end observation contract |
+| `src/traffic_lstm/candidate.py` | Portable operational tree/baseline and calibrated intervals |
+| `src/traffic_lstm/pipeline_v2.py` | Causal preparation, training, packaging and inference |
+| `src/traffic_lstm/evaluation_v2.py` | Seasonal climatology, direct lags and uncertainty |
+| `src/traffic_lstm/research.py` | Recorded comparison protocol and CLI |
+| `tests/` | Leakage mutation, timestamps, metrics, artifact and inference checks |
+| `models/v2/` | Immutable run packages |
+| `scripts/report_v2.py` | Report generated from verified packages |
+| `obsidian_vault/Traffic_LSTM_Brain/` | Archived educational neuron/gate explanations |
 
-### Three decisions worth defending
+V1 modules remain for reproducibility and education. Their preprocessing is not repaired retroactively. Rebuilding a legacy presentation does not produce v2 evidence.
 
-**The split is chronological.** `train_test_split(shuffle=True)` would put
-future hours in the training set. The score would look excellent and mean
-nothing, because in production you only ever have the past.
+## Product delivery
 
-**The scaler is fitted on the training slice only.** If it saw the test set,
-the model would indirectly know the range of the future — data leakage.
+See [ROAD_PRODUCT_PLAN.md](ROAD_PRODUCT_PLAN.md) for current blockers and acceptance gates. The immediate product hypothesis is a read-only observatory that lets an engineer inspect observation quality and forecast errors. Local data access, untouched future/site holdouts and field interval coverage still require external validation. Local persistence, access controls, job isolation, calibration and recovery tests are implemented; managed identity/TLS, OS isolation and encrypted secret/backup handling are still required before shared hosting. More neurons or vehicle animation will not resolve these gaps.
 
-**Gaps in the series are disclosed, not hidden.** This dataset has 2,588
-breaks in time, including a 308-day outage. Sliding windows are built over the
-rows that exist, so **28.7% of the training windows silently span a jump** —
-"the last 24 hours" is really 24 readings spread over longer. Only 5.3% of the
-*test* windows are affected, so the reported metrics barely move, but the flaw
-is real. `--drop-gapped-windows` discards those windows (21,185 training
-windows instead of 32,436); it is off by default so the documented run stays
-reproducible. Turning it on and retraining is the first thing to try.
-
-**A worse score is often the informative one.** Adding weather *and* calendar
-columns made the network worse (241.1 against the baseline's 228.8). The easy
-reading is "the extra columns are useless"; the training history said
-overfitting — validation loss bottomed out at epoch 7 of 12, then climbed. An
-ablation with a control settled it:
-
-| Inputs | Columns | Dropout | MAE |
-| --- | --- | --- | --- |
-| Past traffic only | 1 | 0.20 | 228.8 |
-| Past traffic only *(control)* | 1 | 0.35 | 229.8 |
-| Traffic + **calendar**, no weather | 7 | 0.20 | **201.4** |
-| Traffic + calendar + weather | 11 | 0.20 | 241.1 |
-| Traffic + calendar + weather | 11 | 0.35 | 206.0 |
-
-The control does not move, so none of it is about regularisation. Hour and
-weekday as sine/cosine pairs are worth 12%. The weather columns are noise that
-costs: `rain_1h` and `snow_1h` are zero for nearly every hour, adding
-parameters to overfit and no information to use. XGBoost scores 154.3 with
-calendar only and 154.5 with weather — the same number. **Both families gain
-from the calendar and neither uses the weather; gradient boosting just ignores
-the irrelevant column where the LSTM overfits it.**
-
-`evaluate.training_diagnosis()` now labels every run *capped*, *overfit* or
-*plateaued*, because those three look identical in a final metric and call for
-opposite fixes.
-
-**The baselines are not optional.** A MAE of ~300 vehicles is meaningless
-until you know that predicting *"the same hour yesterday"* scores worse. If
-the network had not beaten both naive rules, the honest conclusion would have
-been that an LSTM is the wrong tool for this problem.
-
----
-
-## The Obsidian vault
-
-**Open folder as vault** → select `obsidian_vault/Traffic_LSTM_Brain` → start
-from `00 Start Here`.
-
-```
-00 Start Here                     the map
-01 Problem  02 Dataset  03 Pipeline  04 Architecture
-05 Results  06 Limits and Next Steps
-07 Presentation Script            a timed 8-minute script
-08 Exam Questions                 the questions a teacher will ask, answered
-
-Canvas/Network Architecture.canvas    the model
-Canvas/Neurons - Rush Hour.canvas     every unit, coloured by its activation
-Canvas/Neurons - Quiet Night.canvas   the same units on an empty road
-Canvas/Timeline/t00 … t23.canvas      one canvas per hour: the memory forming
-
-Layers/    one note per layer, with its behaviour on a real window
-Gates/     forget, input, candidate, output, cell state — with this model's values
-Neurons/   one note per unit (96 of them), each with its own trace
-```
-
-**None of it is illustrative.** `introspect.py` re-implements the LSTM cell in
-NumPy from the trained weights:
-
-```
-z = x_t · W + h_(t-1) · U + b
-i = σ(z_i)   f = σ(z_f)   g = tanh(z_g)   o = σ(z_o)
-c_t = f · c_(t-1) + i · g
-h_t = o · tanh(c_t)
-```
-
-and checks the result against Keras on every export. The current maximum
-absolute difference is printed at the end of each run (~`7e-08`, i.e.
-floating-point noise). If the replay and Keras disagreed, the vault would be
-fiction — so the check is part of the build, not an afterthought.
-
-Two contrasting windows are documented side by side: the busiest hour of the
-test set and the quietest. Comparing the two canvases shows that different
-subsets of units light up in different traffic regimes — the network has
-specialised.
-
----
-
-## Limits
-
-* The model sees **only past traffic**. Weather, holidays and accidents are
-  invisible to it, and those are exactly the hours when a forecast matters
-  most. The dataset ships those columns; using them is the first item on the
-  list below.
-* It cannot predict a first-time event.
-* It is harder to interpret than a decision tree — this vault is an attempt to
-  narrow that gap, not to close it.
-* With no temporal structure, or with little data, gradient boosting on lag
-  features would be simpler and often as strong.
-
-## Next steps
-
-1. Add `temp`, `rain_1h`, `snow_1h`, `holiday`, plus hour-of-day and
-   day-of-week as sine/cosine pairs. Input becomes `(24, 8)`; nothing else in
-   the pipeline changes.
-2. Benchmark against XGBoost on the same chronological split.
-3. Multi-horizon is already supported: `--horizons 1 3 6`.
-4. Feed the forecast to a signal-timing optimiser.
-
-**To be precise about the claim:** this model does not control traffic lights.
-It produces a forecast that a control system could consume.
-
-```
-sensors → hourly history → LSTM → forecast → controller → adaptive lights
-```
-
----
-
-## Data
-
-Metro Interstate Traffic Volume — UCI Machine Learning Repository.
-Hourly westbound traffic on I-94 between Minneapolis and Saint Paul,
-2012-10-02 to 2018-09-30. 48,204 rows; 40,575 unique hours after duplicates
-are collapsed.
+The step-by-step implementation and verification record is [IMPLEMENTATION_LOG.md](reports/IMPLEMENTATION_LOG.md).

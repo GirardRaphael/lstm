@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from traffic_lstm.config import MODEL_DIR, REPORT_DIR, TrainingConfig  # noqa: E402
 
-TARGET = REPORT_DIR / "REPORT.md"
+TARGET = REPORT_DIR / "LEGACY_REPORT.md"  # current report belongs to report_v2.py
 
 
 def load(run_name: str):
@@ -115,7 +115,7 @@ winter in a way motorway traffic never does.
 
 **This is the most interesting result in the project.** The conclusion from
 section 6 - "gradient boosting beats the LSTM" - does not survive contact with
-a second dataset. On bike rentals the ordering flips, and the extra weather and
+a second dataset. On bike rentals the MAE point estimates are very close and do not establish superiority; and the extra weather and
 calendar features *help* the network here while they *hurt* it on traffic.
 
 A plausible reading, offered as a hypothesis rather than a finding: bike demand
@@ -368,7 +368,7 @@ opposite phase of the daily cycle. It is not simply copying the last value.
 2. Benchmark against XGBoost on several junctions at once, where an LSTM's
    shared representation should start to pay off.
 3. Feed the forecast into a signal-timing optimiser:
-   `sensors -> history -> model -> forecast -> controller -> adaptive lights`.
+   `stored hourly observations -> forecast -> offline evaluation`.
 
 ---
 
@@ -404,7 +404,8 @@ opposite phase of the daily cycle. It is not simply copying the last value.
         bike=bike_section)
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    TARGET.write_text(report, encoding="utf-8")
+    from label_legacy import NOTICE
+    TARGET.write_text(NOTICE + report, encoding="utf-8")
     words = len(report.split())
     print("Wrote {} ({:,} words)".format(TARGET, words))
 

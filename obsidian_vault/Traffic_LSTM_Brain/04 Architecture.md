@@ -1,6 +1,9 @@
 ---
 tags: [method, architecture]
 ---
+
+> **Archived v1 exploratory evidence.** Preprocessing includes validation contamination; some runs bridge gaps or use future-informed weather fills. Test results informed historical choices. These scores do not validate a deployed product. See the current `reports/REPORT.md`.
+
 # 04 Architecture
 
 ```mermaid

@@ -1,0 +1,136 @@
+.venv/Scripts/python.exe : WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+At line:2 char:110
++ ... _LEVEL='3'; .venv/Scripts/python.exe -u -m traffic_lstm.research --da ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: All lo...itten to STDERR:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+I0000 00:00:1790361779.429220   19668 port.cc:153] oneDNN custom operations are on. You may see slightly different 
+numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the 
+environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790361780.739182   19668 port.cc:153] oneDNN custom operations are on. You may see slightly different 
+numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the 
+environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING:tensorflow:TensorFlow GPU support is not available on native Windows for TensorFlow >= 2.11. Even if 
+CUDA/cuDNN are installed, GPU will not be used. Please use WSL2 or the TensorFlow-DirectML plugin.
+Epoch 1/50
+75/75 - 3s - 40ms/step - loss: 0.0789 - mae: 0.0789 - val_loss: 0.1123 - val_mae: 0.1123 - learning_rate: 0.0010
+Epoch 2/50
+75/75 - 1s - 14ms/step - loss: 0.0854 - mae: 0.0854 - val_loss: 0.1060 - val_mae: 0.1060 - learning_rate: 0.0010
+Epoch 3/50
+75/75 - 1s - 15ms/step - loss: 0.0866 - mae: 0.0866 - val_loss: 0.1053 - val_mae: 0.1053 - learning_rate: 0.0010
+Epoch 4/50
+75/75 - 1s - 12ms/step - loss: 0.0782 - mae: 0.0782 - val_loss: 0.1079 - val_mae: 0.1079 - learning_rate: 0.0010
+Epoch 5/50
+75/75 - 1s - 12ms/step - loss: 0.0737 - mae: 0.0737 - val_loss: 0.1068 - val_mae: 0.1068 - learning_rate: 0.0010
+Epoch 6/50
+75/75 - 1s - 13ms/step - loss: 0.0698 - mae: 0.0698 - val_loss: 0.0985 - val_mae: 0.0985 - learning_rate: 0.0010
+Epoch 7/50
+75/75 - 1s - 13ms/step - loss: 0.0674 - mae: 0.0674 - val_loss: 0.0848 - val_mae: 0.0848 - learning_rate: 0.0010
+Epoch 8/50
+75/75 - 1s - 12ms/step - loss: 0.0685 - mae: 0.0685 - val_loss: 0.0902 - val_mae: 0.0902 - learning_rate: 0.0010
+Epoch 9/50
+75/75 - 1s - 13ms/step - loss: 0.0615 - mae: 0.0615 - val_loss: 0.0800 - val_mae: 0.0800 - learning_rate: 0.0010
+Epoch 10/50
+75/75 - 1s - 13ms/step - loss: 0.0597 - mae: 0.0597 - val_loss: 0.0752 - val_mae: 0.0752 - learning_rate: 0.0010
+Epoch 11/50
+75/75 - 1s - 12ms/step - loss: 0.0586 - mae: 0.0586 - val_loss: 0.0713 - val_mae: 0.0713 - learning_rate: 0.0010
+Epoch 12/50
+75/75 - 1s - 12ms/step - loss: 0.0569 - mae: 0.0569 - val_loss: 0.0710 - val_mae: 0.0710 - learning_rate: 0.0010
+Epoch 13/50
+75/75 - 1s - 12ms/step - loss: 0.0569 - mae: 0.0569 - val_loss: 0.0693 - val_mae: 0.0693 - learning_rate: 0.0010
+Epoch 14/50
+75/75 - 1s - 12ms/step - loss: 0.0526 - mae: 0.0526 - val_loss: 0.0603 - val_mae: 0.0603 - learning_rate: 0.0010
+Epoch 15/50
+75/75 - 1s - 12ms/step - loss: 0.0503 - mae: 0.0503 - val_loss: 0.0564 - val_mae: 0.0564 - learning_rate: 0.0010
+Epoch 16/50
+75/75 - 1s - 12ms/step - loss: 0.0505 - mae: 0.0505 - val_loss: 0.0609 - val_mae: 0.0609 - learning_rate: 0.0010
+Epoch 17/50
+75/75 - 1s - 12ms/step - loss: 0.0471 - mae: 0.0471 - val_loss: 0.0577 - val_mae: 0.0577 - learning_rate: 0.0010
+Epoch 18/50
+75/75 - 1s - 12ms/step - loss: 0.0461 - mae: 0.0461 - val_loss: 0.0557 - val_mae: 0.0557 - learning_rate: 0.0010
+Epoch 19/50
+75/75 - 1s - 12ms/step - loss: 0.0441 - mae: 0.0441 - val_loss: 0.0541 - val_mae: 0.0541 - learning_rate: 0.0010
+Epoch 20/50
+75/75 - 1s - 13ms/step - loss: 0.0436 - mae: 0.0436 - val_loss: 0.0596 - val_mae: 0.0596 - learning_rate: 0.0010
+Epoch 21/50
+75/75 - 1s - 12ms/step - loss: 0.0430 - mae: 0.0430 - val_loss: 0.0606 - val_mae: 0.0606 - learning_rate: 0.0010
+Epoch 22/50
+75/75 - 1s - 12ms/step - loss: 0.0431 - mae: 0.0431 - val_loss: 0.0559 - val_mae: 0.0559 - learning_rate: 0.0010
+Epoch 23/50
+75/75 - 1s - 12ms/step - loss: 0.0410 - mae: 0.0410 - val_loss: 0.0528 - val_mae: 0.0528 - learning_rate: 0.0010
+Epoch 24/50
+75/75 - 1s - 12ms/step - loss: 0.0412 - mae: 0.0412 - val_loss: 0.0599 - val_mae: 0.0599 - learning_rate: 0.0010
+Epoch 25/50
+75/75 - 1s - 12ms/step - loss: 0.0395 - mae: 0.0395 - val_loss: 0.0522 - val_mae: 0.0522 - learning_rate: 0.0010
+Epoch 26/50
+75/75 - 1s - 12ms/step - loss: 0.0389 - mae: 0.0389 - val_loss: 0.0538 - val_mae: 0.0538 - learning_rate: 0.0010
+Epoch 27/50
+75/75 - 1s - 12ms/step - loss: 0.0382 - mae: 0.0382 - val_loss: 0.0504 - val_mae: 0.0504 - learning_rate: 0.0010
+Epoch 28/50
+75/75 - 1s - 12ms/step - loss: 0.0383 - mae: 0.0383 - val_loss: 0.0489 - val_mae: 0.0489 - learning_rate: 0.0010
+Epoch 29/50
+75/75 - 1s - 12ms/step - loss: 0.0380 - mae: 0.0380 - val_loss: 0.0475 - val_mae: 0.0475 - learning_rate: 0.0010
+Epoch 30/50
+75/75 - 1s - 12ms/step - loss: 0.0369 - mae: 0.0369 - val_loss: 0.0446 - val_mae: 0.0446 - learning_rate: 0.0010
+Epoch 31/50
+75/75 - 1s - 12ms/step - loss: 0.0364 - mae: 0.0364 - val_loss: 0.0459 - val_mae: 0.0459 - learning_rate: 0.0010
+Epoch 32/50
+75/75 - 1s - 12ms/step - loss: 0.0361 - mae: 0.0361 - val_loss: 0.0505 - val_mae: 0.0505 - learning_rate: 0.0010
+Epoch 33/50
+75/75 - 1s - 12ms/step - loss: 0.0356 - mae: 0.0356 - val_loss: 0.0446 - val_mae: 0.0446 - learning_rate: 0.0010
+Epoch 34/50
+75/75 - 1s - 12ms/step - loss: 0.0353 - mae: 0.0353 - val_loss: 0.0462 - val_mae: 0.0462 - learning_rate: 0.0010
+Epoch 35/50
+75/75 - 1s - 12ms/step - loss: 0.0337 - mae: 0.0337 - val_loss: 0.0470 - val_mae: 0.0470 - learning_rate: 5.0000e-04
+Epoch 36/50
+75/75 - 1s - 12ms/step - loss: 0.0326 - mae: 0.0326 - val_loss: 0.0449 - val_mae: 0.0449 - learning_rate: 5.0000e-04
+Epoch 37/50
+75/75 - 1s - 12ms/step - loss: 0.0322 - mae: 0.0322 - val_loss: 0.0432 - val_mae: 0.0432 - learning_rate: 5.0000e-04
+Epoch 38/50
+75/75 - 1s - 12ms/step - loss: 0.0321 - mae: 0.0321 - val_loss: 0.0443 - val_mae: 0.0443 - learning_rate: 5.0000e-04
+Epoch 39/50
+75/75 - 1s - 12ms/step - loss: 0.0314 - mae: 0.0314 - val_loss: 0.0435 - val_mae: 0.0435 - learning_rate: 5.0000e-04
+Epoch 40/50
+75/75 - 1s - 12ms/step - loss: 0.0320 - mae: 0.0320 - val_loss: 0.0425 - val_mae: 0.0425 - learning_rate: 5.0000e-04
+Epoch 41/50
+75/75 - 1s - 12ms/step - loss: 0.0315 - mae: 0.0315 - val_loss: 0.0420 - val_mae: 0.0420 - learning_rate: 5.0000e-04
+Epoch 42/50
+75/75 - 1s - 12ms/step - loss: 0.0313 - mae: 0.0313 - val_loss: 0.0420 - val_mae: 0.0420 - learning_rate: 5.0000e-04
+Epoch 43/50
+75/75 - 1s - 12ms/step - loss: 0.0316 - mae: 0.0316 - val_loss: 0.0443 - val_mae: 0.0443 - learning_rate: 5.0000e-04
+Epoch 44/50
+75/75 - 1s - 12ms/step - loss: 0.0306 - mae: 0.0306 - val_loss: 0.0422 - val_mae: 0.0422 - learning_rate: 5.0000e-04
+Epoch 45/50
+75/75 - 1s - 12ms/step - loss: 0.0309 - mae: 0.0309 - val_loss: 0.0426 - val_mae: 0.0426 - learning_rate: 5.0000e-04
+Epoch 46/50
+75/75 - 1s - 13ms/step - loss: 0.0313 - mae: 0.0313 - val_loss: 0.0441 - val_mae: 0.0441 - learning_rate: 2.5000e-04
+Epoch 47/50
+75/75 - 1s - 12ms/step - loss: 0.0304 - mae: 0.0304 - val_loss: 0.0429 - val_mae: 0.0429 - learning_rate: 2.5000e-04
+Epoch 48/50
+75/75 - 1s - 12ms/step - loss: 0.0303 - mae: 0.0303 - val_loss: 0.0433 - val_mae: 0.0433 - learning_rate: 2.5000e-04
+Epoch 49/50
+75/75 - 1s - 13ms/step - loss: 0.0302 - mae: 0.0302 - val_loss: 0.0421 - val_mae: 0.0421 - learning_rate: 2.5000e-04
+Epoch 50/50
+75/75 - 1s - 14ms/step - loss: 0.0299 - mae: 0.0299 - val_loss: 0.0433 - val_mae: 0.0433 - learning_rate: 1.2500e-04
+Epoch 50: early stopping
+Restoring model weights from the end of the best epoch: 42.
+
+==============================================================
+  V2 RESULTS - bikes_v2_20260925  (site: washington-dc-bike-aggregate)
+==============================================================
+
+  Horizon +1
+    lstm               MAE     38.4   RMSE     59.7   MAPE  28.6%
+    xgboost            MAE     36.8   RMSE     60.2   MAPE  24.1%
+    hour_of_week_mean  MAE    118.5   RMSE    167.0   MAPE  52.8%
+    naive_persistence  MAE     86.2   RMSE    130.5   MAPE  53.0%
+    naive_seasonal     MAE     79.9   RMSE    133.9   MAPE  66.5%
+
+  Eligible windows: {'fit': 9518, 'validation': 2780, 'test': 3359}; excluded: {'non_cadence_step': 1698, 'missing_input': 0, 'missing_target': 0, 'boundary_purge': 0}
+  Package: C:\Users\xxrap\OneDrive\Documents\GitHub\lstm\models\v2\bikes_v2_20260925
+==============================================================
+
+Validation-selected candidate: xgboost
+Evidence: C:\Users\xxrap\OneDrive\Documents\GitHub\lstm\models\v2\bikes_v2_20260925\manifest.json

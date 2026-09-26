@@ -1,0 +1,750 @@
+{
+  "code_revision": "4d7e284fda0c73ce8a7b191380d6d34937ce4bdf",
+  "source_sha256": {
+    "pipeline_v2.py": "5ca36061eb04edb2585445730b67d6075a7fa32b59f578431f62dc34953d66a2",
+    "evaluation_v2.py": "af3f5c1de4d8d742428a75c630c4602f5b3d2a00ee67cde34321ba4eabf75c6e",
+    "model.py": "d6f18dd0941a2e3b420ce7af4ab74881492ec56a9064595681f9896fa15c3e51",
+    "config.py": "42b58f2fa97ab44a1824909a5138d682abc2dc53a8fe726ad0d5792d9cbf9b22"
+  },
+  "evidence_status": "retrospective_reanalysis_not_untouched_confirmatory_test",
+  "selected_on_validation": "xgboost",
+  "pipeline_version": "v2",
+  "preprocessing_version": "v2-causal-1",
+  "run_name": "motorway_v2_20260925",
+  "created_utc": "2026-09-25T18:41:44+00:00",
+  "site_scope": "i94-westbound-uci",
+  "cadence": "1h",
+  "cadence_seconds": 3600.0,
+  "timestamp_convention": "dataset clock labels preserved; interval start/end and timezone not independently verified; not a live-feed contract",
+  "units": {
+    "traffic_volume": "vehicles/hour"
+  },
+  "schema": {
+    "datetime_column": "date_time",
+    "target_column": "traffic_volume",
+    "exogenous_columns": [],
+    "feature_names": [
+      "traffic_volume",
+      "hour_sin",
+      "hour_cos",
+      "weekday_sin",
+      "weekday_cos"
+    ],
+    "xgboost_layout": "direct_lags",
+    "xgboost_direct_features": [
+      "target_t-1h",
+      "target_t-24h",
+      "target_t-168h",
+      "target_hour_sin",
+      "target_hour_cos",
+      "target_weekday_sin",
+      "target_weekday_cos"
+    ],
+    "calendar_features": true,
+    "derived_features": [
+      "hour_sin",
+      "hour_cos",
+      "weekday_sin",
+      "weekday_cos"
+    ],
+    "known_future_inputs": "calendar sin/cos features are functions of the timestamp only and are legitimately known at forecast time"
+  },
+  "sequence_length": 24,
+  "horizons": [
+    1
+  ],
+  "seed": 42,
+  "config": {
+    "pipeline_version": "v2",
+    "data_path": "C:\\Users\\xxrap\\OneDrive\\Documents\\GitHub\\lstm\\data\\raw\\Metro_Interstate_Traffic_Volume.csv",
+    "datetime_column": "date_time",
+    "target_column": "traffic_volume",
+    "exogenous_columns": [],
+    "units": {
+      "traffic_volume": "vehicles/hour"
+    },
+    "cadence": "1h",
+    "site_scope": "i94-westbound-uci",
+    "calendar_features": true,
+    "sequence_length": 24,
+    "horizons": [
+      1
+    ],
+    "fit_ratio": 0.64,
+    "validation_ratio": 0.16,
+    "fit_end": null,
+    "validation_end": null,
+    "duplicate_policy": "mean",
+    "seasonal_period": "24h",
+    "mape_min_actual": 1.0,
+    "seed": 42,
+    "run_name": "motorway_v2_20260925",
+    "output_dir": "C:\\Users\\xxrap\\OneDrive\\Documents\\GitHub\\lstm\\models\\v2",
+    "lstm_units": [
+      64,
+      32
+    ],
+    "dense_units": 16,
+    "dropout": 0.2,
+    "learning_rate": 0.001,
+    "epochs": 50,
+    "batch_size": 128,
+    "patience": 8,
+    "xgb_n_estimators": 1000,
+    "xgb_max_depth": 6,
+    "xgb_learning_rate": 0.05,
+    "xgb_subsample": 0.8,
+    "xgb_colsample": 0.8,
+    "xgb_early_stopping": 40,
+    "xgb_layout": "direct_lags"
+  },
+  "duplicate_policy": "mean",
+  "splits": {
+    "rule": "ratios_over_cleaned_rows",
+    "fit": {
+      "start": "2012-10-02T09:00:00",
+      "end": "2017-01-27T14:00:00",
+      "rows": 25968
+    },
+    "validation": {
+      "start": "2017-01-27T15:00:00",
+      "end": "2017-10-26T17:00:00",
+      "rows": 6492
+    },
+    "test": {
+      "start": "2017-10-26T18:00:00",
+      "end": "2018-09-30T23:00:00",
+      "rows": 8115
+    },
+    "boundary_purge_rule": "an example whose target horizon crosses a partition boundary is dropped entirely; rows from an earlier partition may still serve as input context"
+  },
+  "coverage": {
+    "candidate_windows": 40551,
+    "eligible": {
+      "fit": 15027,
+      "validation": 6158,
+      "test": 7686
+    },
+    "excluded": {
+      "non_cadence_step": 11680,
+      "missing_input": 0,
+      "missing_target": 0,
+      "boundary_purge": 0
+    },
+    "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+  },
+  "data_quality": {
+    "rows_raw": 48204,
+    "rows_clean": 40575,
+    "duplicate_rows_collapsed": 7629,
+    "start": "2012-10-02T09:00:00",
+    "end": "2018-09-30T23:00:00",
+    "cadence": "1h",
+    "expected_intervals": 52551,
+    "missing_intervals": 11976,
+    "missing_values_by_column": {
+      "traffic_volume": 0
+    }
+  },
+  "series_sha256": "7257634c6890a89c222cbd01110222e0c4248cbde4ffb9870b07aa85e2fb3819",
+  "scalers": {
+    "target": {
+      "data_min": [
+        0.0
+      ],
+      "data_max": [
+        7260.0
+      ],
+      "feature_range": [
+        0.0,
+        1.0
+      ]
+    },
+    "features": {
+      "data_min": [
+        0.0,
+        -1.0,
+        -1.0,
+        -0.9749279121818236,
+        -0.9009688679024191
+      ],
+      "data_max": [
+        7260.0,
+        1.0,
+        1.0,
+        0.9749279121818236,
+        1.0
+      ],
+      "feature_range": [
+        0.0,
+        1.0
+      ]
+    }
+  },
+  "models": {
+    "lstm": {
+      "path": "model.keras",
+      "kind": "keras-stacked-lstm",
+      "sha256": "b29c8134bdc63168dd8970d5966a20f33c60a8bf95965976ab2fdb8a894bfe71"
+    },
+    "xgboost": {
+      "h1": {
+        "path": "xgb_h1.json",
+        "kind": "xgboost-regressor",
+        "trees_used": 443,
+        "sha256": "5ba1af5ba30c6e539952191f8208e43ab7d1719a0715f6652ec1870f44371d33"
+      }
+    }
+  },
+  "weights_path": "model.keras",
+  "dependencies": {
+    "python": "3.12.10",
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "scikit-learn": "1.9.1",
+    "tensorflow": "2.21.0",
+    "keras": "3.15.1",
+    "xgboost": "3.4.1"
+  },
+  "training": {
+    "lstm_objective": "MAE on fit-only MinMax target scale",
+    "epochs_run": 50,
+    "training_seconds": {
+      "lstm": 94.9,
+      "xgboost": 1.9
+    },
+    "history": {
+      "loss": [
+        0.13536337018013,
+        0.08632516115903854,
+        0.07148551940917969,
+        0.0645766481757164,
+        0.06165227293968201,
+        0.05882355943322182,
+        0.05526195839047432,
+        0.054948028177022934,
+        0.05186300724744797,
+        0.05116121470928192,
+        0.05073422193527222,
+        0.04922100156545639,
+        0.04819158837199211,
+        0.04795972630381584,
+        0.04594707116484642,
+        0.0454912930727005,
+        0.04462866112589836,
+        0.04425429552793503,
+        0.04365069419145584,
+        0.04351041465997696,
+        0.043095074594020844,
+        0.04287531599402428,
+        0.042688723653554916,
+        0.04234869033098221,
+        0.04242066293954849,
+        0.04179852455854416,
+        0.041889771819114685,
+        0.04167531803250313,
+        0.04171548783779144,
+        0.04189741984009743,
+        0.041043899953365326,
+        0.04102206602692604,
+        0.0403306744992733,
+        0.040686119347810745,
+        0.04011863097548485,
+        0.04050390422344208,
+        0.03965190052986145,
+        0.039920609444379807,
+        0.03966987133026123,
+        0.039443157613277435,
+        0.03891252353787422,
+        0.03902502730488777,
+        0.03887846693396568,
+        0.03859029337763786,
+        0.038657452911138535,
+        0.03855925798416138,
+        0.03807639703154564,
+        0.03783998265862465,
+        0.03811943158507347,
+        0.037932656705379486
+      ],
+      "mae": [
+        0.13536337018013,
+        0.08632516115903854,
+        0.07148551940917969,
+        0.0645766481757164,
+        0.06165227293968201,
+        0.05882355943322182,
+        0.05526195839047432,
+        0.054948028177022934,
+        0.05186300724744797,
+        0.05116121470928192,
+        0.05073422193527222,
+        0.04922100156545639,
+        0.04819158837199211,
+        0.04795972630381584,
+        0.04594707116484642,
+        0.0454912930727005,
+        0.04462866112589836,
+        0.04425429552793503,
+        0.04365069419145584,
+        0.04351041465997696,
+        0.043095074594020844,
+        0.04287531599402428,
+        0.042688723653554916,
+        0.04234869033098221,
+        0.04242066293954849,
+        0.04179852455854416,
+        0.041889771819114685,
+        0.04167531803250313,
+        0.04171548783779144,
+        0.04189741984009743,
+        0.041043899953365326,
+        0.04102206602692604,
+        0.0403306744992733,
+        0.040686119347810745,
+        0.04011863097548485,
+        0.04050390422344208,
+        0.03965190052986145,
+        0.039920609444379807,
+        0.03966987133026123,
+        0.039443157613277435,
+        0.03891252353787422,
+        0.03902502730488777,
+        0.03887846693396568,
+        0.03859029337763786,
+        0.038657452911138535,
+        0.03855925798416138,
+        0.03807639703154564,
+        0.03783998265862465,
+        0.03811943158507347,
+        0.037932656705379486
+      ],
+      "val_loss": [
+        0.08776456117630005,
+        0.07422558963298798,
+        0.06970790028572083,
+        0.06827077269554138,
+        0.08089140802621841,
+        0.07445759326219559,
+        0.06881881505250931,
+        0.07332531362771988,
+        0.05768779665231705,
+        0.05294366180896759,
+        0.054404616355895996,
+        0.05592314898967743,
+        0.05330490320920944,
+        0.05956210941076279,
+        0.05243393033742905,
+        0.047442756593227386,
+        0.047122031450271606,
+        0.049405213445425034,
+        0.0497695617377758,
+        0.04797015339136124,
+        0.046576984226703644,
+        0.045735858380794525,
+        0.04582352191209793,
+        0.0466063991189003,
+        0.04558933153748512,
+        0.047531384974718094,
+        0.04486507549881935,
+        0.04334654286503792,
+        0.04534127190709114,
+        0.044757433235645294,
+        0.04719775915145874,
+        0.04225676506757736,
+        0.04280546307563782,
+        0.04377378523349762,
+        0.04396357014775276,
+        0.041518714278936386,
+        0.041884895414114,
+        0.04281792789697647,
+        0.04420008882880211,
+        0.0449831448495388,
+        0.03848075866699219,
+        0.03799872472882271,
+        0.037908341735601425,
+        0.0382317453622818,
+        0.03851332888007164,
+        0.039214979857206345,
+        0.04075028747320175,
+        0.04072050005197525,
+        0.040435541421175,
+        0.039670180529356
+      ],
+      "val_mae": [
+        0.08776456117630005,
+        0.07422558963298798,
+        0.06970790028572083,
+        0.06827077269554138,
+        0.08089140802621841,
+        0.07445759326219559,
+        0.06881881505250931,
+        0.07332531362771988,
+        0.05768779665231705,
+        0.05294366180896759,
+        0.054404616355895996,
+        0.05592314898967743,
+        0.05330490320920944,
+        0.05956210941076279,
+        0.05243393033742905,
+        0.047442756593227386,
+        0.047122031450271606,
+        0.049405213445425034,
+        0.0497695617377758,
+        0.04797015339136124,
+        0.046576984226703644,
+        0.045735858380794525,
+        0.04582352191209793,
+        0.0466063991189003,
+        0.04558933153748512,
+        0.047531384974718094,
+        0.04486507549881935,
+        0.04334654286503792,
+        0.04534127190709114,
+        0.044757433235645294,
+        0.04719775915145874,
+        0.04225676506757736,
+        0.04280546307563782,
+        0.04377378523349762,
+        0.04396357014775276,
+        0.041518714278936386,
+        0.041884895414114,
+        0.04281792789697647,
+        0.04420008882880211,
+        0.0449831448495388,
+        0.03848075866699219,
+        0.03799872472882271,
+        0.037908341735601425,
+        0.0382317453622818,
+        0.03851332888007164,
+        0.039214979857206345,
+        0.04075028747320175,
+        0.04072050005197525,
+        0.040435541421175,
+        0.039670180529356
+      ],
+      "learning_rate": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0005000000237487257,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0002500000118743628,
+        0.0001250000059371814,
+        0.0001250000059371814,
+        0.0001250000059371814,
+        0.0001250000059371814,
+        0.0001250000059371814,
+        0.0001250000059371814,
+        6.25000029685907e-05,
+        6.25000029685907e-05,
+        6.25000029685907e-05,
+        6.25000029685907e-05
+      ]
+    },
+    "lstm": {
+      "lstm_units": [
+        64,
+        32
+      ],
+      "dense_units": 16,
+      "dropout": 0.2,
+      "learning_rate": 0.001,
+      "batch_size": 128,
+      "patience": 8
+    },
+    "xgboost": {
+      "n_estimators": 1000,
+      "max_depth": 6,
+      "learning_rate": 0.05,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "early_stopping": 40
+    }
+  },
+  "evaluation": {
+    "protocol": {
+      "metrics": [
+        "mae",
+        "rmse",
+        "mape",
+        "bias",
+        "peak_hour_mae",
+        "mae_ci"
+      ],
+      "peak_hours": "weekdays 07-09 and 16-18 inclusive, dataset clock",
+      "uncertainty": "95% percentile bootstrap of calendar-day blocks; 500 replicates; conditional on fitted model; not prediction intervals or seed variability",
+      "undefined_policy": "percentage metrics with no actual above mape_min_actual, and improvements over a zero-error baseline, are undefined and serialise as JSON null",
+      "mape_min_actual": 1.0,
+      "baselines": [
+        "hour_of_week_mean (fit only; fit mean for unseen slots)",
+        "naive_persistence",
+        "naive_seasonal (24h, timestamp-based, persistence fallback)"
+      ],
+      "partition_rule": "chronological fit/validation/test; scalers fitted on fit rows only; windows with missing or non-cadence steps excluded; examples whose targets cross a partition boundary purged"
+    },
+    "validation": {
+      "h1": {
+        "lstm": {
+          "mae": 275.2145238292258,
+          "rmse": 399.3072089798418,
+          "mape": 10.153173608061032,
+          "n": 6158,
+          "mape_n": 6158,
+          "bias": -190.68587978708965,
+          "peak_hour_mae": 405.5544867996141,
+          "peak_hour_n": 1084,
+          "mae_ci": {
+            "low": 264.79693944255615,
+            "high": 287.1156837528646,
+            "confidence": 0.95,
+            "blocks": 270,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "xgboost": {
+          "mae": 151.6235457575684,
+          "rmse": 236.06106624653876,
+          "mape": 6.133764575582985,
+          "n": 6158,
+          "mape_n": 6158,
+          "bias": -13.163717014055061,
+          "peak_hour_mae": 205.81235337658788,
+          "peak_hour_n": 1084,
+          "mae_ci": {
+            "low": 146.5765828277398,
+            "high": 157.80139926761805,
+            "confidence": 0.95,
+            "blocks": 270,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "naive_persistence": {
+          "mae": 604.7976614915357,
+          "rmse": 844.3472951370617,
+          "mape": 26.743528001544263,
+          "n": 6158,
+          "mape_n": 6158,
+          "bias": 0.51965055604877,
+          "peak_hour_mae": 768.247234536273,
+          "peak_hour_n": 1084,
+          "mae_ci": {
+            "low": 589.5538292883482,
+            "high": 619.5552011688746,
+            "confidence": 0.95,
+            "blocks": 270,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "naive_seasonal": {
+          "mae": 548.7124048361266,
+          "rmse": 1022.4815701816361,
+          "mape": 24.37624702560251,
+          "n": 6158,
+          "mape_n": 6158,
+          "bias": 3.0738889451361353,
+          "peak_hour_mae": 773.1337625985877,
+          "peak_hour_n": 1084,
+          "mae_ci": {
+            "low": 501.65390155690494,
+            "high": 597.6095773165615,
+            "confidence": 0.95,
+            "blocks": 270,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "hour_of_week_mean": {
+          "mae": 263.656068078846,
+          "rmse": 412.8361387273762,
+          "mape": 9.55394813018945,
+          "n": 6158,
+          "mape_n": 6158,
+          "bias": -167.16490462048387,
+          "peak_hour_mae": 407.42992251037646,
+          "peak_hour_n": 1084,
+          "mae_ci": {
+            "low": 247.19997969334253,
+            "high": 284.53734587603776,
+            "confidence": 0.95,
+            "blocks": 270,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "paired_xgboost_minus_lstm_mae": {
+          "mean": -123.59097807165742,
+          "ci": {
+            "low": -134.19231467703486,
+            "high": -113.59061734273453,
+            "confidence": 0.95,
+            "blocks": 270,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "improvement_over_best_naive_pct": {
+          "lstm": -4.38,
+          "xgboost": 42.49
+        }
+      }
+    },
+    "test": {
+      "h1": {
+        "lstm": {
+          "mae": 277.9798836749743,
+          "rmse": 424.8273444519216,
+          "mape": 11.466736595122184,
+          "n": 7686,
+          "mape_n": 7686,
+          "bias": -134.51895551613532,
+          "peak_hour_mae": 428.9670137318156,
+          "peak_hour_n": 1376,
+          "mae_ci": {
+            "low": 264.6093933716757,
+            "high": 292.3185253609759,
+            "confidence": 0.95,
+            "blocks": 337,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "xgboost": {
+          "mae": 153.84082122380173,
+          "rmse": 241.4383323238691,
+          "mape": 6.35708053186757,
+          "n": 7686,
+          "mape_n": 7686,
+          "bias": 0.3856982091611965,
+          "peak_hour_mae": 229.37331291890257,
+          "peak_hour_n": 1376,
+          "mae_ci": {
+            "low": 147.77733871993576,
+            "high": 159.74026016869573,
+            "confidence": 0.95,
+            "blocks": 337,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "naive_persistence": {
+          "mae": 585.3328120806885,
+          "rmse": 811.8314114020737,
+          "mape": 26.89101014888024,
+          "n": 7686,
+          "mape_n": 7686,
+          "bias": 0.6265928078950578,
+          "peak_hour_mae": 744.1431662605339,
+          "peak_hour_n": 1376,
+          "mae_ci": {
+            "low": 568.173395042298,
+            "high": 602.5895326431938,
+            "confidence": 0.95,
+            "blocks": 337,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "naive_seasonal": {
+          "mae": 571.5787163859216,
+          "rmse": 1030.8268597489546,
+          "mape": 25.472752172185814,
+          "n": 7686,
+          "mape_n": 7686,
+          "bias": -11.207911485625637,
+          "peak_hour_mae": 842.4643939134428,
+          "peak_hour_n": 1376,
+          "mae_ci": {
+            "low": 524.6596414663775,
+            "high": 622.2910726854686,
+            "confidence": 0.95,
+            "blocks": 337,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "hour_of_week_mean": {
+          "mae": 288.7640189012125,
+          "rmse": 508.423113779335,
+          "mape": 12.210445893514654,
+          "n": 7686,
+          "mape_n": 7686,
+          "bias": -34.83046849766535,
+          "peak_hour_mae": 472.1868042408227,
+          "peak_hour_n": 1376,
+          "mae_ci": {
+            "low": 260.4649460150105,
+            "high": 317.74183033036917,
+            "confidence": 0.95,
+            "blocks": 337,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "paired_xgboost_minus_lstm_mae": {
+          "mean": -124.13906245117255,
+          "ci": {
+            "low": -136.325030445357,
+            "high": -113.30816657463171,
+            "confidence": 0.95,
+            "blocks": 337,
+            "block_hours": 24,
+            "replicates": 500,
+            "seed": 42
+          }
+        },
+        "improvement_over_best_naive_pct": {
+          "lstm": 3.73,
+          "xgboost": 46.72
+        }
+      }
+    }
+  }
+}

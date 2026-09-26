@@ -1,0 +1,44 @@
+python.exe : WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+At C:\Users\xxrap\OneDrive\Documents\GitHub\lstm\test.ps1:5 char:1
++ & $python (Join-Path $PSScriptRoot 'tests/test_pipeline.py')
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: All lo...itten to STDERR:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+I0000 00:00:1790363383.649809    6408 port.cc:153] oneDNN custom operations are on. You may see slightly different 
+numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the 
+environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790363385.119824    6408 port.cc:153] oneDNN custom operations are on. You may see slightly different 
+numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the 
+environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING:tensorflow:TensorFlow GPU support is not available on native Windows for TensorFlow >= 2.11. Even if 
+CUDA/cuDNN are installed, GPU will not be used. Please use WSL2 or the TensorFlow-DirectML plugin.
+  PASS  sequences: X is the 24 hours immediately before y
+  PASS  sequences: multi-horizon targets land on the right steps
+  PASS  split: training data is strictly older than test data
+  PASS  no leakage: the scaler was fitted on training rows only
+  PASS  no leakage: training windows never contain a test-set hour
+  PASS  test set: timestamps line up with the values being predicted
+  PASS  cleaning: duplicate timestamps are collapsed, not duplicated
+  PASS  baselines: persistence and seasonal produce aligned predictions
+  PASS  gaps: windows spanning a break are kept by default, dropped on request
+  PASS  gaps: baselines stay aligned when windows are dropped
+  PASS  baselines: the index-aware form matches the original loop exactly
+  PASS  metrics: a perfect prediction scores zero
+  PASS  diagnosis: tells overfitting, capping and convergence apart
+  PASS  diagnosis: matches the real runs already on disk
+  PASS  introspection: the NumPy replay matches Keras to floating-point noise
+  PASS  introspection: cell state follows c = f*c_prev + i*g exactly
+
+16 passed, 0 failed
+
+......................                                                   [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\keras\src\backend\tensorflow\core.py:172: 24 warnings
+tests/test_evaluation_v2.py: 8 warnings
+  C:\Users\xxrap\OneDrive\Documents\GitHub\lstm\.venv\Lib\site-packages\keras\src\backend\tensorflow\core.py:172: DeprecationWarning: __array__ implementation doesn't accept a copy keyword, so passing copy=False failed. __array__ must implement 'dtype' and 'copy' keyword arguments. To learn more, see the migration guide https://numpy.org/devdocs/numpy_2_0_migration_guide.html#adapting-to-changes-in-the-copy-keyword
+    return np.array(x)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+22 passed, 32 warnings in 21.86s

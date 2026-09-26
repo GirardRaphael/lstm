@@ -1,0 +1,2257 @@
+{
+  "protocol": {
+    "dataset": "motorway",
+    "seeds": [
+      7,
+      42,
+      123
+    ],
+    "epochs": 20,
+    "folds": [
+      [
+        0.4,
+        0.5,
+        0.55,
+        0.65
+      ],
+      [
+        0.55,
+        0.65,
+        0.7,
+        0.8
+      ],
+      [
+        0.7,
+        0.8,
+        0.85,
+        0.95
+      ]
+    ],
+    "source_sha256": "0411ba6c43127a29cefa4d8f39708b9d77979d9dcf895f2d212506fe947b673c",
+    "selection": "validation MAE only",
+    "calibration": "separate next block; nominal 90%",
+    "lstm_units": [
+      32,
+      16
+    ],
+    "batch_size": 128,
+    "patience": 5,
+    "status": "retrospective; historical data were inspected previously; no untouched holdout claim"
+  },
+  "runs": [
+    {
+      "fold": 1,
+      "seed": 7,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 345.9627086474473,
+          "rmse": 500.3867795981176,
+          "mape": 13.645127843751073,
+          "n": 717,
+          "mape_n": 717
+        },
+        "xgboost": {
+          "mae": 157.58462510581128,
+          "rmse": 231.26007718297194,
+          "mape": 8.038715074956961,
+          "n": 717,
+          "mape_n": 717
+        },
+        "hour_of_week_mean": {
+          "mae": 253.32558206077888,
+          "rmse": 365.317376001851,
+          "mape": 11.391395006141215,
+          "n": 717,
+          "mape_n": 717
+        },
+        "yesterday": {
+          "mae": 578.8312398359865,
+          "rmse": 1057.3164085481405,
+          "mape": 29.45924229066843,
+          "n": 717,
+          "mape_n": 717
+        }
+      },
+      "epochs_run": 14,
+      "coverage": {
+        "candidate_windows": 26349,
+        "eligible": {
+          "fit": 9352,
+          "validation": 717,
+          "test": 5363
+        },
+        "excluded": {
+          "non_cadence_step": 10917,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2015-10-04 00:00:00",
+      "validation_end": "2016-06-02 14:00:00",
+      "calibration_end": "2016-08-26T12:00:00",
+      "evaluation_end": "2017-02-13 11:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 336.57066978057685,
+            "rmse": 482.1539618417663,
+            "mape": 35.51951404972026,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": 37.26252746582031,
+            "peak_hour_mae": 558.908935546875,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 316.20227773013573,
+              "high": 362.04112114438476,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.8953757225433526,
+              "mean_width": 1460.1941557206171,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.7260940032414911,
+              "mean_width": 1515.7421875,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 757.87109375,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 177.4507340844656,
+            "rmse": 263.0446431123184,
+            "mape": 25.018640612862487,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": 24.344219207763672,
+            "peak_hour_mae": 259.17266845703125,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 169.7662892032789,
+              "high": 185.99348670743765,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9164739884393064,
+              "mean_width": 828.8681155915895,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8184764991896273,
+              "mean_width": 836.4609375,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 418.23046875,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 319.5789863173954,
+            "rmse": 495.85935457408965,
+            "mape": 36.13065143754789,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": 158.92929130557886,
+            "peak_hour_mae": 436.4534306369344,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 288.5800645248865,
+              "high": 357.77769556951824,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9101156069364161,
+              "mean_width": 1383.6400853400494,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8492706645056726,
+              "mean_width": 1430.4421052631587,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 715.2210526315794,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 528.2225440052893,
+            "rmse": 944.4533123353784,
+            "mape": 43.04210887532569,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": -12.62601121670938,
+            "peak_hour_mae": 749.8217181881205,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 463.55660201184554,
+              "high": 586.3506660313379,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9095375722543353,
+              "mean_width": 2598.8404624277455,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8379254457050244,
+              "mean_width": 2795.2447325769854,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1402.0,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -180.4310561442573,
+          "high": -141.65722626610298,
+          "confidence": 0.95,
+          "blocks": 161,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 7
+        },
+        "72": {
+          "low": -182.31827226224047,
+          "high": -136.5892893589801,
+          "confidence": 0.95,
+          "blocks": 56,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 7
+        },
+        "168": {
+          "low": -185.58743555558178,
+          "high": -135.61552723097682,
+          "confidence": 0.95,
+          "blocks": 25,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 7
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "seed": 42,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 364.1546958167849,
+          "rmse": 478.63258035517026,
+          "mape": 15.085190687360871,
+          "n": 717,
+          "mape_n": 717
+        },
+        "xgboost": {
+          "mae": 158.86709656442724,
+          "rmse": 232.40703107715444,
+          "mape": 8.360121363923543,
+          "n": 717,
+          "mape_n": 717
+        },
+        "hour_of_week_mean": {
+          "mae": 253.32558206077888,
+          "rmse": 365.317376001851,
+          "mape": 11.391395006141215,
+          "n": 717,
+          "mape_n": 717
+        },
+        "yesterday": {
+          "mae": 578.8312398359865,
+          "rmse": 1057.3164085481405,
+          "mape": 29.45924229066843,
+          "n": 717,
+          "mape_n": 717
+        }
+      },
+      "epochs_run": 18,
+      "coverage": {
+        "candidate_windows": 26349,
+        "eligible": {
+          "fit": 9352,
+          "validation": 717,
+          "test": 5363
+        },
+        "excluded": {
+          "non_cadence_step": 10917,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2015-10-04 00:00:00",
+      "validation_end": "2016-06-02 14:00:00",
+      "calibration_end": "2016-08-26T12:00:00",
+      "evaluation_end": "2017-02-13 11:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 328.9878111205349,
+            "rmse": 475.30106693590545,
+            "mape": 31.647010164917077,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": 25.390642166137695,
+            "peak_hour_mae": 501.7212219238281,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 305.21805868071226,
+              "high": 356.73462305754293,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.8904624277456648,
+              "mean_width": 1293.3130015202341,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.7747163695299838,
+              "mean_width": 1347.68115234375,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 673.840576171875,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 177.0304484593386,
+            "rmse": 262.83438190802997,
+            "mape": 24.570001027414737,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": 23.39044952392578,
+            "peak_hour_mae": 255.83648681640625,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 169.56132510837097,
+              "high": 185.94297928290257,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.9158959537572254,
+              "mean_width": 848.4100864873457,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8168557536466775,
+              "mean_width": 856.8505859375,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 428.42529296875,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 319.5789863173954,
+            "rmse": 495.85935457408965,
+            "mape": 36.13065143754789,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": 158.92929130557886,
+            "peak_hour_mae": 436.4534306369344,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 287.20890036946446,
+              "high": 356.66848624702317,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.9101156069364161,
+              "mean_width": 1383.6400853400494,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8492706645056726,
+              "mean_width": 1430.4421052631587,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 715.2210526315794,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 528.2225440052893,
+            "rmse": 944.4533123353784,
+            "mape": 43.04210887532569,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": -12.62601121670938,
+            "peak_hour_mae": 749.8217181881205,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 463.86219094023846,
+              "high": 588.4498394352382,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.9095375722543353,
+              "mean_width": 2598.8404624277455,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8379254457050244,
+              "mean_width": 2795.2447325769854,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1402.0,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -177.69317803915587,
+          "high": -128.78058850857286,
+          "confidence": 0.95,
+          "blocks": 161,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 42
+        },
+        "72": {
+          "low": -180.7556860663245,
+          "high": -130.02215106347094,
+          "confidence": 0.95,
+          "blocks": 56,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 42
+        },
+        "168": {
+          "low": -182.58875697894808,
+          "high": -125.53285745918642,
+          "confidence": 0.95,
+          "blocks": 25,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 42
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "seed": 123,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 413.8844263563595,
+          "rmse": 550.395111381383,
+          "mape": 15.592389030397285,
+          "n": 717,
+          "mape_n": 717
+        },
+        "xgboost": {
+          "mae": 158.40420436460104,
+          "rmse": 231.12710526311704,
+          "mape": 8.189911010534736,
+          "n": 717,
+          "mape_n": 717
+        },
+        "hour_of_week_mean": {
+          "mae": 253.32558206077888,
+          "rmse": 365.317376001851,
+          "mape": 11.391395006141215,
+          "n": 717,
+          "mape_n": 717
+        },
+        "yesterday": {
+          "mae": 578.8312398359865,
+          "rmse": 1057.3164085481405,
+          "mape": 29.45924229066843,
+          "n": 717,
+          "mape_n": 717
+        }
+      },
+      "epochs_run": 20,
+      "coverage": {
+        "candidate_windows": 26349,
+        "eligible": {
+          "fit": 9352,
+          "validation": 717,
+          "test": 5363
+        },
+        "excluded": {
+          "non_cadence_step": 10917,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2015-10-04 00:00:00",
+      "validation_end": "2016-06-02 14:00:00",
+      "calibration_end": "2016-08-26T12:00:00",
+      "evaluation_end": "2017-02-13 11:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 336.84645187730735,
+            "rmse": 489.03851789969053,
+            "mape": 36.08141432802646,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": -38.9786262512207,
+            "peak_hour_mae": 580.9300537109375,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 318.00599014600164,
+              "high": 356.3027208154996,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.8988439306358381,
+              "mean_width": 1521.5689911902984,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.7341977309562399,
+              "mean_width": 1577.06982421875,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 788.534912109375,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 178.12845032091084,
+            "rmse": 264.8126660177562,
+            "mape": 26.67434309562538,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": 25.138090133666992,
+            "peak_hour_mae": 253.78443908691406,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 170.19078835384806,
+              "high": 186.08124735848506,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.919364161849711,
+              "mean_width": 869.9446802657463,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8298217179902755,
+              "mean_width": 879.5771484375,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 439.78857421875,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 319.5789863173954,
+            "rmse": 495.85935457408965,
+            "mape": 36.13065143754789,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": 158.92929130557886,
+            "peak_hour_mae": 436.4534306369344,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 288.61458924876,
+              "high": 354.85685565782353,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.9101156069364161,
+              "mean_width": 1383.6400853400494,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8492706645056726,
+              "mean_width": 1430.4421052631587,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 715.2210526315794,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 528.2225440052893,
+            "rmse": 944.4533123353784,
+            "mape": 43.04210887532569,
+            "n": 3460,
+            "mape_n": 3458,
+            "bias": -12.62601121670938,
+            "peak_hour_mae": 749.8217181881205,
+            "peak_hour_n": 617,
+            "mae_ci": {
+              "low": 469.67814183381324,
+              "high": 589.4312344289639,
+              "confidence": 0.95,
+              "blocks": 161,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.9095375722543353,
+              "mean_width": 2598.8404624277455,
+              "n": 3460,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8379254457050244,
+              "mean_width": 2795.2447325769854,
+              "n": 617,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1402.0,
+            "alpha": 0.1,
+            "n": 1903,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -176.0284020483008,
+          "high": -142.91905304399086,
+          "confidence": 0.95,
+          "blocks": 161,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 123
+        },
+        "72": {
+          "low": -179.51703241603377,
+          "high": -140.08552698701016,
+          "confidence": 0.95,
+          "blocks": 56,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 123
+        },
+        "168": {
+          "low": -181.32459806224108,
+          "high": -138.32730602742356,
+          "confidence": 0.95,
+          "blocks": 25,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 123
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "seed": 7,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 285.05710953287996,
+          "rmse": 429.83741929170503,
+          "mape": 36.03310127958763,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "xgboost": {
+          "mae": 171.01473437843984,
+          "rmse": 256.10166327558994,
+          "mape": 16.027181808245917,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "hour_of_week_mean": {
+          "mae": 314.0430664672932,
+          "rmse": 490.6225870713553,
+          "mape": 36.29656882983505,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "yesterday": {
+          "mae": 528.2225412049046,
+          "rmse": 944.4533092752516,
+          "mape": 43.04210872794813,
+          "n": 3460,
+          "mape_n": 3458
+        }
+      },
+      "epochs_run": 20,
+      "coverage": {
+        "candidate_windows": 32436,
+        "eligible": {
+          "fit": 11972,
+          "validation": 3460,
+          "test": 5753
+        },
+        "excluded": {
+          "non_cadence_step": 11251,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2016-08-26 12:00:00",
+      "validation_end": "2017-02-13 12:00:00",
+      "calibration_end": "2017-05-10T05:00:00",
+      "evaluation_end": "2017-10-26 17:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 330.2860036131447,
+            "rmse": 473.73800704368034,
+            "mape": 12.943616959577858,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -242.03387451171875,
+            "peak_hour_mae": 535.4837646484375,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 310.14536691385894,
+              "high": 352.63757055538053,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9219623792577529,
+              "mean_width": 1515.2601575439328,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.7815602836879433,
+              "mean_width": 1568.330078125,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 784.1650390625,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 149.8645802639921,
+            "rmse": 229.44457433863124,
+            "mape": 6.130818253935071,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -7.596738338470459,
+            "peak_hour_mae": 198.56373596191406,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 143.34409166222258,
+              "high": 156.00172748984644,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9036603965429588,
+              "mean_width": 687.9892133005876,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8439716312056738,
+              "mean_width": 689.0986328125,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 344.54931640625,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 252.26684246085745,
+            "rmse": 422.4814550928227,
+            "mape": 9.762456645965017,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -134.16399621121482,
+            "peak_hour_mae": 370.76724620347477,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 226.08218500864126,
+              "high": 279.9435993087395,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9156075241484494,
+              "mean_width": 1172.3989456700995,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8482269503546099,
+              "mean_width": 1200.347826086957,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 600.1739130434785,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 532.8812916323686,
+            "rmse": 1004.3244761814474,
+            "mape": 23.39847387498733,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": 1.666243358741997,
+            "peak_hour_mae": 750.4453893783244,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 470.7998565881252,
+              "high": 598.4346366139185,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.913065582104728,
+              "mean_width": 2643.265632943569,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8411347517730496,
+              "mean_width": 2825.2595744680852,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1415.0,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -200.5792600160757,
+          "high": -162.2859519510126,
+          "confidence": 0.95,
+          "blocks": 169,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 7
+        },
+        "72": {
+          "low": -203.0278242690072,
+          "high": -161.84123649086987,
+          "confidence": 0.95,
+          "blocks": 57,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 7
+        },
+        "168": {
+          "low": -197.02744856829585,
+          "high": -164.722009742483,
+          "confidence": 0.95,
+          "blocks": 26,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 7
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "seed": 42,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 335.85819087827826,
+          "rmse": 489.9433126224388,
+          "mape": 34.27625417839486,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "xgboost": {
+          "mae": 171.47421663978886,
+          "rmse": 256.96228865448654,
+          "mape": 16.60390424503462,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "hour_of_week_mean": {
+          "mae": 314.0430664672932,
+          "rmse": 490.6225870713553,
+          "mape": 36.29656882983505,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "yesterday": {
+          "mae": 528.2225412049046,
+          "rmse": 944.4533092752516,
+          "mape": 43.04210872794813,
+          "n": 3460,
+          "mape_n": 3458
+        }
+      },
+      "epochs_run": 20,
+      "coverage": {
+        "candidate_windows": 32436,
+        "eligible": {
+          "fit": 11972,
+          "validation": 3460,
+          "test": 5753
+        },
+        "excluded": {
+          "non_cadence_step": 11251,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2016-08-26 12:00:00",
+      "validation_end": "2017-02-13 12:00:00",
+      "calibration_end": "2017-05-10T05:00:00",
+      "evaluation_end": "2017-10-26 17:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 423.07187167363054,
+            "rmse": 579.1375245774644,
+            "mape": 13.573362939989847,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -356.6578369140625,
+            "peak_hour_mae": 843.9342041015625,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 402.1127901866601,
+              "high": 447.1093003373049,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.93111337061515,
+              "mean_width": 1972.4610525964176,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.7404255319148936,
+              "mean_width": 2085.24365234375,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1042.621826171875,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 150.3804818343922,
+            "rmse": 230.95487123297193,
+            "mape": 6.170965178003312,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -7.322478771209717,
+            "peak_hour_mae": 197.15492248535156,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 144.4129759408414,
+              "high": 157.10715096094165,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.9026436197254702,
+              "mean_width": 691.3265622153037,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8425531914893617,
+              "mean_width": 692.4775390625,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 346.23876953125,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 252.26684246085745,
+            "rmse": 422.4814550928227,
+            "mape": 9.762456645965017,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -134.16399621121482,
+            "peak_hour_mae": 370.76724620347477,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 229.0876278317527,
+              "high": 284.9264025384037,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.9156075241484494,
+              "mean_width": 1172.3989456700995,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8482269503546099,
+              "mean_width": 1200.347826086957,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 600.1739130434785,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 532.8812916323686,
+            "rmse": 1004.3244761814474,
+            "mape": 23.39847387498733,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": 1.666243358741997,
+            "peak_hour_mae": 750.4453893783244,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 470.59135916811874,
+              "high": 598.97939720368,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.913065582104728,
+              "mean_width": 2643.265632943569,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8411347517730496,
+              "mean_width": 2825.2595744680852,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1415.0,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -293.70254030098516,
+          "high": -252.79604616246738,
+          "confidence": 0.95,
+          "blocks": 169,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 42
+        },
+        "72": {
+          "low": -292.99756628388434,
+          "high": -252.70463105648793,
+          "confidence": 0.95,
+          "blocks": 57,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 42
+        },
+        "168": {
+          "low": -290.5533606144448,
+          "high": -255.98058323119088,
+          "confidence": 0.95,
+          "blocks": 26,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 42
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "seed": 123,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 358.2442820334021,
+          "rmse": 505.91936345883977,
+          "mape": 36.75426699037943,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "xgboost": {
+          "mae": 171.60910573997938,
+          "rmse": 257.84416902215776,
+          "mape": 12.056277822447546,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "hour_of_week_mean": {
+          "mae": 314.0430664672932,
+          "rmse": 490.6225870713553,
+          "mape": 36.29656882983505,
+          "n": 3460,
+          "mape_n": 3458
+        },
+        "yesterday": {
+          "mae": 528.2225412049046,
+          "rmse": 944.4533092752516,
+          "mape": 43.04210872794813,
+          "n": 3460,
+          "mape_n": 3458
+        }
+      },
+      "epochs_run": 20,
+      "coverage": {
+        "candidate_windows": 32436,
+        "eligible": {
+          "fit": 11972,
+          "validation": 3460,
+          "test": 5753
+        },
+        "excluded": {
+          "non_cadence_step": 11251,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2016-08-26 12:00:00",
+      "validation_end": "2017-02-13 12:00:00",
+      "calibration_end": "2017-05-10T05:00:00",
+      "evaluation_end": "2017-10-26 17:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 446.50358582318705,
+            "rmse": 598.1569570400166,
+            "mape": 14.439240947802446,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -373.8773193359375,
+            "peak_hour_mae": 807.1197509765625,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 429.12378412987897,
+              "high": 464.7136969949224,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.9270462633451957,
+              "mean_width": 2011.8696574767228,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.7574468085106383,
+              "mean_width": 2116.48193359375,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1058.240966796875,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 150.63997894504317,
+            "rmse": 231.3812500938309,
+            "mape": 6.161499000086175,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -7.430714130401611,
+            "peak_hour_mae": 198.46449279785156,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 143.49859395569345,
+              "high": 157.3435464349334,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.896797153024911,
+              "mean_width": 674.4592091880841,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8312056737588652,
+              "mean_width": 675.2802734375,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 337.64013671875,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 252.26684246085745,
+            "rmse": 422.4814550928227,
+            "mape": 9.762456645965017,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": -134.16399621121482,
+            "peak_hour_mae": 370.76724620347477,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 229.02433523995737,
+              "high": 280.5710572583285,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.9156075241484494,
+              "mean_width": 1172.3989456700995,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8482269503546099,
+              "mean_width": 1200.347826086957,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 600.1739130434785,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 532.8812916323686,
+            "rmse": 1004.3244761814474,
+            "mape": 23.39847387498733,
+            "n": 3934,
+            "mape_n": 3934,
+            "bias": 1.666243358741997,
+            "peak_hour_mae": 750.4453893783244,
+            "peak_hour_n": 705,
+            "mae_ci": {
+              "low": 466.99469764835726,
+              "high": 593.7729734234684,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.913065582104728,
+              "mean_width": 2643.265632943569,
+              "n": 3934,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8411347517730496,
+              "mean_width": 2825.2595744680852,
+              "n": 705,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1415.0,
+            "alpha": 0.1,
+            "n": 1819,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -313.6085906514739,
+          "high": -278.81828682022115,
+          "confidence": 0.95,
+          "blocks": 169,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 123
+        },
+        "72": {
+          "low": -314.31788381082634,
+          "high": -277.6101705095236,
+          "confidence": 0.95,
+          "blocks": 57,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 123
+        },
+        "168": {
+          "low": -310.91806213506186,
+          "high": -278.39396555285816,
+          "confidence": 0.95,
+          "blocks": 26,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 123
+        }
+      }
+    },
+    {
+      "fold": 3,
+      "seed": 7,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 266.8154446437508,
+          "rmse": 420.3921404938923,
+          "mape": 11.61389262952624,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "xgboost": {
+          "mae": 149.1422235889367,
+          "rmse": 229.50872211052038,
+          "mape": 6.109686043632327,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "hour_of_week_mean": {
+          "mae": 255.59394657051905,
+          "rmse": 423.65478914629807,
+          "mape": 9.753030112397337,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "yesterday": {
+          "mae": 532.8812911669252,
+          "rmse": 1004.3244757257937,
+          "mape": 23.398473817099806,
+          "n": 3934,
+          "mape_n": 3934
+        }
+      },
+      "epochs_run": 13,
+      "coverage": {
+        "candidate_windows": 38522,
+        "eligible": {
+          "fit": 17251,
+          "validation": 3934,
+          "test": 5705
+        },
+        "excluded": {
+          "non_cadence_step": 11632,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2017-05-10 05:00:00",
+      "validation_end": "2017-10-26 18:00:00",
+      "calibration_end": "2018-01-19T15:00:00",
+      "evaluation_end": "2018-07-08 06:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 299.87530103955385,
+            "rmse": 487.823029969653,
+            "mape": 14.258502593524963,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -29.029356002807617,
+            "peak_hour_mae": 460.95941162109375,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 269.8233348397148,
+              "high": 333.71975496078613,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9287200832466181,
+              "mean_width": 1468.9383535236275,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8798283261802575,
+              "mean_width": 1520.353515625,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 760.1767578125,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 153.48225689430515,
+            "rmse": 236.6247286019535,
+            "mape": 6.42898261829817,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": 1.154768466949463,
+            "peak_hour_mae": 221.54470825195312,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 145.53051593948248,
+              "high": 161.89896929191391,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9232570239334027,
+              "mean_width": 793.9931954295529,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8469241773962805,
+              "mean_width": 800.087890625,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 400.0439453125,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 292.03951581625256,
+            "rmse": 504.84803947067155,
+            "mape": 12.59629376651062,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -35.070184761599876,
+            "peak_hour_mae": 461.58587056037857,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 254.81904764892687,
+              "high": 331.24903548753275,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.9375650364203955,
+              "mean_width": 1536.2945058592038,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8984263233190272,
+              "mean_width": 1594.1863354037266,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 797.0931677018634,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 596.3511959079897,
+            "rmse": 1073.1870496443596,
+            "mape": 26.607284059888016,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -21.376172044894947,
+            "peak_hour_mae": 868.3061519944787,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 518.0403413231061,
+              "high": 666.8298654300281,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 7
+            },
+            "interval": {
+              "coverage": 0.8969823100936525,
+              "mean_width": 2894.037200832466,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8068669527896996,
+              "mean_width": 3124.206008583691,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1571.0,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -176.2296901017507,
+          "high": -122.35073679732128,
+          "confidence": 0.95,
+          "blocks": 169,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 7
+        },
+        "72": {
+          "low": -178.58849827073493,
+          "high": -118.25097142082339,
+          "confidence": 0.95,
+          "blocks": 57,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 7
+        },
+        "168": {
+          "low": -174.30293530480924,
+          "high": -122.5286509325258,
+          "confidence": 0.95,
+          "blocks": 25,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 7
+        }
+      }
+    },
+    {
+      "fold": 3,
+      "seed": 42,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 261.5785285938071,
+          "rmse": 422.33217340548026,
+          "mape": 11.264522560420316,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "xgboost": {
+          "mae": 148.98594182629722,
+          "rmse": 229.03859548542553,
+          "mape": 6.0741550919808995,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "hour_of_week_mean": {
+          "mae": 255.59394657051905,
+          "rmse": 423.65478914629807,
+          "mape": 9.753030112397337,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "yesterday": {
+          "mae": 532.8812911669252,
+          "rmse": 1004.3244757257937,
+          "mape": 23.398473817099806,
+          "n": 3934,
+          "mape_n": 3934
+        }
+      },
+      "epochs_run": 19,
+      "coverage": {
+        "candidate_windows": 38522,
+        "eligible": {
+          "fit": 17251,
+          "validation": 3934,
+          "test": 5705
+        },
+        "excluded": {
+          "non_cadence_step": 11632,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2017-05-10 05:00:00",
+      "validation_end": "2017-10-26 18:00:00",
+      "calibration_end": "2018-01-19T15:00:00",
+      "evaluation_end": "2018-07-08 06:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 297.08523606410506,
+            "rmse": 497.2966732327947,
+            "mape": 14.158976803807978,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -12.640382766723633,
+            "peak_hour_mae": 495.2602233886719,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 261.8023914993657,
+              "high": 333.5376218943911,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.9297606659729448,
+              "mean_width": 1529.0645712258045,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.876967095851216,
+              "mean_width": 1579.8701171875,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 789.93505859375,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 152.40694543399871,
+            "rmse": 236.63036025415624,
+            "mape": 6.378327088500613,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": 2.5194926261901855,
+            "peak_hour_mae": 218.1262969970703,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 143.8413624458648,
+              "high": 161.23011399317653,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.9308012486992716,
+              "mean_width": 802.6820848923444,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8741058655221745,
+              "mean_width": 809.18408203125,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 404.592041015625,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 292.03951581625256,
+            "rmse": 504.84803947067155,
+            "mape": 12.59629376651062,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -35.070184761599876,
+            "peak_hour_mae": 461.58587056037857,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 254.37306219215637,
+              "high": 330.8417580342722,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.9375650364203955,
+              "mean_width": 1536.2945058592038,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8984263233190272,
+              "mean_width": 1594.1863354037266,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 797.0931677018634,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 596.3511959079897,
+            "rmse": 1073.1870496443596,
+            "mape": 26.607284059888016,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -21.376172044894947,
+            "peak_hour_mae": 868.3061519944787,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 519.7777706830243,
+              "high": 668.5734113399167,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 42
+            },
+            "interval": {
+              "coverage": 0.8969823100936525,
+              "mean_width": 2894.037200832466,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8068669527896996,
+              "mean_width": 3124.206008583691,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1571.0,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -177.08283787649071,
+          "high": -115.43956618655452,
+          "confidence": 0.95,
+          "blocks": 169,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 42
+        },
+        "72": {
+          "low": -184.165629199732,
+          "high": -115.74795478474842,
+          "confidence": 0.95,
+          "blocks": 57,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 42
+        },
+        "168": {
+          "low": -179.98353047273386,
+          "high": -116.68646584799859,
+          "confidence": 0.95,
+          "blocks": 25,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 42
+        }
+      }
+    },
+    {
+      "fold": 3,
+      "seed": 123,
+      "selected": "xgboost",
+      "validation": {
+        "lstm": {
+          "mae": 309.53743008107904,
+          "rmse": 465.02186213244806,
+          "mape": 11.994107717479196,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "xgboost": {
+          "mae": 149.7479126721272,
+          "rmse": 231.09439712601664,
+          "mape": 6.196505089630145,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "hour_of_week_mean": {
+          "mae": 255.59394657051905,
+          "rmse": 423.65478914629807,
+          "mape": 9.753030112397337,
+          "n": 3934,
+          "mape_n": 3934
+        },
+        "yesterday": {
+          "mae": 532.8812911669252,
+          "rmse": 1004.3244757257937,
+          "mape": 23.398473817099806,
+          "n": 3934,
+          "mape_n": 3934
+        }
+      },
+      "epochs_run": 17,
+      "coverage": {
+        "candidate_windows": 38522,
+        "eligible": {
+          "fit": 17251,
+          "validation": 3934,
+          "test": 5705
+        },
+        "excluded": {
+          "non_cadence_step": 11632,
+          "missing_input": 0,
+          "missing_target": 0,
+          "boundary_purge": 0
+        },
+        "policy": "complete windows only; excluded windows are never imputed or filled; each exclusion is counted once, by the first failed check in ['non_cadence_step', 'missing_input', 'missing_target', 'boundary_purge']"
+      },
+      "fit_end": "2017-05-10 05:00:00",
+      "validation_end": "2017-10-26 18:00:00",
+      "calibration_end": "2018-01-19T15:00:00",
+      "evaluation_end": "2018-07-08 06:00:00",
+      "evaluation": {
+        "lstm": {
+          "metrics": {
+            "mae": 348.07351454338846,
+            "rmse": 530.2829073620768,
+            "mape": 15.013920442118831,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -100.68727111816406,
+            "peak_hour_mae": 546.1683349609375,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 320.98554057484773,
+              "high": 378.6434350465613,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.9079084287200833,
+              "mean_width": 1574.4542447109004,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.7825464949928469,
+              "mean_width": 1630.28125,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 815.140625,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "xgboost": {
+          "metrics": {
+            "mae": 152.91090388104521,
+            "rmse": 237.18812447118657,
+            "mape": 6.445326867587128,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": 1.7677568197250366,
+            "peak_hour_mae": 217.7557830810547,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 145.51618664576824,
+              "high": 162.65558479666475,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.926378772112383,
+              "mean_width": 806.4277343611067,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8597997138769671,
+              "mean_width": 813.1787109375,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 406.58935546875,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "hour_of_week_mean": {
+          "metrics": {
+            "mae": 292.03951581625256,
+            "rmse": 504.84803947067155,
+            "mape": 12.59629376651062,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -35.070184761599876,
+            "peak_hour_mae": 461.58587056037857,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 261.3687617976757,
+              "high": 331.6875400427932,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.9375650364203955,
+              "mean_width": 1536.2945058592038,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8984263233190272,
+              "mean_width": 1594.1863354037266,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 797.0931677018634,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        },
+        "yesterday": {
+          "metrics": {
+            "mae": 596.3511959079897,
+            "rmse": 1073.1870496443596,
+            "mape": 26.607284059888016,
+            "n": 3844,
+            "mape_n": 3844,
+            "bias": -21.376172044894947,
+            "peak_hour_mae": 868.3061519944787,
+            "peak_hour_n": 699,
+            "mae_ci": {
+              "low": 530.6926707727134,
+              "high": 671.0336866700783,
+              "confidence": 0.95,
+              "blocks": 169,
+              "block_hours": 24,
+              "replicates": 500,
+              "seed": 123
+            },
+            "interval": {
+              "coverage": 0.8969823100936525,
+              "mean_width": 2894.037200832466,
+              "n": 3844,
+              "nominal_coverage": 0.9
+            },
+            "peak_interval": {
+              "coverage": 0.8068669527896996,
+              "mean_width": 3124.206008583691,
+              "n": 699,
+              "nominal_coverage": 0.9
+            }
+          },
+          "calibration": {
+            "radius": 1571.0,
+            "alpha": 0.1,
+            "n": 1861,
+            "method": "absolute-residual split calibration",
+            "limitation": "nominal coverage is not guaranteed under temporal dependence or shift"
+          }
+        }
+      },
+      "paired_block_sensitivity": {
+        "24": {
+          "low": -221.5746853145375,
+          "high": -172.45465027546038,
+          "confidence": 0.95,
+          "blocks": 169,
+          "block_hours": 24,
+          "replicates": 500,
+          "seed": 123
+        },
+        "72": {
+          "low": -225.5218241214162,
+          "high": -167.60806187291732,
+          "confidence": 0.95,
+          "blocks": 57,
+          "block_hours": 72,
+          "replicates": 500,
+          "seed": 123
+        },
+        "168": {
+          "low": -222.40556117638377,
+          "high": -173.7087848893325,
+          "confidence": 0.95,
+          "blocks": 25,
+          "block_hours": 168,
+          "replicates": 500,
+          "seed": 123
+        }
+      }
+    }
+  ]
+}

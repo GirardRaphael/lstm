@@ -9,6 +9,8 @@ open the model up and look at what every neuron did.
 from __future__ import annotations
 
 import sys
+import json
+from uuid import uuid4
 from pathlib import Path
 
 # Make `src/` importable whichever directory Streamlit was launched from.
@@ -31,7 +33,7 @@ from traffic_lstm.introspect import (
     trace_network,
 )
 
-st.set_page_config(page_title="Traffic LSTM", page_icon="🚦", layout="wide")
+st.set_page_config(page_title="Hourly Forecast Workbench", page_icon="🚦", layout="wide")
 
 ACCENT = "#d62728"
 BLUE = "#1f77b4"
@@ -164,6 +166,8 @@ def page_data():
 
 
 def page_train():
+    st.warning("Legacy v1 education only: validation contamination and gap handling limit these scores. "
+               "Use train.ps1 for a versioned causal comparison.")
     st.header("2 · Train")
     if state("series") is None:
         st.warning("Load a dataset on the **Data** tab first.")
@@ -199,7 +203,7 @@ def page_train():
         sequence_length=int(sequence_length), horizons=tuple(sorted(horizons)),
         lstm_units=(int(units_1), int(units_2)), dropout=float(dropout),
         epochs=int(epochs), batch_size=int(batch_size), patience=int(patience),
-        train_ratio=float(train_ratio), run_name="streamlit_run")
+        train_ratio=float(train_ratio), run_name="education_" + uuid4().hex[:12])
 
     from traffic_lstm.train import train
 
@@ -209,14 +213,7 @@ def page_train():
         len(bundle.X_train), len(bundle.X_test), cfg.sequence_length))
 
     progress = StreamlitProgress(cfg.epochs)
-    import traffic_lstm.model as model_module
-
-    original = model_module.default_callbacks
-    model_module.default_callbacks = lambda c: original(c) + [progress.callback]
-    try:
-        outcome = train(cfg, bundle=bundle, verbose=0)
-    finally:
-        model_module.default_callbacks = original
+    outcome = train(cfg, bundle=bundle, verbose=0, callbacks=[progress.callback])
 
     progress.bar.progress(1.0, text="Done — {} epochs".format(
         outcome["artifacts"]["epochs_run"]))
@@ -432,13 +429,13 @@ def page_predict():
         st.warning("Train a model first.")
         return
     cfg, bundle, model = state("cfg"), outcome["bundle"], outcome["model"]
-    series, target = state("series"), state("target_column")
+    series, target = bundle.series, cfg.target_column
 
     mode = st.radio("Input", ["Last {} hours of the dataset".format(cfg.sequence_length),
                               "Type the values myself"], horizontal=True)
     if mode.startswith("Last"):
         window = series[target].to_numpy()[-cfg.sequence_length:]
-        ends_at = str(series[state("datetime_column")].iloc[-1])
+        ends_at = str(series[cfg.datetime_column].iloc[-1])
     else:
         default = ", ".join("{:.0f}".format(v) for v in
                             series[target].to_numpy()[-cfg.sequence_length:])
@@ -455,10 +452,16 @@ def page_predict():
             return
         ends_at = "manual input"
 
+    if not np.isfinite(window).all():
+        st.error("History must contain finite values.")
+        return
     scaled = bundle.scaler.transform(np.asarray(window, dtype="float64").reshape(-1, 1))
     predicted = bundle.scaler.inverse_transform(
         model.predict(scaled.reshape(1, cfg.sequence_length, 1), verbose=0).reshape(-1, 1)
     ).ravel()
+    if len(predicted) != len(cfg.horizons) or not np.isfinite(predicted).all():
+        st.error("Model returned an invalid forecast.")
+        return
 
     st.caption("Window ends: {}".format(ends_at))
     cols = st.columns(len(cfg.horizons))
@@ -469,7 +472,7 @@ def page_predict():
                    "{} {} — {}".format(badge, level, comment))
 
     fig = go.Figure()
-    fig.add_scatter(x=list(range(-cfg.sequence_length, 0)), y=window,
+    fig.add_scatter(x=list(range(1 - cfg.sequence_length, 1)), y=window,
                     name="History", line=dict(color=BLUE, width=2))
     fig.add_scatter(x=[h for h in cfg.horizons], y=predicted, name="Forecast",
                     mode="markers+lines", line=dict(color=ACCENT, width=2, dash="dot"),
@@ -504,12 +507,45 @@ def page_vault():
                    "start from `00 Start Here`.")
 
 
+def page_evidence():
+    st.header("Forecast evidence")
+    st.caption("Read-only research workbench. Hourly count forecasts; no signal control or congestion diagnosis.")
+    manifests = sorted((ROOT / "models" / "v2").glob("*/manifest.json"))
+    if not manifests:
+        st.info("No v2 packages yet. Train a comparison from the terminal.")
+        st.code("./train.ps1 --dataset motorway --run-name motorway_v2")
+        return
+    path = st.selectbox("Versioned run", manifests, format_func=lambda p: p.parent.name)
+    try:
+        from traffic_lstm.pipeline_v2 import load_package
+        package = load_package(path.parent)
+        manifest = package.manifest
+        st.write("Validation-selected candidate:", manifest.get("selected_on_validation", "unrecorded"))
+        st.warning("Retrospective reanalysis: this historical test period has been inspected before. "
+                   "Intervals describe test-period sampling uncertainty, not future forecast bounds.")
+        split = st.radio("Evaluation partition", ["validation", "test"], horizontal=True)
+        horizon = st.selectbox("Horizon", list(manifest["evaluation"][split]))
+        block = manifest["evaluation"][split][horizon]
+        rows = [{"model": name, **{k: value.get(k) for k in
+                 ("mae", "rmse", "mape", "mape_n", "bias", "peak_hour_mae", "n")}}
+                for name, value in block.items() if isinstance(value, dict) and "mae" in value]
+        st.dataframe(pd.DataFrame(rows), hide_index=True)
+        st.caption("Errors are in declared target units; MAPE is percent on actuals > 1. "
+                   "Peak hours: weekdays 07–09 and 16–18 in the dataset clock.")
+        with st.expander("Coverage, uncertainty and provenance"):
+            st.json({"coverage": manifest["coverage"], "evaluation": block,
+                     "protocol": manifest["evaluation"]["protocol"], "source_sha256": manifest.get("source_sha256")})
+        st.download_button("Download run manifest", path.read_bytes(), file_name=path.parent.name + ".json")
+    except (ValueError, KeyError, OSError, RuntimeError) as exc:
+        st.error(f"Package unavailable: {exc}")
+
+
 # ------------------------------------------------------------------- main ---
-st.title("🚦 Traffic LSTM")
-st.caption("Forecast the next hour of traffic from the last 24 — and look inside the network "
-           "while it does it.")
+st.title("Hourly Forecast Workbench")
+st.caption("Compare forecast evidence; inspect archived LSTM computations in the educational pages.")
 
 PAGES = {
+    "0 · Forecast evidence": page_evidence,
     "1 · Data": page_data,
     "2 · Train": page_train,
     "3 · Results": page_results,

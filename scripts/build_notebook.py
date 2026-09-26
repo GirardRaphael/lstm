@@ -508,7 +508,7 @@ nothing else in the pipeline changes.
 lights. It produces a forecast that a signal controller could consume.
 
 ```
-Sensors -> hourly history -> LSTM -> forecast -> controller -> adaptive lights
+Stored hourly observations -> forecast -> offline evaluation
 ```
 """)
 

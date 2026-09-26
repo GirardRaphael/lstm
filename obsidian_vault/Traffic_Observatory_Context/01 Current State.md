@@ -7,6 +7,10 @@ updated_utc: 2026-09-13T14:05:00Z
 verified_commit: a652a04fbaee8579fdf20fbe4efe162d66155373
 ---
 
+> **Current local delivery:** Authenticated observatory, durable jobs, forecasts/actuals, calibration, monitoring and backup/restore now pass verification. See `reports/IMPLEMENTATION_LOG.md`, `reports/BACKTEST_REPORT.md` and `docs/OPERATIONS.md`. Field and shared-hosting gates remain open.
+
+> **2026-09-25 update:** The v2 code was recovered from `origin/observatory/pipeline-v2` (0c0e62d) and integrated into this working tree. Motorway and bike reruns and verification are recorded in `reports/DELIVERY_REVIEW.md` and `reports/REPORT.md`. The older state below is historical; its missing-branch blocker and previous-machine paths are superseded. No changes have been pushed.
+
 # Current State
 
 ## Checkout (verified now)

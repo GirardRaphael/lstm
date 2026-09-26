@@ -125,9 +125,9 @@ def training_diagnosis(history: dict, patience: int = 5) -> dict:
 
 
 def traffic_level(volume: float, low: int = 2000, high: int = 4000) -> tuple[str, str]:
-    """Turn a number of vehicles into something a dispatcher can act on."""
+    """Describe count bands only; volume alone cannot identify congestion."""
     if volume < low:
-        return "LOW", "Free flow"
+        return "LOW", "Low count band; speed and queues unknown"
     if volume < high:
-        return "MODERATE", "Steady traffic"
-    return "HIGH", "Congestion risk"
+        return "MODERATE", "Middle count band; speed and queues unknown"
+    return "HIGH", "High count band; speed and queues unknown"
