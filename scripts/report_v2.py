@@ -27,8 +27,12 @@ def render():
                   "The direct tree uses longer seasonal lags and the target clock; this is a practical candidate comparison, not an architecture-only ablation.",
                   f"Eligible windows: `{m['coverage']['eligible']}`. Excluded: `{m['coverage']['excluded']}`.", ""]
         for horizon, block in m["evaluation"]["test"].items():
-            lines += [f"Test {horizon}:", "", "| Candidate | MAE [95% CI] | RMSE | MAPE | MAPE n | Bias | Peak MAE | n |",
-                      "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+            lines += [
+                f"Test {horizon}:", "",
+                "| Candidate | MAE [95% CI] | Median AE | P90 AE | RMSE | "
+                "MAPE | sMAPE | WAPE | Bias | Peak MAE | n |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+            ]
             for name in ("xgboost", "lstm", "hour_of_week_mean", "naive_last_week", "naive_seasonal", "naive_persistence"):
                 if name not in block:
                     continue
@@ -38,8 +42,13 @@ def render():
                 def number(key):
                     v = values.get(key)
                     return "undefined" if v is None else f"{v:.2f}"
-                lines.append(f"| {name} | {number('mae')}{interval} | {number('rmse')} | {number('mape')}% | "
-                             f"{values.get('mape_n')} | {number('bias')} | {number('peak_hour_mae')} | {values['n']} |")
+                lines.append(
+                    f"| {name} | {number('mae')}{interval} | "
+                    f"{number('median_ae')} | {number('p90_ae')} | "
+                    f"{number('rmse')} | {number('mape')}% | "
+                    f"{number('smape')}% | {number('wape')}% | "
+                    f"{number('bias')} | {number('peak_hour_mae')} | "
+                    f"{values['n']} |")
             paired = block.get("paired_xgboost_minus_lstm_mae")
             lines += ["", f"Paired XGBoost minus LSTM absolute-error difference: `{json.dumps(paired)}`. Negative favors XGBoost.", ""]
     lines += ["## Delivery status", "",

@@ -33,10 +33,34 @@ def test_long_horizon_seasonal_never_reads_after_origin():
 def test_direct_lags_use_timestamps_and_refuse_future_observations():
     df = frame().drop(index=177)
     target = pd.Timestamp("2020-01-01") + pd.Timedelta(hours=201)
-    x = direct_features(df, "date_time", "traffic_volume", [target], [target - pd.Timedelta(hours=1)])
+    x = direct_features(
+        df, "date_time", "traffic_volume", [target],
+        [target - pd.Timedelta(hours=1)], "seasonal_v1")
     assert x[0, 0] == 200 and np.isnan(x[0, 1]) and x[0, 2] == 33
-    future = direct_features(df, "date_time", "traffic_volume", [target], [target - pd.Timedelta(hours=25)])
+    future = direct_features(
+        df, "date_time", "traffic_volume", [target],
+        [target - pd.Timedelta(hours=25)], "seasonal_v1")
     assert np.isnan(future[0, :2]).all()
+
+
+def test_direct_v2_features_are_causal_and_do_not_fill_outages():
+    df = frame()
+    target = pd.Timestamp("2020-01-10 00:00")
+    origin = target - pd.Timedelta(hours=1)
+    got = direct_features(
+        df, "date_time", "traffic_volume", [target], [origin],
+        "seasonal_v2")
+    assert got.shape == (1, 14)
+    assert got[0, :6].tolist() == [215, 214, 213, 192, 191, 48]
+    assert got[0, 6] == pytest.approx(np.mean([213, 214, 215]))
+    assert got[0, 7] == pytest.approx(np.mean(np.arange(192, 216)))
+    assert got[0, 8] == pytest.approx(np.std(np.arange(192, 216)))
+
+    missing = df[df.date_time != origin - pd.Timedelta(hours=5)]
+    with_gap = direct_features(
+        missing, "date_time", "traffic_volume", [target], [origin],
+        "seasonal_v2")
+    assert np.isnan(with_gap[0, 7:9]).all()
 
 
 def test_intervals_preserve_calendar_blocks_and_constant_difference():
@@ -51,6 +75,11 @@ def test_metrics_reject_broadcasting_and_nonfinite():
         regression_metrics_v2([1, 2], [1])
     with pytest.raises(ValueError):
         regression_metrics_v2([1], [np.inf])
+    metrics = regression_metrics_v2([0, 10, 20], [0, 12, 10])
+    assert metrics["median_ae"] == 2
+    assert metrics["p90_ae"] == pytest.approx(8.4)
+    assert metrics["wape"] == pytest.approx(40)
+    assert metrics["smape"] is not None
 
 
 def test_future_mutation_cannot_change_fit_or_validation_inputs():
@@ -84,5 +113,9 @@ def test_direct_tree_package_roundtrip_and_baseline_alignment(tmp_path):
     assert result["manifest"]["baselines"]["hour_of_week_mean"]["slots"]
     selected = package.forecast(history)
     assert selected["model"] == result["manifest"]["selected_on_validation"]
+    short_history = history.tail(cfg.sequence_length)
+    degraded = package.forecast(short_history, model="xgboost")
+    assert degraded["input_warnings"]
+    assert "target_t-168h" in degraded["input_warnings"][0]
     cfg_default = V2Config(units={"traffic_volume": "vehicles/hour"}, site_scope="test")
     assert cfg_default.xgb_layout == "direct_lags"

@@ -528,7 +528,9 @@ def _():
     assert m["mape"] is None and m["mae"] is not None, m
     assert json.loads(json.dumps(m))["mape"] is None
     empty = v2.regression_metrics_v2(np.array([]), np.array([]))
-    assert empty == {"mae": None, "rmse": None, "mape": None, "n": 0}, empty
+    assert empty["n"] == 0
+    assert all(empty[name] is None for name in (
+        "mae", "median_ae", "p90_ae", "rmse", "mape", "smape", "wape")), empty
     assert v2.improvement_pct(0.0, 0.0) is None      # zero-error baseline
     assert v2.improvement_pct(2.0, 0.0) is None
     assert v2.improvement_pct(3.0, 6.0) == 50.0

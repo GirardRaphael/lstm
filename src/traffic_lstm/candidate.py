@@ -24,7 +24,10 @@ def train_candidate(frame, stream_id, *, seed=42):
     if min(len(fit), len(val), len(post)) < 100:
         raise ValueError("Insufficient complete windows after exclusions")
     def x(part):
-        return direct_features(data.series, "date_time", "vehicle_count", part.target_stamps[:, 0], part.context_end_stamps)
+        return direct_features(
+            data.series, "date_time", "vehicle_count",
+            part.target_stamps[:, 0], part.context_end_stamps,
+            cfg.xgb_direct_feature_set)
     def y(part):
         return data.target_scaler.inverse_transform(part.y).ravel()
     tree = XGBRegressor(n_estimators=600, max_depth=6, learning_rate=.05, n_jobs=1,
@@ -56,6 +59,7 @@ def train_candidate(frame, stream_id, *, seed=42):
             "units": "vehicles/completed_hour", "selected": selected, "validation": validation,
             "calibration": calibration, "evaluation": metrics, "calibration_end": cal_end.isoformat(),
             "splits": data.boundaries, "coverage": data.coverage, "seed": seed,
+            "direct_feature_set": cfg.xgb_direct_feature_set,
             "weekly_means": {str(int(k)): float(v) for k,v in weekly.items()},
             "fit_mean": float(fit_frame.vehicle_count.mean()),
             "fit_q01": float(fit_frame.vehicle_count.quantile(.01)),
@@ -78,7 +82,9 @@ def predict_candidate(meta, payload, frame):
     if meta["selected"] == "xgboost":
         tree = XGBRegressor()
         tree.load_model(bytearray(payload))
-        value = float(tree.predict(direct_features(history, "date_time", "vehicle_count", [target], [origin]))[0])
+        value = float(tree.predict(direct_features(
+            history, "date_time", "vehicle_count", [target], [origin],
+            meta.get("direct_feature_set", "seasonal_v1")))[0])
     else:
         value = meta["weekly_means"].get(str(target.dayofweek*24 + target.hour), meta["fit_mean"])
     if not np.isfinite(value):

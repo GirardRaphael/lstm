@@ -63,7 +63,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Mapping, Sequence
 
 import numpy as np
@@ -71,7 +71,13 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
 from .config import DEFAULT_DATASET, MODEL_DIR
-from .evaluation_v2 import weekly_mean, diagnostic_metrics, block_interval, direct_features
+from .evaluation_v2 import (
+    DIRECT_FEATURE_NAMES,
+    weekly_mean,
+    diagnostic_metrics,
+    block_interval,
+    direct_features,
+)
 
 PIPELINE_VERSION = "v2"
 PREPROCESSING_VERSION = "v2-causal-1"
@@ -191,10 +197,15 @@ class V2Config:
     xgb_colsample: float = 0.8
     xgb_early_stopping: int = 30
     xgb_layout: str = "direct_lags"  # flattened: the 24xF tensor, kept as an ablation
+    xgb_direct_feature_set: str = "seasonal_v2"
 
     def __post_init__(self) -> None:
         if self.xgb_layout not in ("flattened", "direct_lags"):
             raise ValueError("xgb_layout must be flattened or direct_lags")
+        if self.xgb_direct_feature_set not in DIRECT_FEATURE_NAMES:
+            raise ValueError(
+                "xgb_direct_feature_set must be one of "
+                f"{sorted(DIRECT_FEATURE_NAMES)}")
         if self.pipeline_version != PIPELINE_VERSION:
             raise ValueError(
                 f"V2Config only builds pipeline_version={PIPELINE_VERSION!r}, "
@@ -709,16 +720,37 @@ def regression_metrics_v2(actual: np.ndarray, predicted: np.ndarray,
     if not np.isfinite(actual).all() or not np.isfinite(predicted).all():
         raise ValueError("metrics require finite actuals and predictions")
     if actual.size == 0:
-        return {"mae": None, "rmse": None, "mape": None, "n": 0}
+        return {
+            "mae": None, "median_ae": None, "p90_ae": None, "rmse": None,
+            "mape": None, "smape": None, "wape": None, "n": 0,
+            "mape_n": 0,
+        }
     errors = actual - predicted
-    mae = float(np.mean(np.abs(errors)))
+    absolute = np.abs(errors)
+    mae = float(np.mean(absolute))
     rmse = float(np.sqrt(np.mean(errors ** 2)))
     mask = np.abs(actual) > min_actual_for_mape
     mape = (float(np.mean(np.abs((actual[mask] - predicted[mask])
                                  / actual[mask])) * 100)
             if mask.any() else None)
-    return {"mae": mae, "rmse": rmse, "mape": mape, "n": int(actual.size),
-            "mape_n": int(mask.sum())}
+    smape_denominator = np.abs(actual) + np.abs(predicted)
+    smape_mask = smape_denominator > 0
+    smape = (float(np.mean(
+        2 * absolute[smape_mask] / smape_denominator[smape_mask]) * 100)
+        if smape_mask.any() else None)
+    actual_total = float(np.sum(np.abs(actual)))
+    wape = float(np.sum(absolute) / actual_total * 100) if actual_total > 0 else None
+    return {
+        "mae": mae,
+        "median_ae": float(np.median(absolute)),
+        "p90_ae": float(np.quantile(absolute, 0.90)),
+        "rmse": rmse,
+        "mape": mape,
+        "smape": smape,
+        "wape": wape,
+        "n": int(actual.size),
+        "mape_n": int(mask.sum()),
+    }
 
 
 def improvement_pct(model_mae: float | None,
@@ -878,7 +910,8 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
         def tree_input(part):
             if cfg.xgb_layout == "direct_lags":
                 return direct_features(data.series, cfg.datetime_column, cfg.target_column,
-                                       part.target_stamps[:, k], part.context_end_stamps)
+                                       part.target_stamps[:, k], part.context_end_stamps,
+                                       cfg.xgb_direct_feature_set)
             return part.X.reshape(len(part.X), -1)
         estimator.fit(tree_input(fit), fit.y[:, k],
                       eval_set=[(tree_input(val), val.y[:, k])],
@@ -893,7 +926,8 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
             "xgboost": np.column_stack([
                 _xgb_predict(xgb_models[h],
                     direct_features(data.series, cfg.datetime_column, cfg.target_column,
-                                    part.target_stamps[:, j], part.context_end_stamps)
+                                    part.target_stamps[:, j], part.context_end_stamps,
+                                    cfg.xgb_direct_feature_set)
                     if cfg.xgb_layout == "direct_lags" else flat)
                 for j, h in enumerate(cfg.horizons)]),
         }
@@ -1025,9 +1059,10 @@ def save_package(cfg: V2Config, data: V2Data, lstm_model, xgb_models: dict,
             "exogenous_columns": list(cfg.exogenous_columns),
             "feature_names": list(data.feature_names),
             "xgboost_layout": cfg.xgb_layout,
-            "xgboost_direct_features": (["target_t-1h", "target_t-24h", "target_t-168h",
-                                         "target_hour_sin", "target_hour_cos",
-                                         "target_weekday_sin", "target_weekday_cos"]
+            "xgboost_direct_feature_set": (
+                cfg.xgb_direct_feature_set if cfg.xgb_layout == "direct_lags" else None),
+            "xgboost_direct_features": (
+                list(DIRECT_FEATURE_NAMES[cfg.xgb_direct_feature_set])
                                         if cfg.xgb_layout == "direct_lags" else None),
             "calendar_features": bool(cfg.calendar_features),
             "derived_features": derived,
@@ -1199,6 +1234,7 @@ class V2Package:
         chosen = model
         if chosen == "selected":
             chosen = self.manifest.get("selected_on_validation") or "lstm"
+        input_warnings = []
         if chosen == "lstm":
             window = self.build_input_window(recent_history)
             predicted_scaled = np.asarray(
@@ -1210,12 +1246,32 @@ class V2Package:
             history = recent_history.copy()
             history[self.cfg.datetime_column] = pd.to_datetime(history[self.cfg.datetime_column])
             origin = history[self.cfg.datetime_column].max()
+            feature_set = self.manifest["schema"].get(
+                "xgboost_direct_feature_set") or "seasonal_v1"
+            direct_rows = [
+                direct_features(
+                    history, self.cfg.datetime_column, self.cfg.target_column,
+                    [origin + h * pd.Timedelta(self.cfg.cadence)], [origin],
+                    feature_set)
+                for h in self.cfg.horizons
+            ]
+            feature_names = list(DIRECT_FEATURE_NAMES[feature_set])
+            missing = (sorted({
+                feature_names[index]
+                for row in direct_rows
+                for index in np.flatnonzero(~np.isfinite(row[0]))
+            }) if self.cfg.xgb_layout == "direct_lags" else [])
+            if missing:
+                input_warnings.append(
+                    "Direct-tree inputs unavailable and passed as missing: "
+                    + ", ".join(missing)
+                    + ". Supply timestamp-complete history through t-168h "
+                      "for parity with evaluation.")
             predicted_scaled = np.asarray([
                 _xgb_predict(self.load_xgboost(h),
-                    direct_features(history, self.cfg.datetime_column, self.cfg.target_column,
-                                    [origin + h * pd.Timedelta(self.cfg.cadence)], [origin])
-                    if self.cfg.xgb_layout == "direct_lags" else flat)[0]
-                for h in self.cfg.horizons], dtype="float64")
+                    direct_rows[index] if self.cfg.xgb_layout == "direct_lags"
+                    else flat)[0]
+                for index, h in enumerate(self.cfg.horizons)], dtype="float64")
             predicted = _inverse_target(self.target_scaler, predicted_scaled)
         elif chosen in ("naive_persistence", "naive_seasonal", "naive_last_week",
                         "hour_of_week_mean"):
@@ -1248,6 +1304,7 @@ class V2Package:
             "cadence": self.cfg.cadence,
             "window_end": window_end.isoformat(),
             "forecasts": forecasts,
+            "input_warnings": input_warnings,
         }
 
     def _baseline_values(self, recent_history: pd.DataFrame, name: str) -> np.ndarray:
@@ -1336,7 +1393,8 @@ def read_legacy_artifact(path: str | Path) -> dict:
     if model_path:
         # The artifact's own directory first: archived absolute paths point at
         # the training machine and must never be silently substituted.
-        candidates = [path.parent / Path(model_path).name, Path(model_path)]
+        archived_name = PureWindowsPath(str(model_path)).name
+        candidates = [path.parent / archived_name, Path(model_path)]
         weights = next((c for c in candidates if c.exists()), None)
     return {
         "pipeline_version": PIPELINE_VERSION_LEGACY,

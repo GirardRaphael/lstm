@@ -4,6 +4,22 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+DIRECT_FEATURE_NAMES = {
+    "seasonal_v1": (
+        "target_t-1h", "target_t-24h", "target_t-168h",
+        "target_hour_sin", "target_hour_cos",
+        "target_weekday_sin", "target_weekday_cos",
+    ),
+    "seasonal_v2": (
+        "target_t-1h", "target_t-2h", "target_t-3h",
+        "target_t-24h", "target_t-25h", "target_t-168h",
+        "target_rolling_mean_3h", "target_rolling_mean_24h",
+        "target_rolling_std_24h",
+        "target_hour_sin", "target_hour_cos",
+        "target_weekday_sin", "target_weekday_cos", "target_is_weekend",
+    ),
+}
+
 
 def weekly_mean(fit_frame, datetime_column, target_column, target_stamps):
     """Fit hour-of-week means on fit rows; unseen slots use the fit mean."""
@@ -54,22 +70,49 @@ def diagnostic_metrics(actual, predicted, stamps, *, seed=42):
             "mae_ci": block_interval(np.abs(error), stamps, seed=seed)}
 
 
-def direct_features(series, datetime_column, target_column, target_stamps, context_stamps):
-    """Timestamp lags t-1/t-24/t-168 and target clock; unavailable lags stay NaN.
+def direct_features(series, datetime_column, target_column, target_stamps,
+                    context_stamps, feature_set="seasonal_v2"):
+    """Causal target lags, history summaries and target clock for a direct tree.
 
     A lag after the forecast origin is unavailable, including for longer horizons.
-    XGBoost handles missing values; no observations are invented to fill outages.
+    Rolling summaries require every timestamp in the requested window; otherwise
+    they stay NaN. XGBoost handles missing values, so outages are never filled.
+
+    ``seasonal_v1`` reproduces existing seven-feature packages. ``seasonal_v2``
+    adds short-term momentum and causal rolling summaries for newly trained runs.
     """
+    if feature_set not in DIRECT_FEATURE_NAMES:
+        raise ValueError(
+            f"unknown direct feature set {feature_set!r}; "
+            f"use one of {sorted(DIRECT_FEATURE_NAMES)}")
     lookup = series.set_index(datetime_column)[target_column]
     target = pd.DatetimeIndex(target_stamps)
     context = pd.DatetimeIndex(context_stamps)
     columns = []
-    for hours in (1, 24, 168):
+    lags = (1, 24, 168) if feature_set == "seasonal_v1" else (1, 2, 3, 24, 25, 168)
+    for hours in lags:
         source = target - pd.Timedelta(hours=hours)
         values = lookup.reindex(source).to_numpy(dtype=float, copy=True)
         values[source > context] = np.nan
         columns.append(values)
+    if feature_set == "seasonal_v2":
+        for hours, statistic in ((3, "mean"), (24, "mean"), (24, "std")):
+            values = []
+            for origin in context:
+                stamps = pd.date_range(
+                    origin - pd.Timedelta(hours=hours - 1),
+                    origin, freq="h")
+                window = lookup.reindex(stamps).to_numpy(dtype=float)
+                if len(window) != hours or not np.isfinite(window).all():
+                    values.append(np.nan)
+                elif statistic == "mean":
+                    values.append(float(window.mean()))
+                else:
+                    values.append(float(window.std(ddof=0)))
+            columns.append(np.asarray(values, dtype=float))
     for clock, period in ((target.hour, 24), (target.dayofweek, 7)):
         columns.extend([np.sin(2 * np.pi * clock / period),
                         np.cos(2 * np.pi * clock / period)])
+    if feature_set == "seasonal_v2":
+        columns.append((target.dayofweek >= 5).astype(float))
     return np.column_stack(columns)
