@@ -1,17 +1,16 @@
 # Pick up here
 
-## Current continuation - 2026-09-25
+## Current continuation — 2026-09-28
 
-The September 13 recovery notes below are historical. The missing-v2 blocker is resolved, and the local observatory and 12-slide project briefing are implemented in this working tree.
+GitHub `main` is [`105734e`](https://github.com/GirardRaphael/lstm/commit/105734e). That commit is pushed. The branch map, including every side branch and why it was not merged, is [docs/REPOSITORY_MAP.md](docs/REPOSITORY_MAP.md).
 
-- Current implementation and verification record: [reports/IMPLEMENTATION_LOG.md](reports/IMPLEMENTATION_LOG.md).
-- Research evidence: [reports/REPORT.md](reports/REPORT.md) and [reports/BACKTEST_REPORT.md](reports/BACKTEST_REPORT.md).
-- Local setup, launch, worker and recovery instructions: [docs/OPERATIONS.md](docs/OPERATIONS.md).
-- Run `./test.ps1` from the repository to verify the current checkout; run `./run_app.ps1` to open the observatory.
-- Remaining external work: authorized field data and certified source semantics, untouched future/site evaluation, operator utility validation, and shared-hosting controls. Remote CI and external-browser visual review remain unverified.
-- Changes remain local and uncommitted. No push, merge or deployment has been performed.
+- Training and the local observatory: this `main` checkout.
+- Live intersection demo: branch `observatory/phase2-v2-wiring` at `0b21861`, already on GitHub, not merged.
+- Evidence: [reports/REPORT.md](reports/REPORT.md), [reports/BACKTEST_REPORT.md](reports/BACKTEST_REPORT.md), [reports/IMPLEMENTATION_LOG.md](reports/IMPLEMENTATION_LOG.md).
+- How to run the observatory: [docs/OPERATIONS.md](docs/OPERATIONS.md).
+- Limits that are still open: authorized field data, certified timestamps, an untouched future holdout, operator review, and shared-hosting controls.
 
-Do not resume the obsolete missing-branch recovery steps below.
+The September 13 notes below are historical. Do not resume the missing-branch recovery. Do not treat “no push has been performed” in those notes as the current state.
 
 ---
 
