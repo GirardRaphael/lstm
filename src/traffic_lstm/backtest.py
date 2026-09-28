@@ -9,7 +9,13 @@ import pandas as pd
 
 from .config import PROJECT_ROOT, TrainingConfig
 from .evaluation_v2 import direct_features, weekly_mean, diagnostic_metrics, block_interval
-from .pipeline_v2 import V2Config, prepare_v2, regression_metrics_v2, seasonal_baseline
+from .pipeline_v2 import (
+    V2Config,
+    prepare_v2,
+    regression_metrics_v2,
+    seasonal_baseline,
+    _early_stopping_roles,
+)
 from .uncertainty import calibrate, interval_metrics
 
 
@@ -28,6 +34,8 @@ def run(dataset, output, seeds=(7, 42, 123), epochs=20):
                 "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                 "selection": "validation MAE only", "calibration": "separate next block; nominal 90%",
                 "lstm_units": [32, 16], "batch_size": 128, "patience": 5,
+                "direct_feature_set": "seasonal_v2",
+                "training_roles": "chronological fit core; fit tail for early stopping; validation for candidate selection",
                 "status": "retrospective; historical data were inspected previously; no untouched holdout claim"}
     (output / "protocol.json").write_text(json.dumps(protocol, indent=2), encoding="utf-8")
     from .model import build_model, default_callbacks, set_seeds
@@ -41,6 +49,8 @@ def run(dataset, output, seeds=(7, 42, 123), epochs=20):
                        validation_end=str(frame.date_time.iloc[val_end]))
         data = prepare_v2(cfg, frame.iloc[:test_end])
         fit, val, post = [data.partitions[k] for k in ("fit", "validation", "test")]
+        train_fit, early_stop, training_roles = _early_stopping_roles(
+            fit, cfg.early_stopping_ratio)
         split = pd.Timestamp(frame.date_time.iloc[cal_end])
         calibration_mask = pd.DatetimeIndex(post.target_stamps[:, 0]) < split
         evaluation_mask = ~calibration_mask
@@ -49,7 +59,9 @@ def run(dataset, output, seeds=(7, 42, 123), epochs=20):
         def actual(part):
             return data.target_scaler.inverse_transform(part.y).ravel()
         def features(part):
-            return direct_features(data.series, "date_time", target, part.target_stamps[:, 0], part.context_end_stamps)
+            return direct_features(
+                data.series, "date_time", target, part.target_stamps[:, 0],
+                part.context_end_stamps, cfg.xgb_direct_feature_set)
         fit_frame = data.series[data.series.date_time < pd.Timestamp(cfg.fit_end)]
         for seed in seeds:
             print(f"{dataset} fold={fold+1} seed={seed}", flush=True)
@@ -59,12 +71,15 @@ def run(dataset, output, seeds=(7, 42, 123), epochs=20):
                                   run_name=f"fold_{fold}_seed_{seed}")
             model = build_model(shim, n_features=len(data.feature_names))
             model.compile(optimizer=model.optimizer, loss="mae")
-            history = model.fit(fit.X, fit.y, validation_data=(val.X, val.y), epochs=epochs,
+            history = model.fit(train_fit.X, train_fit.y,
+                                validation_data=(early_stop.X, early_stop.y), epochs=epochs,
                                 batch_size=128, shuffle=False, callbacks=default_callbacks(shim), verbose=0)
             tree = XGBRegressor(n_estimators=800, max_depth=6, learning_rate=.05,
                                 subsample=.8, colsample_bytree=.8, random_state=seed, n_jobs=1,
                                 early_stopping_rounds=30, eval_metric="mae")
-            tree.fit(features(fit), actual(fit), eval_set=[(features(val), actual(val))], verbose=False)
+            tree.fit(features(train_fit), actual(train_fit),
+                     eval_set=[(features(early_stop), actual(early_stop))],
+                     verbose=False)
             def predictions(part):
                 return {"lstm": np.maximum(0, data.target_scaler.inverse_transform(model.predict(part.X, verbose=0)).ravel()),
                         "xgboost": np.maximum(0, tree.predict(features(part))),
@@ -76,6 +91,7 @@ def run(dataset, output, seeds=(7, 42, 123), epochs=20):
             stamps = post.target_stamps[:, 0][evaluation_mask]
             row = {"fold": fold+1, "seed": seed, "selected": selected, "validation": validation,
                    "epochs_run": len(history.history["loss"]), "coverage": data.coverage,
+                   "training_roles": training_roles,
                    "fit_end": cfg.fit_end, "validation_end": cfg.validation_end,
                    "calibration_end": split.isoformat(), "evaluation_end": str(frame.date_time.iloc[test_end-1]),
                    "evaluation": {}}

@@ -71,7 +71,7 @@ def diagnostic_metrics(actual, predicted, stamps, *, seed=42):
 
 
 def direct_features(series, datetime_column, target_column, target_stamps,
-                    context_stamps, feature_set="seasonal_v2"):
+                    context_stamps, feature_set):
     """Causal target lags, history summaries and target clock for a direct tree.
 
     A lag after the forecast origin is unavailable, including for longer horizons.

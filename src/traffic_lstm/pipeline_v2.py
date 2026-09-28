@@ -81,6 +81,7 @@ from .evaluation_v2 import (
 
 PIPELINE_VERSION = "v2"
 PREPROCESSING_VERSION = "v2-causal-1"
+MODEL_SCHEMA_VERSION = 2
 # Archived artifacts carry no pipeline_version key; they are reported as "v1".
 PIPELINE_VERSION_LEGACY = "v1"
 
@@ -188,6 +189,7 @@ class V2Config:
     epochs: int = 50
     batch_size: int = 32
     patience: int = 5
+    early_stopping_ratio: float = 0.15
 
     # --- XGBoost comparator ---
     xgb_n_estimators: int = 500
@@ -206,6 +208,8 @@ class V2Config:
             raise ValueError(
                 "xgb_direct_feature_set must be one of "
                 f"{sorted(DIRECT_FEATURE_NAMES)}")
+        if not 0.05 <= self.early_stopping_ratio <= 0.5:
+            raise ValueError("early_stopping_ratio must be between 0.05 and 0.5")
         if self.pipeline_version != PIPELINE_VERSION:
             raise ValueError(
                 f"V2Config only builds pipeline_version={PIPELINE_VERSION!r}, "
@@ -250,6 +254,11 @@ class V2Config:
             raise ValueError(f"cadence {self.cadence!r} is not parseable") from exc
         if seconds <= 0:
             raise ValueError("cadence must be positive")
+        if self.xgb_layout == "direct_lags" and not math.isclose(
+                seconds, 3600.0):
+            raise ValueError(
+                "direct_lags currently supports hourly cadence only; "
+                "use xgb_layout='flattened' for another cadence")
         if self.seasonal_timedelta.total_seconds() <= 0:
             raise ValueError("seasonal_period must be positive")
 
@@ -531,6 +540,42 @@ class PartitionData:
 
     def __len__(self) -> int:
         return len(self.end_index)
+
+
+def _partition_slice(part: PartitionData, start: int, stop: int,
+                     name: str) -> PartitionData:
+    return PartitionData(
+        name=name,
+        X=part.X[start:stop],
+        y=part.y[start:stop],
+        context_end_stamps=part.context_end_stamps[start:stop],
+        target_stamps=part.target_stamps[start:stop],
+        end_index=part.end_index[start:stop],
+    )
+
+
+def _early_stopping_roles(fit: PartitionData, ratio: float):
+    """Chronologically separate parameter fitting from early stopping."""
+    split = int(len(fit) * (1 - ratio))
+    if split < 1 or len(fit) - split < 1:
+        raise PartitionError(
+            "fit partition is too small for separate training and "
+            f"early-stopping roles (n={len(fit)}, ratio={ratio})")
+    core = _partition_slice(fit, 0, split, "training")
+    early = _partition_slice(fit, split, len(fit), "early_stopping")
+    roles = {
+        "training": {
+            "start": pd.Timestamp(core.target_stamps[0, 0]).isoformat(),
+            "end": pd.Timestamp(core.target_stamps[-1, -1]).isoformat(),
+            "windows": len(core),
+        },
+        "early_stopping": {
+            "start": pd.Timestamp(early.target_stamps[0, 0]).isoformat(),
+            "end": pd.Timestamp(early.target_stamps[-1, -1]).isoformat(),
+            "windows": len(early),
+        },
+    }
+    return core, early, roles
 
 
 @dataclass
@@ -835,11 +880,10 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
              verbose: int = 1) -> dict:
     """Train the stacked LSTM and the XGBoost comparator on the same windows.
 
-    Both models see exactly the same eligible fit/validation/test windows of
-    the same causally prepared data. The LSTM validates on the explicit
-    chronological validation partition (never Keras's ``validation_split``);
-    XGBoost early-stops on the same partition. The package is written only
-    under a run name that does not exist yet.
+    The fit windows are split chronologically into parameter-fitting and
+    early-stopping roles. The untouched validation partition selects among
+    trained candidates and baselines. Test is scored only after that selection
+    is frozen. The package is written only under a new run name.
     """
     package_dir = Path(cfg.output_dir) / cfg.run_name
     if package_dir.exists():
@@ -872,6 +916,8 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
         run_name=cfg.run_name,
     )
     fit, val, test = (data.partitions[name] for name in PARTITIONS)
+    train_fit, early_stop, training_roles = _early_stopping_roles(
+        fit, cfg.early_stopping_ratio)
 
     model = build_model(shim, n_features=len(data.feature_names))
     # MinMax MAE differs from physical-unit MAE by one positive constant.
@@ -879,8 +925,8 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
     model.compile(optimizer=model.optimizer, loss="mae", metrics=["mae"])
     started = time.time()
     history = model.fit(
-        fit.X, fit.y,
-        validation_data=(val.X, val.y),
+        train_fit.X, train_fit.y,
+        validation_data=(early_stop.X, early_stop.y),
         epochs=cfg.epochs,
         batch_size=cfg.batch_size,
         shuffle=False,               # temporal order is kept, always
@@ -913,8 +959,8 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
                                        part.target_stamps[:, k], part.context_end_stamps,
                                        cfg.xgb_direct_feature_set)
             return part.X.reshape(len(part.X), -1)
-        estimator.fit(tree_input(fit), fit.y[:, k],
-                      eval_set=[(tree_input(val), val.y[:, k])],
+        estimator.fit(tree_input(train_fit), train_fit.y[:, k],
+                      eval_set=[(tree_input(early_stop), early_stop.y[:, k])],
                       verbose=False)
         xgb_seconds += time.time() - started
         xgb_models[horizon] = estimator
@@ -939,6 +985,7 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
                    key=lambda name: np.mean([validation[f"h{h}"][name]["mae"] for h in cfg.horizons]))
     evaluation = {
         "selected_on_validation": selected,
+        "training_roles": training_roles,
         "validation": validation,
         "test": _evaluate_partition(cfg, data, test, predict_all(test)),
     }
@@ -1045,6 +1092,7 @@ def save_package(cfg: V2Config, data: V2Data, lstm_model, xgb_models: dict,
         "baselines": {"hour_of_week_mean": _climatology_table(cfg, data)},
         "pipeline_version": PIPELINE_VERSION,
         "preprocessing_version": PREPROCESSING_VERSION,
+        "model_schema_version": MODEL_SCHEMA_VERSION,
         "run_name": cfg.run_name,
         "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "site_scope": cfg.site_scope,
@@ -1088,6 +1136,7 @@ def save_package(cfg: V2Config, data: V2Data, lstm_model, xgb_models: dict,
         "dependencies": _runtime_versions(),
         "training": {
             "lstm_objective": "MAE on fit-only MinMax target scale",
+            "roles": evaluation["training_roles"],
             "epochs_run": len(history.get("loss", [])),
             "training_seconds": training_seconds,
             "history": history,
@@ -1106,7 +1155,10 @@ def save_package(cfg: V2Config, data: V2Data, lstm_model, xgb_models: dict,
         },
         "evaluation": {
             "protocol": {
-                "metrics": ["mae", "rmse", "mape", "bias", "peak_hour_mae", "mae_ci"],
+                "metrics": [
+                    "mae", "median_ae", "p90_ae", "rmse", "mape", "smape",
+                    "wape", "bias", "peak_hour_mae", "mae_ci",
+                ],
                 "peak_hours": "weekdays 07-09 and 16-18 inclusive, dataset clock",
                 "uncertainty": "95% percentile bootstrap of calendar-day blocks; 500 replicates; conditional on fitted model; not prediction intervals or seed variability",
                 "undefined_policy": ("percentage metrics with no actual above "
@@ -1116,9 +1168,13 @@ def save_package(cfg: V2Config, data: V2Data, lstm_model, xgb_models: dict,
                 "mape_min_actual": cfg.mape_min_actual,
                 "baselines": ["hour_of_week_mean (fit only; fit mean for unseen slots)", "naive_persistence",
                               f"naive_seasonal ({cfg.seasonal_period}, "
-                              "timestamp-based, persistence fallback)"],
-                "partition_rule": ("chronological fit/validation/test; scalers "
-                                   "fitted on fit rows only; windows with "
+                              "timestamp-based, persistence fallback)",
+                              "naive_last_week (168h timestamp-based, persistence fallback)"],
+                "partition_rule": ("chronological fit/validation/test; fit is "
+                                   "split again into parameter-training and "
+                                   "early-stopping windows; validation is used "
+                                   "only for candidate selection; scalers "
+                                   "are fitted on all fit rows; windows with "
                                    "missing or non-cadence steps excluded; "
                                    "examples whose targets cross a partition "
                                    "boundary purged"),
@@ -1140,6 +1196,12 @@ class V2Package:
     def __init__(self, package_dir: Path, manifest: dict):
         self.package_dir = Path(package_dir)
         self.manifest = manifest
+        schema_version = int(manifest.get("model_schema_version", 1))
+        if schema_version not in (1, MODEL_SCHEMA_VERSION):
+            raise SchemaError(
+                f"Unsupported model_schema_version={schema_version}; "
+                f"this reader supports 1 and {MODEL_SCHEMA_VERSION}.")
+        self.model_schema_version = schema_version
         self.cfg = V2Config(**manifest["config"])
         self.feature_names = list(manifest["schema"]["feature_names"])
         self.units = dict(manifest["units"])
@@ -1166,6 +1228,17 @@ class V2Package:
             estimator = XGBRegressor()
             estimator.load_model(
                 self.package_dir / self.manifest["models"]["xgboost"][key]["path"])
+            if self.cfg.xgb_layout == "direct_lags":
+                feature_set = self.manifest["schema"].get(
+                    "xgboost_direct_feature_set") or "seasonal_v1"
+                expected = len(DIRECT_FEATURE_NAMES[feature_set])
+            else:
+                expected = self.cfg.sequence_length * len(self.feature_names)
+            actual = int(estimator.get_booster().num_features())
+            if actual != expected:
+                raise SchemaError(
+                    f"XGBoost {key} expects {actual} inputs but its manifest "
+                    f"declares {expected}; refusing schema-mismatched inference.")
             self._xgboost[key] = estimator
         return self._xgboost[key]
 
@@ -1248,6 +1321,8 @@ class V2Package:
             origin = history[self.cfg.datetime_column].max()
             feature_set = self.manifest["schema"].get(
                 "xgboost_direct_feature_set") or "seasonal_v1"
+            if self.cfg.xgb_layout == "direct_lags":
+                self._require_weekly_history(history, origin, chosen)
             direct_rows = [
                 direct_features(
                     history, self.cfg.datetime_column, self.cfg.target_column,
@@ -1276,6 +1351,12 @@ class V2Package:
         elif chosen in ("naive_persistence", "naive_seasonal", "naive_last_week",
                         "hour_of_week_mean"):
             self.build_input_window(recent_history)
+            if chosen == "naive_last_week":
+                history = recent_history.copy()
+                history[self.cfg.datetime_column] = pd.to_datetime(
+                    history[self.cfg.datetime_column])
+                self._require_weekly_history(
+                    history, history[self.cfg.datetime_column].max(), chosen)
             predicted = self._baseline_values(recent_history, chosen)
         else:
             raise ValueError(
@@ -1306,6 +1387,20 @@ class V2Package:
             "forecasts": forecasts,
             "input_warnings": input_warnings,
         }
+
+    def _require_weekly_history(self, history: pd.DataFrame,
+                                origin: pd.Timestamp, candidate: str) -> None:
+        first_target = origin + min(self.cfg.horizons) * pd.Timedelta(
+            self.cfg.cadence)
+        required_start = first_target - pd.Timedelta(hours=168)
+        available_start = pd.Timestamp(
+            history[self.cfg.datetime_column].min())
+        if available_start > required_start:
+            raise GapHistoryError(
+                f"{candidate} was evaluated with a t-168h input but supplied "
+                f"history starts at {available_start.isoformat()}; history "
+                f"must start no later than {required_start.isoformat()}. "
+                "Refusing a degraded predictor that is not evaluation-parity.")
 
     def _baseline_values(self, recent_history: pd.DataFrame, name: str) -> np.ndarray:
         cfg = self.cfg

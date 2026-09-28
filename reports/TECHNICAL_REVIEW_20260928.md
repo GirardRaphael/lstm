@@ -116,11 +116,21 @@ old manifest has no feature-set field.
 
 ### Serving diagnostics
 
-A direct-tree forecast now reports every unavailable input. Supplying only a
-24-hour window to a model that expects `t-168` no longer degrades silently.
-The estimator may still score a missing feature because XGBoost learned
-missing-value branches, but the response states that serving parity is not
-met.
+A direct-tree or last-week forecast now refuses history that does not extend
+through the required weekly source timestamp. If the span is adequate but a
+specific historical timestamp is absent, the direct tree preserves the
+missing value exactly as evaluation does and reports the unavailable input.
+It never silently turns a weekly model into a 24-hour model.
+
+### Separate adaptation and selection roles
+
+The original v2 routine reused validation both for early stopping and for
+candidate selection. New runs chronologically divide the fit windows into a
+parameter-training core and an early-stopping tail. The validation partition
+is then used only to select among the stopped candidates and baselines. Test
+remains untouched until selection is frozen. Every role boundary and window
+count is stored in the manifest. Scalers still fit all rows in the declared
+fit partition; that fact is explicit in the protocol.
 
 ### Error diagnostics
 
@@ -159,7 +169,7 @@ The implementation is acceptable only when all of the following are true:
 5. New packages record `seasonal_v2` and the exact ordered feature names.
 6. Save/reload predictions match.
 7. Default package forecast names the validation-selected candidate.
-8. Missing weekly history appears in `input_warnings`.
+8. Insufficient weekly history is refused; isolated lag outages are reported.
 9. Metric functions reject broadcasting and non-finite values.
 10. CI and local test commands pass on the committed revision.
 

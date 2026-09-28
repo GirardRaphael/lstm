@@ -57,9 +57,9 @@ Every name must be new. An experiment contract is written to `reports/protocols/
 
 - Split timestamps before fitting scalers; never fill missing targets or bridge outages.
 - Compare on identical eligible timestamps: fit-only hour-of-week mean, timestamp-true yesterday, timestamp-true last week, persistence, direct XGBoost and LSTM. A saved package forecasts the validation-selected candidate unless a model is named.
-- New direct XGBoost runs use t-1/t-2/t-3, t-24/t-25 and t-168 count lags, causal 3h/24h history summaries, and the target hour/weekday clock. Missing historical inputs stay missing and serving reports them. Existing `seasonal_v1` packages retain their original seven-feature contract. `--tree-layout flattened` retains the original tensor comparator.
+- New direct XGBoost runs use t-1/t-2/t-3, t-24/t-25 and t-168 count lags, causal 3h/24h history summaries, and the target hour/weekday clock. Serving refuses a history span shorter than the weekly contract; isolated outages stay missing and are reported. Existing `seasonal_v1` packages retain their original seven-feature contract. `--tree-layout flattened` retains the original tensor comparator.
 - Direct-tree and LSTM information sets differ: this compares practical candidates, not recurrence alone. No weather ablation is claimed.
-- LSTM optimizes scaled MAE, proportional to physical-unit MAE; early stopping uses validation. XGBoost uses squared-error fitting and validation MAE for stopping.
+- LSTM optimizes scaled MAE, proportional to physical-unit MAE. The chronological tail of fit is reserved for early stopping; the separate validation partition selects the candidate. XGBoost uses squared-error fitting and the same fit-tail role for stopping.
 - Report MAE, RMSE, MAPE and its denominator count, signed bias, peak-hour MAE, and paired daily-block bootstrap uncertainty. A one-seed bootstrap does not measure training variability or forecast interval coverage.
 - Packages retain model checksums, scalers, schema, units, site scope, split/coverage records, dependency versions, revision and source hashes. Invalid/gapped recent windows are refused.
 

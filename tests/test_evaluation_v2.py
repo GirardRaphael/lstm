@@ -3,7 +3,15 @@ import pandas as pd
 import pytest
 
 from traffic_lstm.evaluation_v2 import weekly_mean, direct_features, block_interval
-from traffic_lstm.pipeline_v2 import seasonal_baseline, regression_metrics_v2, V2Config, prepare_v2, train_v2, load_package
+from traffic_lstm.pipeline_v2 import (
+    GapHistoryError,
+    V2Config,
+    load_package,
+    prepare_v2,
+    regression_metrics_v2,
+    seasonal_baseline,
+    train_v2,
+)
 
 
 def frame():
@@ -103,7 +111,9 @@ def test_direct_tree_package_roundtrip_and_baseline_alignment(tmp_path):
     part = result["data"].partitions["test"]
     end = pd.Timestamp(part.context_end_stamps[-1])
     history = df[df.date_time <= end]
-    features = direct_features(df, "date_time", "traffic_volume", part.target_stamps[-1:, 0], [end])
+    features = direct_features(
+        df, "date_time", "traffic_volume", part.target_stamps[-1:, 0],
+        [end], cfg.xgb_direct_feature_set)
     scaled = result["xgb_models"][1].predict(features)
     expected = result["data"].target_scaler.inverse_transform(scaled.reshape(-1, 1))[0, 0]
     assert package.forecast(history, model="xgboost")["forecasts"][0]["value"] == pytest.approx(expected)
@@ -114,8 +124,21 @@ def test_direct_tree_package_roundtrip_and_baseline_alignment(tmp_path):
     selected = package.forecast(history)
     assert selected["model"] == result["manifest"]["selected_on_validation"]
     short_history = history.tail(cfg.sequence_length)
-    degraded = package.forecast(short_history, model="xgboost")
-    assert degraded["input_warnings"]
-    assert "target_t-168h" in degraded["input_warnings"][0]
+    with pytest.raises(GapHistoryError, match="evaluation-parity"):
+        package.forecast(short_history, model="xgboost")
+    roles = result["manifest"]["training"]["roles"]
+    assert roles["training"]["end"] < roles["early_stopping"]["start"]
+    assert roles["early_stopping"]["end"] < result["manifest"]["splits"]["validation"]["start"]
     cfg_default = V2Config(units={"traffic_volume": "vehicles/hour"}, site_scope="test")
     assert cfg_default.xgb_layout == "direct_lags"
+
+
+def test_direct_lags_reject_non_hourly_cadence():
+    with pytest.raises(ValueError, match="hourly cadence"):
+        V2Config(
+            units={"traffic_volume": "vehicles/15min"},
+            site_scope="test", cadence="15min")
+    flattened = V2Config(
+        units={"traffic_volume": "vehicles/15min"},
+        site_scope="test", cadence="15min", xgb_layout="flattened")
+    assert flattened.cadence == "15min"

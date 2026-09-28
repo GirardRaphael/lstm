@@ -54,12 +54,13 @@ def train_candidate(frame, stream_id, *, seed=42):
     slots = fit_frame.date_time.dt.dayofweek*24 + fit_frame.date_time.dt.hour
     weekly = fit_frame.vehicle_count.groupby(slots).mean()
     payload = bytes(tree.get_booster().save_raw(raw_format="ubj"))
-    meta = {"format_version": 1, "stream_id": stream_id, "interval_seconds": 3600,
+    meta = {"format_version": 2, "stream_id": stream_id, "interval_seconds": 3600,
             "evidence_through": frame.date_time.max().tz_localize("UTC").isoformat(),
             "units": "vehicles/completed_hour", "selected": selected, "validation": validation,
             "calibration": calibration, "evaluation": metrics, "calibration_end": cal_end.isoformat(),
             "splits": data.boundaries, "coverage": data.coverage, "seed": seed,
             "direct_feature_set": cfg.xgb_direct_feature_set,
+            "required_history_hours": 168,
             "weekly_means": {str(int(k)): float(v) for k,v in weekly.items()},
             "fit_mean": float(fit_frame.vehicle_count.mean()),
             "fit_q01": float(fit_frame.vehicle_count.quantile(.01)),
@@ -80,6 +81,12 @@ def predict_candidate(meta, payload, frame):
     origin = history.date_time.max()
     target = origin + pd.Timedelta(hours=1)
     if meta["selected"] == "xgboost":
+        required_start = target - pd.Timedelta(
+            hours=meta.get("required_history_hours", 168))
+        if history.date_time.min() > required_start:
+            raise ValueError(
+                "Insufficient history for evaluation-parity direct-tree "
+                f"inference; need observations back through {required_start}.")
         tree = XGBRegressor()
         tree.load_model(bytearray(payload))
         value = float(tree.predict(direct_features(
