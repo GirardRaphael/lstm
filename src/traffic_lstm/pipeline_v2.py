@@ -190,7 +190,7 @@ class V2Config:
     xgb_subsample: float = 0.8
     xgb_colsample: float = 0.8
     xgb_early_stopping: int = 30
-    xgb_layout: str = "flattened"  # direct_lags: t-1/t-24/t-168 + target clock
+    xgb_layout: str = "direct_lags"  # flattened: the 24xF tensor, kept as an ablation
 
     def __post_init__(self) -> None:
         if self.xgb_layout not in ("flattened", "direct_lags"):
@@ -749,8 +749,11 @@ def _evaluate_partition(cfg: V2Config, data: V2Data, part: PartitionData,
                                   part.target_stamps[:, k])
         predictions = {name: _inverse_target(data.target_scaler, p[:, k])
                        for name, p in model_predictions.items()}
+        last_week = seasonal_baseline(
+            data.series, cfg.datetime_column, cfg.target_column,
+            part.target_stamps[:, k], part.context_end_stamps, period="168h")
         predictions.update(naive_persistence=persistence, naive_seasonal=seasonal,
-                           hour_of_week_mean=climatology)
+                           naive_last_week=last_week, hour_of_week_mean=climatology)
         entry = {}
         for model_name, predicted_scaled in model_predictions.items():
             entry[model_name] = regression_metrics_v2(
@@ -761,6 +764,8 @@ def _evaluate_partition(cfg: V2Config, data: V2Data, part: PartitionData,
             actual, persistence, cfg.mape_min_actual)
         entry["naive_seasonal"] = regression_metrics_v2(
             actual, seasonal, cfg.mape_min_actual)
+        entry["naive_last_week"] = regression_metrics_v2(
+            actual, last_week, cfg.mape_min_actual)
         entry["hour_of_week_mean"] = regression_metrics_v2(
             actual, climatology, cfg.mape_min_actual)
         for name, predicted in predictions.items():
@@ -773,7 +778,8 @@ def _evaluate_partition(cfg: V2Config, data: V2Data, part: PartitionData,
                 "ci": block_interval(difference, part.target_stamps[:, k], seed=cfg.seed)}
 
         naive_maes = [entry[name]["mae"]
-                      for name in ("naive_persistence", "naive_seasonal", "hour_of_week_mean")]
+                      for name in ("naive_persistence", "naive_seasonal",
+                                   "naive_last_week", "hour_of_week_mean")]
         naive_maes = [m for m in naive_maes if m is not None]
         best_naive = min(naive_maes) if naive_maes else None
         entry["improvement_over_best_naive_pct"] = {
@@ -894,7 +900,8 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
 
     validation = _evaluate_partition(cfg, data, val, predict_all(val))
     # Freeze the model choice before scoring test predictions; no test ranking.
-    selected = min(("lstm", "xgboost", "hour_of_week_mean", "naive_seasonal", "naive_persistence"),
+    selected = min(("lstm", "xgboost", "hour_of_week_mean", "naive_last_week",
+                    "naive_seasonal", "naive_persistence"),
                    key=lambda name: np.mean([validation[f"h{h}"][name]["mae"] for h in cfg.horizons]))
     evaluation = {
         "selected_on_validation": selected,
@@ -923,6 +930,20 @@ def train_v2(cfg: V2Config, df: pd.DataFrame | None = None,
     }
 
 
+def _climatology_table(cfg: V2Config, data: V2Data) -> dict:
+    """Fit-only hour-of-week means, stored so a selected baseline can be served."""
+    fit_frame = data.series[data.series[cfg.datetime_column] <
+                            pd.Timestamp(data.boundaries["validation"]["start"])]
+    stamps = pd.to_datetime(fit_frame[cfg.datetime_column])
+    values = fit_frame[cfg.target_column]
+    means = values.groupby(stamps.dt.dayofweek * 24 + stamps.dt.hour).mean()
+    fallback = float(values.mean())
+    return {
+        "slots": {str(int(k)): float(v) for k, v in means.items()},
+        "fallback": fallback,
+    }
+
+
 def _print_summary(cfg: V2Config, manifest: dict) -> None:
     print("\n" + "=" * 62)
     print(f"  V2 RESULTS - {cfg.run_name}  (site: {cfg.site_scope})")
@@ -930,11 +951,14 @@ def _print_summary(cfg: V2Config, manifest: dict) -> None:
     for horizon in cfg.horizons:
         block = manifest["evaluation"]["test"][f"h{horizon}"]
         print(f"\n  Horizon +{horizon}")
-        for name in ("lstm", "xgboost", "hour_of_week_mean", "naive_persistence", "naive_seasonal"):
+        for name in ("lstm", "xgboost", "hour_of_week_mean", "naive_last_week",
+                     "naive_persistence", "naive_seasonal"):
             m = block[name]
             mape = "  null" if m["mape"] is None else f"{m['mape']:5.1f}%"
+            peak = m.get("peak_hour_mae")
+            peak_s = "  n/a" if peak is None else f"{peak:8.1f}"
             print(f"    {name:<18} MAE {m['mae']:8.1f}   RMSE {m['rmse']:8.1f}"
-                  f"   MAPE {mape}")
+                  f"   MAPE {mape}   peak {peak_s}")
     cov = manifest["coverage"]
     print(f"\n  Eligible windows: {cov['eligible']}; excluded: {cov['excluded']}")
     print(f"  Package: {Path(cfg.output_dir) / cfg.run_name}")
@@ -984,6 +1008,7 @@ def save_package(cfg: V2Config, data: V2Data, lstm_model, xgb_models: dict,
         "source_sha256": {name: _sha256_file(Path(__file__).with_name(name)) for name in source_files},
         "evidence_status": "retrospective_reanalysis_not_untouched_confirmatory_test",
         "selected_on_validation": evaluation.get("selected_on_validation"),
+        "baselines": {"hour_of_week_mean": _climatology_table(cfg, data)},
         "pipeline_version": PIPELINE_VERSION,
         "preprocessing_version": PREPROCESSING_VERSION,
         "run_name": cfg.run_name,
@@ -1160,18 +1185,27 @@ class V2Package:
         return scaled.reshape(1, cfg.sequence_length,
                             len(self.feature_names)).astype("float32")
 
-    def forecast(self, recent_history: pd.DataFrame, model: str = "lstm",
+    def forecast(self, recent_history: pd.DataFrame, model: str = "selected",
                  declared_units: Mapping[str, str] | None = None) -> dict:
-        """Multivariate-capable forecast with correctly timestamped horizons."""
+        """Forecast with the validation-selected candidate unless a model is named.
+
+        ``selected`` serves the candidate chosen on validation MAE, including a
+        stored baseline. Pass ``lstm`` or ``xgboost`` to force a trained model.
+        """
         if declared_units is not None and dict(declared_units) != self.units:
             raise SchemaError(
                 f"Declared units {dict(declared_units)} do not match the "
                 f"package contract {self.units}.")
-        window = self.build_input_window(recent_history)
-        if model == "lstm":
+        chosen = model
+        if chosen == "selected":
+            chosen = self.manifest.get("selected_on_validation") or "lstm"
+        if chosen == "lstm":
+            window = self.build_input_window(recent_history)
             predicted_scaled = np.asarray(
                 self.load_lstm().predict(window, verbose=0)[0], dtype="float64")
-        elif model == "xgboost":
+            predicted = _inverse_target(self.target_scaler, predicted_scaled)
+        elif chosen == "xgboost":
+            window = self.build_input_window(recent_history)
             flat = window.reshape(1, -1)
             history = recent_history.copy()
             history[self.cfg.datetime_column] = pd.to_datetime(history[self.cfg.datetime_column])
@@ -1182,9 +1216,15 @@ class V2Package:
                                     [origin + h * pd.Timedelta(self.cfg.cadence)], [origin])
                     if self.cfg.xgb_layout == "direct_lags" else flat)[0]
                 for h in self.cfg.horizons], dtype="float64")
+            predicted = _inverse_target(self.target_scaler, predicted_scaled)
+        elif chosen in ("naive_persistence", "naive_seasonal", "naive_last_week",
+                        "hour_of_week_mean"):
+            self.build_input_window(recent_history)
+            predicted = self._baseline_values(recent_history, chosen)
         else:
-            raise ValueError(f"unknown model {model!r}; use 'lstm' or 'xgboost'")
-        predicted = _inverse_target(self.target_scaler, predicted_scaled)
+            raise ValueError(
+                f"unknown model {model!r}; use 'selected', 'lstm', 'xgboost', "
+                "or a scored baseline name")
         if predicted.shape != (len(self.cfg.horizons),) or not np.isfinite(predicted).all():
             raise SchemaError("Model returned invalid forecast shape or non-finite values")
 
@@ -1204,11 +1244,34 @@ class V2Package:
             "pipeline_version": PIPELINE_VERSION,
             "run_name": self.cfg.run_name,
             "site_scope": self.cfg.site_scope,
-            "model": model,
+            "model": chosen,
             "cadence": self.cfg.cadence,
             "window_end": window_end.isoformat(),
             "forecasts": forecasts,
         }
+
+    def _baseline_values(self, recent_history: pd.DataFrame, name: str) -> np.ndarray:
+        cfg = self.cfg
+        history = recent_history.copy()
+        history[cfg.datetime_column] = pd.to_datetime(history[cfg.datetime_column])
+        origin = pd.Timestamp(history[cfg.datetime_column].max())
+        step = pd.Timedelta(cfg.cadence)
+        targets = [origin + int(h) * step for h in cfg.horizons]
+        contexts = [origin] * len(targets)
+        if name == "naive_persistence":
+            return persistence_baseline(history, cfg.datetime_column, cfg.target_column, contexts)
+        if name == "naive_seasonal":
+            return seasonal_baseline(history, cfg.datetime_column, cfg.target_column,
+                                     targets, contexts, period=cfg.seasonal_period)
+        if name == "naive_last_week":
+            return seasonal_baseline(history, cfg.datetime_column, cfg.target_column,
+                                     targets, contexts, period="168h")
+        table = self.manifest["baselines"]["hour_of_week_mean"]
+        slots, fallback = table["slots"], table["fallback"]
+        return np.array([
+            float(slots.get(str(int(t.dayofweek * 24 + t.hour)), fallback))
+            for t in targets
+        ], dtype="float64")
 
 
 def load_package(package_dir: str | Path, verify: bool = True) -> V2Package:
@@ -1245,7 +1308,7 @@ def load_package(package_dir: str | Path, verify: bool = True) -> V2Package:
 
 
 def forecast(package_dir: str | Path, recent_history: pd.DataFrame,
-             model: str = "lstm",
+             model: str = "selected",
              declared_units: Mapping[str, str] | None = None) -> dict:
     """One-call inference: verify, load and forecast from recent history."""
     return load_package(package_dir).forecast(

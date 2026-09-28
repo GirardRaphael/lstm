@@ -79,5 +79,10 @@ def test_direct_tree_package_roundtrip_and_baseline_alignment(tmp_path):
     expected = result["data"].target_scaler.inverse_transform(scaled.reshape(-1, 1))[0, 0]
     assert package.forecast(history, model="xgboost")["forecasts"][0]["value"] == pytest.approx(expected)
     metrics = result["evaluation"]["test"]["h1"]
-    assert len({metrics[name]["n"] for name in ("lstm", "xgboost", "hour_of_week_mean", "naive_seasonal")}) == 1
+    assert len({metrics[name]["n"] for name in ("lstm", "xgboost", "hour_of_week_mean", "naive_seasonal", "naive_last_week")}) == 1
     assert result["manifest"]["selected_on_validation"] is not None
+    assert result["manifest"]["baselines"]["hour_of_week_mean"]["slots"]
+    selected = package.forecast(history)
+    assert selected["model"] == result["manifest"]["selected_on_validation"]
+    cfg_default = V2Config(units={"traffic_volume": "vehicles/hour"}, site_scope="test")
+    assert cfg_default.xgb_layout == "direct_lags"

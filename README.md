@@ -52,7 +52,7 @@ This is historical replay. UTC is assigned to bundled clock labels only for the 
 Every name must be new. An experiment contract is written to `reports/protocols/` before training. Defaults: 64/16/20 chronological fit/validation/test, 24-hour complete windows, one-hour horizon, seed 42, 50 maximum epochs, patience 8. Hyperparameter exploration must use validation; do not rerun choices to improve the displayed test score.
 
 - Split timestamps before fitting scalers; never fill missing targets or bridge outages.
-- Compare on identical eligible timestamps: fit-only hour-of-week mean, timestamp-true yesterday, persistence, direct XGBoost and LSTM.
+- Compare on identical eligible timestamps: fit-only hour-of-week mean, timestamp-true yesterday, timestamp-true last week, persistence, direct XGBoost and LSTM. A saved package forecasts the validation-selected candidate unless a model is named.
 - Direct XGBoost uses t-1, t-24 and t-168 count lags plus the target hour/weekday clock. Missing historical lags stay missing. `--tree-layout flattened` retains the original tensor comparator.
 - Direct-tree and LSTM information sets differ: this compares practical candidates, not recurrence alone. No weather ablation is claimed.
 - LSTM optimizes scaled MAE, proportional to physical-unit MAE; early stopping uses validation. XGBoost uses squared-error fitting and validation MAE for stopping.

@@ -128,11 +128,11 @@ def trained(kind):
     """Train (once) and cache a tiny package: "uv" univariate, "mv" multivariate."""
     if kind not in _TRAINED:
         if kind == "uv":
-            cfg = uv_cfg("uv_pack", TMP / "uv")
+            cfg = uv_cfg("uv_pack", TMP / "uv", xgb_layout="flattened")
             frame = make_frame(600, seed=1, exogenous=False)
         else:
             cfg = mv_cfg("mv_pack", TMP / "mv", horizons=(1, 2),
-                         calendar_features=True)
+                         calendar_features=True, xgb_layout="flattened")
             frame = make_frame(600, seed=2)
         _TRAINED[kind] = (v2.train_v2(cfg, df=frame, verbose=0), cfg, frame)
     return _TRAINED[kind]
@@ -458,7 +458,7 @@ def _():
     out, cfg, frame = trained("mv")
     pack = v2.load_package(out["package_dir"])
     history = frame.tail(cfg.sequence_length).reset_index(drop=True)
-    result = pack.forecast(history)
+    result = pack.forecast(history, model="lstm")
     end = pd.Timestamp(frame["date_time"].iloc[-1])
     assert [f["horizon"] for f in result["forecasts"]] == [1, 2]
     assert result["forecasts"][0]["timestamp"] == (end + pd.Timedelta(hours=1)).isoformat()

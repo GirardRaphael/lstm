@@ -29,7 +29,9 @@ def render():
         for horizon, block in m["evaluation"]["test"].items():
             lines += [f"Test {horizon}:", "", "| Candidate | MAE [95% CI] | RMSE | MAPE | MAPE n | Bias | Peak MAE | n |",
                       "| --- | --- | --- | --- | --- | --- | --- | --- |"]
-            for name in ("xgboost", "lstm", "hour_of_week_mean", "naive_seasonal", "naive_persistence"):
+            for name in ("xgboost", "lstm", "hour_of_week_mean", "naive_last_week", "naive_seasonal", "naive_persistence"):
+                if name not in block:
+                    continue
                 values = block[name]
                 ci = values.get("mae_ci")
                 interval = f" [{ci['low']:.2f}, {ci['high']:.2f}]" if ci else ""
