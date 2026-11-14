@@ -9,5 +9,5 @@ try {
     }
     uv pip sync requirements.lock
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Host 'Environment ready. Run ./observatory.ps1 init to create your access token, then ./run_app.ps1.'
+    Write-Host 'Environment ready. Run ./observatory.ps1 init to create your access token, then ./run_app.ps1 -Observatory. For the intersection, install Node.js 22.12+ and run ./run_app.ps1.'
 } finally { Pop-Location }

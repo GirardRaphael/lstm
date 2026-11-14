@@ -10,3 +10,20 @@ jobs:
       - run: uv venv --python 3.12
       - run: uv pip sync requirements.lock
       - run: ./test.ps1
+  intersection:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: presentation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: presentation/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test -- --maxWorkers=1
+      - run: npm run build
+      - run: npm run lint

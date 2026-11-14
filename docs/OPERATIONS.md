@@ -19,7 +19,7 @@ Enter the token into the app's password field. For CLI/worker commands, set it i
 ```powershell
 $secureToken = Read-Host 'Observatory token' -AsSecureString
 $env:OBSERVATORY_TOKEN = [System.Net.NetworkCredential]::new('', $secureToken).Password
-./run_app.ps1
+./run_app.ps1 -Observatory
 ```
 
 Open `http://127.0.0.1:8501`. The application binds to loopback and uses Streamlit's XSRF protection. The token is held in that browser session, not written into the URL. Sign out when finished.

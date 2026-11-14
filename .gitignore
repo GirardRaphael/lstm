@@ -12,3 +12,10 @@ obsidian_vault/*/.obsidian/cache
 # Scratch
 *.tmp
 var/
+
+# Local intersection images, recovered demo and runtime files
+/data/intersection_anomalies/
+/recovered_intersection/
+/.runtime/
+*.tsbuildinfo
+.pytest_cache/

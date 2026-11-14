@@ -10,3 +10,4 @@ jupyterlab
 ipykernel
 xgboost
 pytest
+Pillow
