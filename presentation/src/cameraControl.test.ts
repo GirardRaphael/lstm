@@ -167,3 +167,30 @@ describe('screenshot-driven signal integration', () => {
     expect(state.phase).toBe('ew-green')
   })
 })
+
+describe('reviewed operator holds', () => {
+  it('finishes yellow and holds red despite a queued green request', () => {
+    let state: SimState = { ...readyScene(), phase: 'ew-green' as Phase, phaseTimer: 10,
+      cameraRecoveryRequired: false, operatorHold: true, controllerOverride: 'ns' as const }
+    state = stepSimulation(state, 0.05, noArrivals)
+    expect(state.phase).toBe('ew-yellow')
+    expect(state.phaseTimer).toBe(1.4)
+    for (let i = 0; i < 80; i++) {
+      state = applyVisionFrame(state, frame(state.elapsed, observation(5, 1)))
+      state = stepSimulation(state, 0.05, noArrivals)
+    }
+    expect(state.phase).toBe('all-red')
+    expect(state.decisions).toHaveLength(0)
+  })
+  it('releasing a reviewed hold still requires the red interval and usable camera', () => {
+    let state: SimState = { ...readyScene(), operatorHold: false, cameraRecoveryRequired: true,
+      phaseTimer: 0.8, controllerOverride: 'ns' as const }
+    state = stepSimulation(state, 0.05, noArrivals)
+    expect(state.phase).toBe('all-red')
+    for (let i = 0; i < 20; i++) {
+      state = applyVisionFrame(state, frame(state.elapsed, observation(5, 1)))
+      state = stepSimulation(state, 0.05, noArrivals)
+    }
+    expect(state.phase).toBe('ns-green')
+  })
+})

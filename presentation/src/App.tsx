@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VisionPanel } from './VisionPanel'
+import { TrainingLab } from './TrainingLab'
 import { analyzeScreenshot, type VisionFrame } from './screenshotVision'
 import { IntersectionCanvas } from './IntersectionCanvas'
 import { SlideView } from './SlideView'
@@ -28,16 +29,17 @@ import {
 } from './simulation'
 import './App.css'
 
-type Mode = 'slides' | 'live'
+type Mode = 'slides' | 'live' | 'learn'
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>('live')
+  const [mode, setMode] = useState<Mode>('learn')
   const [slideIndex, setSlideIndex] = useState(0)
   const [cars, setCars] = useState(12)
   const [trucks, setTrucks] = useState(3)
   const [pedestrians, setPedestrians] = useState(20)
   const [jamApproach, setJamApproach] = useState<Approach>('east')
   const [running, setRunning] = useState(true)
+  const [simulationSessionId, setSimulationSessionId] = useState(() => crypto.randomUUID())
   const [cameraEnabled, setCameraEnabled] = useState(true)
   const [cameraSample, setCameraSample] = useState<{ pixels: ImageData; vision: VisionFrame } | null>(null)
   const previousVision = useRef<VisionFrame | undefined>(undefined)
@@ -98,7 +100,7 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return
       if (mode === 'slides') {
         if (e.key === 'ArrowRight' || e.key === ' ') {
           e.preventDefault()
@@ -182,8 +184,22 @@ export default function App() {
   }, [mode, intensityBucket, lookup, showHistory])
 
   const thought = useMemo(() => thinkDecision(state, liveModel, lookup), [state, liveModel, lookup])
+  const applyReviewedAction = (action: 'ns' | 'ew' | 'walk' | 'hold') => {
+    setState(prev => {
+      if (action === 'hold') return { ...prev, operatorHold: true, controllerOverride: null,
+        crosswalkRequest: { ns: false, ew: false } }
+      const released = { ...prev, operatorHold: false }
+      if (action === 'walk') return pressCrosswalkButton(released, 'ns')
+      return { ...released, controllerOverride: action }
+    })
+    setRunning(true)
+    setMode('live')
+    setLastAction(action === 'hold' ? 'Reviewed hold: finish yellow, then keep red.' :
+      `Reviewed ${action.toUpperCase()} request queued. Crossing clearance and waiting priorities remain active.`)
+  }
+
   const overrideDecisionAxis = (axis: Axis) => {
-    setState(prev => ({ ...prev, controllerOverride: axis }))
+    setState(prev => ({ ...prev, operatorHold: false, controllerOverride: axis }))
     setLastAction(`Requested ${axis.toUpperCase()} at the next clear junction. Waiting-time and pedestrian priority remain active.`)
   }
 
@@ -205,7 +221,10 @@ export default function App() {
           <span className="brand-mark">Traffic LSTM</span>
           <span className="brand-sub">Observatory demo</span>
         </div>
-        <nav className="mode-switch" aria-label="Presentation mode">
+        <nav className="mode-switch" aria-label="Application mode">
+          <button type="button" className={mode === 'learn' ? 'active' : ''} onClick={() => setMode('learn')}>
+            Train &amp; review
+          </button>
           <button
             type="button"
             className={mode === 'slides' ? 'active' : ''}
@@ -222,11 +241,15 @@ export default function App() {
           </button>
         </nav>
         <div className="top-hint">
-          {mode === 'slides' ? '← → navigate · L live' : 'R spawn · J jam · watch the screenshot detections'}
+          {mode === 'slides' ? '← → navigate · L live' : mode === 'learn' ? 'Real images · model evidence · your corrections' : 'R spawn · J jam · screenshot detections'}
         </div>
       </header>
 
-      {mode === 'slides' ? (
+      {mode === 'learn' ? (
+        <main className="learning-stage">
+          <TrainingLab frame={cameraSample?.pixels ?? null} simulationSessionId={simulationSessionId} onApply={applyReviewedAction} />
+        </main>
+      ) : mode === 'slides' ? (
         <main className="slides-stage">
           <SlideView slide={SLIDES[slideIndex]} index={slideIndex} total={SLIDES.length} />
           <div className="slide-controls">
@@ -255,7 +278,7 @@ export default function App() {
             <section className="live-visual">
             <IntersectionCanvas state={state} cameraEnabled={cameraEnabled} onFrame={receiveScreenshot} />
             <div className={`response-banner ${state.jamActive ? 'hot' : ''}`}>
-              <strong>{state.adaptive ? 'Automatic traffic control' : 'Fixed signal cycle'}</strong>
+              <strong>{state.operatorHold ? 'Reviewed hold — waiting for release' : state.adaptive ? 'Automatic traffic control' : 'Fixed signal cycle'}</strong>
               <span>{phaseLabel(state.phase)} · {state.phaseTimer.toFixed(1)}s remaining</span>
             </div>
             <p className="sim-disclaimer">
@@ -471,6 +494,7 @@ export default function App() {
                   previousVision.current = undefined
                   setCameraSample(null)
                   setState(createInitialState(adaptive, 'camera'))
+                  setSimulationSessionId(crypto.randomUUID())
                   setLastAction('Intersection reset.')
                 }}
               >
@@ -492,6 +516,7 @@ export default function App() {
           </aside>
           </div>
 
+          <button type="button" className="accent" onClick={() => setMode('learn')}>Teach a decision from this screenshot</button>
           <VisionPanel frame={cameraSample?.pixels ?? null} vision={cameraSample?.vision ?? null} enabled={cameraEnabled} onEnabledChange={setCameraEnabled} />
           <AppliedDecisions state={state} />
           <details className="historical-model" onToggle={event => setShowHistory(event.currentTarget.open)}>

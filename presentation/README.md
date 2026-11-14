@@ -1,6 +1,6 @@
 # Traffic LSTM live intersection
 
-Run `./run_app.ps1` from the repository root. The live view opens automatically
+Run `./run_app.ps1` from the repository root. The Train & review view opens automatically
 at http://127.0.0.1:43125/. The Slideshow button opens the presentation deck.
 Use Ctrl+C in the launcher terminal to stop both services.
 
@@ -108,3 +108,7 @@ historical traffic-count LSTM is not an image-recognition model.
 Checks include raw-pixel recognition, the app's actual canvas renderer, queue
 changes affecting applied signals, hidden-state mutations having no control
 effect, camera loss and recovery, and image-only crossing/left-lane decisions.
+
+## Train & review
+
+See [the teaching guide](../reports/DECISION_TRAINING_GUIDE.md). The lab accepts real images/video frames and frozen app screenshots, stores explicit human action labels, trains separate models by image domain, and reports held-out group results. The initial street anomaly experiment was trained and evaluated on real images; its failures are visible in the lab and [report](../reports/STREET_VISION_EVALUATION.md). Neither a fitted calibration nor a high score is proof of road-ready decisions.

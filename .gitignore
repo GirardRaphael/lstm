@@ -19,3 +19,7 @@ var/
 /.runtime/
 *.tsbuildinfo
 .pytest_cache/
+
+# Additional local real-image training and recognition data
+/data/intersection_anomalies_expanded/
+/data/detector_benchmark/

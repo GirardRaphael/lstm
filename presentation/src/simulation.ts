@@ -80,6 +80,7 @@ export type SimState = {
   elapsed: number
   visionClearFrames: number
   cameraRecoveryRequired: boolean
+  operatorHold: boolean
 }
 
 export type SpawnConfig = {
@@ -156,7 +157,7 @@ export function createInitialState(adaptive = true, controlSource: 'scene' | 'ca
     controllerOverride: null,
     decisions: [],
     controlSource, vision: null, elapsed: 0, visionClearFrames: 0,
-    cameraRecoveryRequired: controlSource === 'camera',
+    cameraRecoveryRequired: controlSource === 'camera', operatorHold: false,
   }
 }
 
@@ -476,8 +477,8 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   let decisions = state.decisions
   let controllerOverride = state.controllerOverride
   const usableCamera = cameraReady(state)
-  let cameraRecoveryRequired = state.cameraRecoveryRequired || !usableCamera
-  if (usableCamera && phase === 'all-red' && phaseTimer <= 0) cameraRecoveryRequired = false
+  let cameraRecoveryRequired = state.cameraRecoveryRequired || !usableCamera || state.operatorHold
+  if (usableCamera && !state.operatorHold && phase === 'all-red' && phaseTimer <= 0) cameraRecoveryRequired = false
   const visible = observeTraffic(state).queues
   const redWait = { ...state.redWait }
   for (const axis of ['ns', 'ew'] as const) {
@@ -486,7 +487,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     if (usableCamera) redWait[axis] = count === 0 || served ? 0 : redWait[axis] + dt
   }
 
-  if (state.controlSource === 'camera' && (!usableCamera || cameraRecoveryRequired)) {
+  if (state.operatorHold || (state.controlSource === 'camera' && (!usableCamera || cameraRecoveryRequired))) {
     // Lose image input: terminate green via yellow, never release new traffic.
     // Recovery finishes an all-red interval before using a new image decision.
     if (phase.endsWith('-green')) {
