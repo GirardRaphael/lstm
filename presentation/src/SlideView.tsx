@@ -1,4 +1,5 @@
 import type { Slide } from './slides'
+import { SlideVisual } from './SlideVisuals'
 
 type Props = {
   slide: Slide
@@ -9,7 +10,8 @@ type Props = {
 export function SlideView({ slide, index, total }: Props) {
   return (
     <article className={`slide slide-${slide.variant ?? 'content'}`} data-slide={slide.id}>
-      <div className="slide-inner">
+      <div className={`slide-inner ${slide.visual ? 'slide-has-visual' : ''}`}>
+        <div className="slide-copy">
         {slide.kicker ? <p className="slide-kicker">{slide.kicker}</p> : null}
         <h1 className="slide-title">{slide.title}</h1>
         {slide.body ? <p className="slide-body">{slide.body}</p> : null}
@@ -55,6 +57,9 @@ export function SlideView({ slide, index, total }: Props) {
           </div>
         ) : null}
         {slide.footer ? <p className="slide-footer">{slide.footer}</p> : null}
+        </div>
+        {slide.visual ? <div className="slide-visual"><SlideVisual kind={slide.visual} /></div> : null}
+        <p className="slide-takeaway"><span>Remember</span>{slide.takeaway}</p>
       </div>
       <div className="slide-index">
         {index + 1} / {total}

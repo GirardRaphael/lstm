@@ -1,12 +1,39 @@
-# Traffic LSTM live intersection
+# Traffic intersection classroom presentation
 
 Run `./run_app.ps1` from the repository root. The Train & review view opens automatically
-at http://127.0.0.1:43125/. The Slideshow button opens the presentation deck.
+at http://127.0.0.1:43125/. Select **Slideshow** for the classroom presentation,
+**Live intersection** for the operating simulation, or **Train & review** for real-image
+inspection and human teaching labels.
 Use Ctrl+C in the launcher terminal to stop both services.
 
 The launcher uses `.venv/Scripts/python.exe` or the existing
 `~/.venvs/traffic_lstm/Scripts/python.exe`. Install the root requirements first.
 Node.js 22.12+ is required; this copy was checked with Node 24.14.
+
+## Classroom presentation
+
+Use the in-app deck for the current project explanation. It provides chapter navigation,
+interactive diagrams, speaker notes, local readiness information and prepared live demo
+scenarios. The balanced, east-jam, pedestrian, camera-loss and fixed-cycle presets make
+behavior easier to demonstrate. Use **Return to slide** to resume your place after
+a demo. Seeded scenes are illustrative scenarios, not quantitative proof of reduced delay.
+
+The deck links to the [classroom presenter guide](../reports/CLASSROOM_PRESENTER_GUIDE.md),
+including a 15–20 minute talk, 5/15 minute cuts, exact controls, worked equations,
+training/calibration/evaluation explanations, common questions and troubleshooting.
+Rehearse the detector once before class because initial model loading can take time.
+
+The essential distinction is between four tasks: object recognition, anomaly recognition,
+human light-choice learning, and simulated signal operation. The historical LSTM forecast
+is a separate branch. The live camera controller uses graphics-specific screenshot rules;
+the real-image lab uses pretrained EfficientDet-Lite2. Human action learning starts
+untrained and does not autonomously control physical signals.
+
+Present the actual evidence: detector precision **80.98%**, recall **48.18%** on 500 general
+COCO images; the expanded aerial anomaly baseline detected **0 of 45** test anomalies.
+The 3,000-image aerial collection supplies binary anomaly labels, not correct signal
+choices or verified object boxes. A 90% recommendation-score cutoff is separate from
+measured reliability. See the guide and linked reports before quoting a result.
 
 ## Manual startup
 
@@ -25,7 +52,8 @@ The API health endpoint is http://127.0.0.1:43125/api/health.
 Imported from `origin/observatory/phase2-v2-wiring`, commit
 `0b21861719c6529f16b70401ca948b67ec5680e9` (September 25, 2026).
 `DecisionLog.tsx` was renamed `DecisionLogPanel.tsx` to avoid colliding with
-`decisionLog.ts` on Windows. The live view is now the default.
+`decisionLog.ts` on Windows. **Train & review** is the current default view; the
+slideshow and live simulation are separate modes in the same app.
 
 The model and data dependencies are the existing root files:
 `models/baseline_univariate.keras`, `models/baseline_univariate_artifacts.json`,

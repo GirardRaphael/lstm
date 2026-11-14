@@ -3,7 +3,10 @@ import { VisionPanel } from './VisionPanel'
 import { TrainingLab } from './TrainingLab'
 import { analyzeScreenshot, type VisionFrame } from './screenshotVision'
 import { IntersectionCanvas } from './IntersectionCanvas'
-import { SlideView } from './SlideView'
+import { PresentationDeck } from './PresentationDeck'
+import { createClassroomScenario, type DemoScenarioId } from './classroomScenarios'
+import { initialClassroomRoute } from './classroomRoute'
+import { applyReviewedActionToState } from './reviewedAction'
 import { ThinkingPanel } from './ThinkingPanel'
 import { ControllerPanel, AppliedDecisions } from './ControllerPanel'
 import { cameraReady, observeTraffic, type Axis } from './trafficController'
@@ -13,7 +16,7 @@ import {
   type HourLookupFile,
   type LiveModelOutput,
 } from './decisionBrain'
-import { SLIDES } from './slides'
+import { SLIDES, type Slide } from './slides'
 import {
   applyVisionFrame,
   createInitialState,
@@ -32,8 +35,10 @@ import './App.css'
 type Mode = 'slides' | 'live' | 'learn'
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>('learn')
-  const [slideIndex, setSlideIndex] = useState(0)
+  const [mode, setMode] = useState<Mode>(() => initialClassroomRoute(window.location.hash).mode)
+  const [slideIndex, setSlideIndex] = useState(() => initialClassroomRoute(window.location.hash).slideIndex)
+  const [teachingSource, setTeachingSource] = useState<'dataset' | 'upload' | 'simulation'>('upload')
+  const [guidedDemo, setGuidedDemo] = useState<NonNullable<Slide['demo']> | null>(null)
   const [cars, setCars] = useState(12)
   const [trucks, setTrucks] = useState(3)
   const [pedestrians, setPedestrians] = useState(20)
@@ -53,6 +58,10 @@ export default function App() {
   )
   const lastTs = useRef<number | null>(null)
   const adaptive = state.adaptive
+  useEffect(() => {
+    const hash = mode === 'slides' ? `#slides/${SLIDES[slideIndex].id}` : `#${mode}`
+    window.history.replaceState(null, '', hash)
+  }, [mode, slideIndex])
   const receiveScreenshot = useCallback((frame: ImageData, capturedAt: number) => {
     if (previousVision.current && capturedAt <= previousVision.current.capturedAt) return
     // This is the perception boundary: pixels, a clock and prior pixel tracks only.
@@ -100,7 +109,7 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return
+      if (e.altKey || e.ctrlKey || e.metaKey || (e.target instanceof HTMLElement && (e.target.closest('input, select, textarea, button, a, summary') || e.target.isContentEditable))) return
       if (mode === 'slides') {
         if (e.key === 'ArrowRight' || e.key === ' ') {
           e.preventDefault()
@@ -185,22 +194,49 @@ export default function App() {
 
   const thought = useMemo(() => thinkDecision(state, liveModel, lookup), [state, liveModel, lookup])
   const applyReviewedAction = (action: 'ns' | 'ew' | 'walk' | 'hold') => {
-    setState(prev => {
-      if (action === 'hold') return { ...prev, operatorHold: true, controllerOverride: null,
-        crosswalkRequest: { ns: false, ew: false } }
-      const released = { ...prev, operatorHold: false }
-      if (action === 'walk') return pressCrosswalkButton(released, 'ns')
-      return { ...released, controllerOverride: action }
-    })
+    setState(prev => applyReviewedActionToState(prev, action))
     setRunning(true)
     setMode('live')
     setLastAction(action === 'hold' ? 'Reviewed hold: finish yellow, then keep red.' :
-      `Reviewed ${action.toUpperCase()} request queued. Crossing clearance and waiting priorities remain active.`)
+      `Reviewed ${action.toUpperCase()} request queued${action === 'ns' || action === 'ew' ? '; automatic control enabled' : ''}. Crossing clearance and waiting priorities remain active.`)
   }
 
   const overrideDecisionAxis = (axis: Axis) => {
     setState(prev => ({ ...prev, operatorHold: false, controllerOverride: axis }))
     setLastAction(`Requested ${axis.toUpperCase()} at the next clear junction. Waiting-time and pedestrian priority remain active.`)
+  }
+
+  const openTraining = (source: 'dataset' | 'upload' | 'simulation' = 'upload') => {
+    setTeachingSource(source)
+    setMode('learn')
+    window.scrollTo({ top: 0 })
+  }
+  const startClassroomScenario = (id: DemoScenarioId) => {
+    const scenario = createClassroomScenario(id)
+    previousVision.current = undefined
+    setCameraSample(null)
+    setState(scenario.state)
+    setCameraEnabled(scenario.cameraEnabled)
+    setCars(scenario.counts.cars); setTrucks(scenario.counts.trucks); setPedestrians(scenario.counts.pedestrians)
+    setJamApproach(scenario.jamApproach)
+    setSimulationSessionId(crypto.randomUUID())
+    setRunning(true); setShowHistory(false); setMode('live')
+    setLastAction('Classroom scenario loaded. The camera will measure the rendered scene.')
+    window.scrollTo({ top: 0 })
+  }
+  const launchDemo = (demo: NonNullable<Slide['demo']>) => {
+    setGuidedDemo(demo)
+    if (demo.target === 'learn') openTraining('upload')
+    else startClassroomScenario(demo.scenario ?? 'balanced')
+  }
+  const startTeachingPractice = () => {
+    previousVision.current = undefined; setCameraSample(null)
+    const counts = randomSpawnCounts()
+    setState(spawnAgents(createInitialState(true, 'camera'), counts))
+    setCars(counts.cars); setTrucks(counts.trucks); setPedestrians(counts.pedestrians)
+    setSimulationSessionId(crypto.randomUUID()); setCameraEnabled(true); setRunning(true); setMode('live')
+    setLastAction('Teaching practice: let the scene develop, then choose Teach a decision from this screenshot.')
+    window.scrollTo({ top: 0 })
   }
 
   const randomizeCounts = () => {
@@ -222,7 +258,7 @@ export default function App() {
           <span className="brand-sub">Observatory demo</span>
         </div>
         <nav className="mode-switch" aria-label="Application mode">
-          <button type="button" className={mode === 'learn' ? 'active' : ''} onClick={() => setMode('learn')}>
+          <button type="button" className={mode === 'learn' ? 'active' : ''} onClick={() => openTraining()}>
             Train &amp; review
           </button>
           <button
@@ -245,33 +281,13 @@ export default function App() {
         </div>
       </header>
 
+      {guidedDemo && mode !== 'slides' ? <aside className="classroom-return" aria-label="Guided classroom demonstration"><div><p className="visual-eyebrow">CLASSROOM DEMONSTRATION</p><strong>{guidedDemo.label}</strong><ol>{guidedDemo.steps.map(step => <li key={step}>{step}</li>)}</ol></div><div><button className="accent" onClick={() => { setMode('slides'); window.scrollTo({ top: 0 }) }}>Return to slide {slideIndex + 1}</button>{guidedDemo.scenario ? <button onClick={() => startClassroomScenario(guidedDemo.scenario!)}>Restart this scenario</button> : null}<button onClick={() => setGuidedDemo(null)}>Close demo guide</button></div></aside> : null}
       {mode === 'learn' ? (
         <main className="learning-stage">
-          <TrainingLab frame={cameraSample?.pixels ?? null} simulationSessionId={simulationSessionId} onApply={applyReviewedAction} />
+          <TrainingLab frame={cameraSample?.pixels ?? null} simulationSessionId={simulationSessionId} initialSource={teachingSource} onStartSimulation={startTeachingPractice} onApply={applyReviewedAction} />
         </main>
       ) : mode === 'slides' ? (
-        <main className="slides-stage">
-          <SlideView slide={SLIDES[slideIndex]} index={slideIndex} total={SLIDES.length} />
-          <div className="slide-controls">
-            <button
-              type="button"
-              onClick={() => setSlideIndex((i) => Math.max(0, i - 1))}
-              disabled={slideIndex === 0}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              onClick={() => setSlideIndex((i) => Math.min(SLIDES.length - 1, i + 1))}
-              disabled={slideIndex === SLIDES.length - 1}
-            >
-              Next
-            </button>
-            <button type="button" className="accent" onClick={() => setMode('live')}>
-              Open live intersection
-            </button>
-          </div>
-        </main>
+        <PresentationDeck index={slideIndex} onIndex={setSlideIndex} onDemo={launchDemo} />
       ) : (
         <main className="live-stage thinking-layout">
           <div className="live-windows">
@@ -516,7 +532,7 @@ export default function App() {
           </aside>
           </div>
 
-          <button type="button" className="accent" onClick={() => setMode('learn')}>Teach a decision from this screenshot</button>
+          <button type="button" className="accent" disabled={!cameraSample} onClick={() => openTraining('simulation')}>Teach a decision from this screenshot</button>
           <VisionPanel frame={cameraSample?.pixels ?? null} vision={cameraSample?.vision ?? null} enabled={cameraEnabled} onEnabledChange={setCameraEnabled} />
           <AppliedDecisions state={state} />
           <details className="historical-model" onToggle={event => setShowHistory(event.currentTarget.open)}>
