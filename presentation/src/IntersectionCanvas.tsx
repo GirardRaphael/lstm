@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
+import { cameraReady } from './trafficController'
 import {
   CENTER,
   LANE_GAP,
@@ -574,7 +575,7 @@ function drawPedestrian(ctx: CanvasRenderingContext2D, p: Pedestrian, slot: numb
   }
 }
 
-function paint(ctx: CanvasRenderingContext2D, state: SimState) {
+export function paintIntersection(ctx: CanvasRenderingContext2D, state: SimState) {
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.globalAlpha = 1
   drawRoad(ctx)
@@ -594,54 +595,32 @@ function paint(ctx: CanvasRenderingContext2D, state: SimState) {
     drawPedestrian(ctx, p, slot)
   }
 
-  // Center status
-  ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.4)'
-  ctx.shadowBlur = 12
-  ctx.shadowOffsetY = 3
-  ctx.fillStyle = state.jamActive
-    ? 'rgba(124,45,18,0.85)'
-    : state.pedestrianCrossing
-      ? 'rgba(30,64,60,0.85)'
-      : 'rgba(10,15,20,0.85)'
-  roundRect(ctx, CENTER - 70, CENTER - 16, 140, 32, 8)
-  ctx.fill()
-  ctx.restore()
-
-  ctx.strokeStyle = state.jamActive
-    ? 'rgba(255,122,89,0.5)'
-    : state.pedestrianCrossing
-      ? 'rgba(46,196,182,0.5)'
-      : 'rgba(244,239,230,0.15)'
-  ctx.lineWidth = 1
-  roundRect(ctx, CENTER - 70, CENTER - 16, 140, 32, 8)
-  ctx.stroke()
-
-  ctx.fillStyle = '#f4efe6'
-  ctx.font = '600 11px "Instrument Sans", sans-serif'
-  ctx.textAlign = 'center'
-  const label = state.jamActive
-    ? 'JAM RESPONSE'
-    : state.pedestrianCrossing
-      ? 'PEDESTRIANS'
-      : 'LIVE'
-  ctx.fillText(label, CENTER, CENTER + 4)
+  // Keep the traffic image unobscured; status is shown in HTML outside the camera.
 }
 
 type Props = {
   state: SimState
+  cameraEnabled?: boolean
+  onFrame?: (frame: ImageData, capturedAt: number) => void
 }
 
-export function IntersectionCanvas({ state }: Props) {
+export function IntersectionCanvas({ state, cameraEnabled = true, onFrame }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
+  const lastCapture = useRef(-Infinity)
 
   useLayoutEffect(() => {
     const canvas = ref.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) return
-    paint(ctx, state)
-  }, [state])
+    paintIntersection(ctx, state)
+    const now = performance.now()
+    if (cameraEnabled && onFrame && now - lastCapture.current >= 250) {
+      lastCapture.current = now
+      // Capture the actual displayed canvas pixels, before any detection overlays.
+      onFrame(ctx.getImageData(0, 0, SIZE, SIZE), state.elapsed)
+    }
+  }, [state, cameraEnabled, onFrame])
 
   return (
     <div className="intersection-frame">
@@ -652,6 +631,13 @@ export function IntersectionCanvas({ state }: Props) {
         className="intersection-canvas"
         aria-label="Two-dimensional traffic intersection simulation"
       />
+      {state.controlSource === 'camera' && cameraReady(state) ? <svg
+        className="detection-overlay" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true">
+        {state.vision?.detections.map(detection => <rect key={detection.id}
+          x={detection.x} y={detection.y} width={detection.width} height={detection.height}
+          fill="none" stroke={detection.kind === 'pedestrian' ? '#f6bd60' : detection.kind === 'truck' ? '#c2a1ff' : '#55e3d4'}
+          strokeWidth="1.5" />)}
+      </svg> : null}
     </div>
   )
 }

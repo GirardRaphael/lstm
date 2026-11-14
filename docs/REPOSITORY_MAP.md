@@ -1,5 +1,10 @@
 # Repository map
 
+**Screenshot input update:** the live app now measures captured canvas pixels.
+The signal controller uses those estimated detections and waiting times, with a
+red hold for missing images. See [the input contract and limits](../presentation/README.md#screenshot-input-and-limits).
+These are screenshots of simulated traffic, not real street footage.
+
 GitHub: https://github.com/GirardRaphael/lstm
 
 ## Current integration — 2026-11-14

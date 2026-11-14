@@ -1,12 +1,12 @@
 # Traffic Intersection, Observatory and Forecast Workbench
 
-A local, authenticated observatory for importing vehicle counts, running durable training jobs, storing forecasts and reviewing later actuals. The research workbench compares hourly I-94 counts and Washington DC bike rentals. Compare a seasonal baseline, XGBoost and an inspectable LSTM. The forecast workbench does not control traffic. A separate interactive intersection simulation now includes an automatic scene-based light controller; no real signals or live sensors are connected.
+A local, authenticated observatory for importing vehicle counts, running durable training jobs, storing forecasts and reviewing later actuals. The research workbench compares hourly I-94 counts and Washington DC bike rentals. Compare a seasonal baseline, XGBoost and an inspectable LSTM. The forecast workbench does not control traffic. A separate interactive intersection simulation now includes an automatic screenshot-driven light controller; no real signals or live sensors are connected.
 
 **Delivery status:** the local observation-to-error workflow is implemented and tested, including backup/restore. Field validation and shared-hosting readiness remain open. The legacy scores are exploratory; clean reanalysis of previously inspected data is still not an untouched confirmatory test.
 
 ## Live intersection and image gallery
 
-The live intersection previously on `observatory/phase2-v2-wiring` is now included here, with automatic decisions based on the vehicles and pedestrians visible in the simulation.
+The live intersection previously on `observatory/phase2-v2-wiring` is now included here, with automatic decisions based on vehicles and pedestrians detected in screenshots of the simulation.
 
 ```powershell
 # After ./setup.ps1; also install Node.js 22.12+ (tested with Node 24.14)
@@ -17,9 +17,9 @@ The live intersection previously on `observatory/phase2-v2-wiring` is now includ
 ./run_app.ps1 -Images         # Separate local aerial-image gallery
 ```
 
-Automatic control is enabled by default. At each cleared junction, the controller uses visible queue sizes, stopped vehicles, waiting time and pedestrians to choose which direction receives green and for how long. Yellow, clearance and walk phases remain in the simulation; waiting-time priority helps prevent a smaller queue from being ignored. The panel explains applied decisions and records them. Operator requests are queued for a decision boundary.
+Automatic control is enabled by default. Every 250ms the app captures its intersection canvas and detects traffic from pixels. At each cleared junction, the controller uses detected queue sizes, stopped vehicles, tracked waiting time and pedestrians to choose which direction receives green and for how long. Yellow, clearance and walk phases remain in the simulation; waiting-time priority helps prevent a smaller queue from being ignored. The panel explains applied decisions and records them. Operator requests are queued for a decision boundary.
 
-This is a rule-based controller reading scene objects, not a camera-image detector or a trained neural controller. The optional historical LSTM panel replays stored traffic-count forecasts and does not choose the lights. See [the demo guide](presentation/README.md) for the decision rules, tests and source revision. Press Ctrl+C in the launcher terminal to stop its services. The first launch installs the locked JavaScript dependencies.
+The recognizer uses color, shape and tracking calibrated to this app's 800 × 800 graphics; the light policy uses rules. It reads screenshot pixels rather than hidden scene objects. The images still depict simulated traffic, and the recognizer is not trained or validated for real street footage. The camera preview shows estimated boxes; PNG/JSON downloads preserve screenshots and detections. Missing or stale images cause a yellow-to-red hold. The optional historical LSTM panel replays stored traffic-count forecasts and does not choose the lights. See [the demo guide](presentation/README.md) for the decision rules, tests and source revision. Press Ctrl+C in the launcher terminal to stop its services. The first launch installs the locked JavaScript dependencies.
 
 The dataset tools support a local **1,500-image UIT-ADrone subset: 1,200 normal and 300 anomalous aerial frames**. Images, labels and retained source metadata live in the ignored `data/intersection_anomalies/` directory and are **not bundled in GitHub**. A fresh clone's gallery reports that the dataset is missing until that directory is restored or prepared. The photographs show real roundabouts, and the labels are publisher-provided binary anomalies; verified violation subtypes and object boxes are not included. See [the dataset specification](reports/INTERSECTION_DATASET_SPEC.md) for provenance, split rules and verification.
 
@@ -98,7 +98,7 @@ $env:PYTHONPATH = "src"
 
 | Path | Purpose |
 | --- | --- |
-| `presentation/` | Interactive intersection, scene-based signal controller and historical LSTM replay |
+| `presentation/` | Interactive intersection, screenshot-driven signal controller and historical LSTM replay |
 | `app/intersection_images.py` | Standalone gallery for locally prepared aerial images |
 | `scripts/*intersection*.py` | Select, download and verify the image subset |
 | `src/traffic_lstm/observatory.py` | Durable workspace, access, jobs, models, forecasts, actuals and recovery |

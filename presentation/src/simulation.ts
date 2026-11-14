@@ -1,4 +1,5 @@
-import { decideTraffic, observeTraffic, type SignalDecision } from './trafficController'
+import type { VisionFrame } from './screenshotVision'
+import { cameraReady, decideTraffic, observeTraffic, type SignalDecision } from './trafficController'
 
 export type VehicleKind = 'car' | 'truck'
 export type Approach = 'north' | 'south' | 'east' | 'west'
@@ -74,6 +75,11 @@ export type SimState = {
   redWait: Record<'ns' | 'ew', number>
   controllerOverride: 'ns' | 'ew' | null
   decisions: SignalDecision[]
+  controlSource: 'scene' | 'camera'
+  vision: VisionFrame | null
+  elapsed: number
+  visionClearFrames: number
+  cameraRecoveryRequired: boolean
 }
 
 export type SpawnConfig = {
@@ -122,12 +128,12 @@ const CAR_COLORS = ['#e74c3c', '#3498db', '#f39c12', '#ecf0f1', '#9b59b6', '#1ab
 let nextId = 1
 let nextPedApproach = 0
 
-export function createInitialState(adaptive = true): SimState {
+export function createInitialState(adaptive = true, controlSource: 'scene' | 'camera' = 'scene'): SimState {
   return {
     vehicles: [],
     pedestrians: [],
-    phase: adaptive ? 'all-red' : 'ns-green',
-    phaseTimer: adaptive ? ALL_RED : 6,
+    phase: adaptive || controlSource === 'camera' ? 'all-red' : 'ns-green',
+    phaseTimer: adaptive || controlSource === 'camera' ? ALL_RED : 6,
     nsGreen: 6,
     ewGreen: 6,
     nsLeftGreen: 4,
@@ -149,7 +155,21 @@ export function createInitialState(adaptive = true): SimState {
     redWait: { ns: 0, ew: 0 },
     controllerOverride: null,
     decisions: [],
+    controlSource, vision: null, elapsed: 0, visionClearFrames: 0,
+    cameraRecoveryRequired: controlSource === 'camera',
   }
+}
+
+/** Accept only a newer frame from this simulation's clock. No scene data is
+ * supplied to the detector. Clearance requires two consecutive usable captures. */
+export function applyVisionFrame(state: SimState, frame: VisionFrame): SimState {
+  if (state.controlSource !== 'camera' || !Number.isFinite(frame.capturedAt) ||
+      frame.capturedAt < 0 || state.elapsed - frame.capturedAt > 1 ||
+      frame.capturedAt > state.elapsed || (state.vision && frame.capturedAt <= state.vision.capturedAt)) return state
+  const clear = frame.valid && !frame.boxOccupied && frame.crossingPedestrians === 0
+  const recent = state.vision && frame.capturedAt - state.vision.capturedAt <= 1
+  return { ...state, vision: frame,
+    visionClearFrames: clear ? (recent ? state.visionClearFrames + 1 : 1) : 0 }
 }
 
 function randomApproach(rng: () => number): Approach {
@@ -360,7 +380,7 @@ function nextPhase(state: SimState): Pick<
   const { phase, adaptive, nsGreen, ewGreen, nsLeftGreen, ewLeftGreen, crosswalkRequest } = state
   const decision = decideTraffic(state, phase === 'all-red')
   const nextAxis = decision.action === 'walk' ? state.nextAxis : decision.action
-  const leftQueues = adaptive ? decision.observation.leftQueues : state.leftQueues
+  const leftQueues = adaptive || state.controlSource === 'camera' ? decision.observation.leftQueues : state.leftQueues
   const wantsPedestrian = decision.action === 'walk'
   const greenFor = (_axis: 'ns' | 'ew'): number => decision.seconds
 
@@ -455,17 +475,35 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
   let pedWalkCooldown = Math.max(0, state.pedWalkCooldown - dt)
   let decisions = state.decisions
   let controllerOverride = state.controllerOverride
+  const usableCamera = cameraReady(state)
+  let cameraRecoveryRequired = state.cameraRecoveryRequired || !usableCamera
+  if (usableCamera && phase === 'all-red' && phaseTimer <= 0) cameraRecoveryRequired = false
   const visible = observeTraffic(state).queues
   const redWait = { ...state.redWait }
   for (const axis of ['ns', 'ew'] as const) {
     const count = axis === 'ns' ? visible.north + visible.south : visible.east + visible.west
     const served = phase === `${axis}-green` || phase === `${axis}-left-green`
-    redWait[axis] = count === 0 || served ? 0 : redWait[axis] + dt
+    if (usableCamera) redWait[axis] = count === 0 || served ? 0 : redWait[axis] + dt
   }
 
-  if (phaseTimer <= 0) {
-    const boxBusy = state.vehicles.some(vehicleOccupiesBox)
-    const pedsInRoad = state.pedestrians.some(pedestrianInCrosswalk)
+  if (state.controlSource === 'camera' && (!usableCamera || cameraRecoveryRequired)) {
+    // Lose image input: terminate green via yellow, never release new traffic.
+    // Recovery finishes an all-red interval before using a new image decision.
+    if (phase.endsWith('-green')) {
+      phase = phase.replace('-green', '-yellow') as Phase
+      phaseTimer = YELLOW
+    } else if (phaseTimer <= 0) {
+      phase = 'all-red'
+      phaseTimer = ALL_RED
+      pedestrianCrossing = false
+    }
+  } else if (phaseTimer <= 0) {
+    const boxBusy = state.controlSource === 'camera'
+      ? state.visionClearFrames < 2 || !!state.vision?.boxOccupied
+      : state.vehicles.some(vehicleOccupiesBox)
+    const pedsInRoad = state.controlSource === 'camera'
+      ? (state.vision?.crossingPedestrians ?? 0) > 0
+      : state.pedestrians.some(pedestrianInCrosswalk)
     // Walk never starts while a vehicle is still in the box. Hold only while
     // the snapshot cohort is still on the zebra — newcomers wait at the curb
     // and must not extend this walk.
@@ -606,6 +644,7 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     (p) => p.waiting && (p.waitTime ?? 0) >= PED_AUTO_PRESS_WAIT,
   ).length
   const autoPressAllowed =
+    state.controlSource !== 'camera' &&
     state.tick > 0 &&
     phase !== 'pedestrian-crossing' &&
     pedWalkCooldown <= 0 &&
@@ -702,6 +741,8 @@ export function stepSimulation(state: SimState, dt: number, rng: () => number = 
     redWait,
     controllerOverride,
     decisions,
+    elapsed: state.elapsed + dt,
+    cameraRecoveryRequired,
   }
 }
 

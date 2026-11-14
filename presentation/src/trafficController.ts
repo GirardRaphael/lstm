@@ -20,11 +20,30 @@ export type SignalDecision = {
   scores: Record<Axis, number>
   tick: number
   automatic: boolean
+  source: 'camera' | 'scene'
+  frameCapturedAt?: number
 }
 
-/** Inputs are rendered scene objects and observed elapsed time, never future arrivals,
+export function emptyObservation(): TrafficObservation {
+  return { queues: { north: 0, south: 0, east: 0, west: 0 },
+    leftQueues: { north: 0, south: 0, east: 0, west: 0 },
+    stopped: { ns: 0, ew: 0 }, cars: 0, trucks: 0, pedestrians: 0, oldestPedestrian: 0 }
+}
+
+/** Camera time uses the simulation clock: paused simulation cannot apply decisions. */
+export function cameraReady(state: SimState): boolean {
+  if (state.controlSource !== 'camera') return true
+  const frame = state.vision
+  return !!frame?.valid && Number.isFinite(frame.capturedAt) && frame.capturedAt >= 0 &&
+    frame.capturedAt <= state.elapsed && state.elapsed - frame.capturedAt <= 1
+}
+
+/** Camera mode consumes only measured image observations. Missing input is never
+ * replaced by scene objects. Scene observations remain for legacy comparison tests.
+ * Inputs in scene mode are rendered scene objects and observed elapsed time, never future arrivals,
  * hidden off-screen queues, the jam flag, or historical motorway forecasts. */
 export function observeTraffic(state: SimState): TrafficObservation {
+  if (state.controlSource === 'camera') return cameraReady(state) ? state.vision!.observation : emptyObservation()
   const result: TrafficObservation = {
     queues: { north: 0, south: 0, east: 0, west: 0 },
     leftQueues: { north: 0, south: 0, east: 0, west: 0 },
@@ -57,7 +76,8 @@ export function decideTraffic(state: SimState, allowWalk = true): SignalDecision
     ns: pressure.ns * 2 + observation.stopped.ns + redWait.ns * 0.3,
     ew: pressure.ew * 2 + observation.stopped.ew + redWait.ew * 0.3,
   }
-  const base = { observation, redWait, scores, tick: state.tick, automatic: state.adaptive }
+  const base = { observation, redWait, scores, tick: state.tick, automatic: state.adaptive,
+    source: state.controlSource, ...(state.controlSource === 'camera' ? { frameCapturedAt: state.vision?.capturedAt } : {}) }
   const manualWalk = state.crosswalkRequest.ns || state.crosswalkRequest.ew
   const waitingWalk = state.adaptive && state.pedWalkCooldown <= 0 &&
     (observation.oldestPedestrian >= 20 || (observation.pedestrians >= 6 && observation.oldestPedestrian >= 12))
@@ -80,7 +100,7 @@ export function decideTraffic(state: SimState, allowWalk = true): SignalDecision
       if (pressure.ns === 0 && pressure.ew > 0) action = 'ew'
       else if (pressure.ew === 0 && pressure.ns > 0) action = 'ns'
       else if (scores.ns !== scores.ew) action = scores.ns > scores.ew ? 'ns' : 'ew'
-      reason = `Visible traffic score: NS ${scores.ns.toFixed(1)}, EW ${scores.ew.toFixed(1)}. ` +
+      reason = `Observed traffic score: NS ${scores.ns.toFixed(1)}, EW ${scores.ew.toFixed(1)}. ` +
         `${action.toUpperCase()} selected from queue size, stopped traffic and waiting time.`
     }
   }

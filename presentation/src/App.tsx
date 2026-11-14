@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { VisionPanel } from './VisionPanel'
+import { analyzeScreenshot, type VisionFrame } from './screenshotVision'
 import { IntersectionCanvas } from './IntersectionCanvas'
 import { SlideView } from './SlideView'
 import { ThinkingPanel } from './ThinkingPanel'
 import { ControllerPanel, AppliedDecisions } from './ControllerPanel'
-import { observeTraffic, type Axis } from './trafficController'
+import { cameraReady, observeTraffic, type Axis } from './trafficController'
 import {
   congestionIntensity,
   thinkDecision,
@@ -12,6 +14,7 @@ import {
 } from './decisionBrain'
 import { SLIDES } from './slides'
 import {
+  applyVisionFrame,
   createInitialState,
   createTrafficJam,
   phaseLabel,
@@ -35,16 +38,27 @@ export default function App() {
   const [pedestrians, setPedestrians] = useState(20)
   const [jamApproach, setJamApproach] = useState<Approach>('east')
   const [running, setRunning] = useState(true)
+  const [cameraEnabled, setCameraEnabled] = useState(true)
+  const [cameraSample, setCameraSample] = useState<{ pixels: ImageData; vision: VisionFrame } | null>(null)
+  const previousVision = useRef<VisionFrame | undefined>(undefined)
   const [showHistory, setShowHistory] = useState(false)
   const [lastAction, setLastAction] = useState('Ready — randomize traffic or force a jam.')
   const [lookup, setLookup] = useState<HourLookupFile | null>(null)
   const [liveModel, setLiveModel] = useState<LiveModelOutput | null>(null)
   const [modelStatus, setModelStatus] = useState('Loading Keras hour lookup…')
   const [state, setState] = useState<SimState>(() =>
-    spawnAgents(createInitialState(true), { cars: 12, trucks: 3, pedestrians: 20 }),
+    spawnAgents(createInitialState(true, 'camera'), { cars: 12, trucks: 3, pedestrians: 20 }),
   )
   const lastTs = useRef<number | null>(null)
   const adaptive = state.adaptive
+  const receiveScreenshot = useCallback((frame: ImageData, capturedAt: number) => {
+    if (previousVision.current && capturedAt <= previousVision.current.capturedAt) return
+    // This is the perception boundary: pixels, a clock and prior pixel tracks only.
+    const measured = analyzeScreenshot(frame, capturedAt, previousVision.current)
+    previousVision.current = measured
+    setCameraSample({ pixels: frame, vision: measured })
+    setState(prev => applyVisionFrame(prev, measured))
+  }, [])
 
   useEffect(() => {
     fetch('/hour_lookup.json')
@@ -111,7 +125,7 @@ export default function App() {
         const approach = randomApproachChoice()
         setJamApproach(approach)
         setState((prev) => createTrafficJam(prev, approach))
-        setLastAction(`Random jam on the ${approach} approach — watch the decision brain.`)
+        setLastAction(`Random jam on the ${approach} approach — watch the screenshot detections.`)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -208,7 +222,7 @@ export default function App() {
           </button>
         </nav>
         <div className="top-hint">
-          {mode === 'slides' ? '← → navigate · L live' : 'R spawn · J jam · watch the decision brain'}
+          {mode === 'slides' ? '← → navigate · L live' : 'R spawn · J jam · watch the screenshot detections'}
         </div>
       </header>
 
@@ -239,14 +253,14 @@ export default function App() {
         <main className="live-stage thinking-layout">
           <div className="live-windows">
             <section className="live-visual">
-            <IntersectionCanvas state={state} />
+            <IntersectionCanvas state={state} cameraEnabled={cameraEnabled} onFrame={receiveScreenshot} />
             <div className={`response-banner ${state.jamActive ? 'hot' : ''}`}>
               <strong>{state.adaptive ? 'Automatic traffic control' : 'Fixed signal cycle'}</strong>
               <span>{phaseLabel(state.phase)} · {state.phaseTimer.toFixed(1)}s remaining</span>
             </div>
             <p className="sim-disclaimer">
-              Simulation only. The controller uses visible traffic and waiting time to operate these lights.
-              The separate historical LSTM forecast does not control them.
+              Screenshot-driven control of simulated traffic. The detector reads canvas pixels to count and track traffic.
+              The historical LSTM forecast is separate; no real street camera is connected.
             </p>
           </section>
 
@@ -273,11 +287,11 @@ export default function App() {
                 <strong>{state.phaseTimer.toFixed(1)}s</strong>
               </div>
               <div>
-                <span className="stat-label">Queue (PCU)</span>
-                <strong>{queueTotal}</strong>
+                <span className="stat-label">Detected queue (PCU)</span>
+                <strong>{cameraReady(state) ? queueTotal : '—'}</strong>
               </div>
               <div>
-                <span className="stat-label">On road now</span>
+                <span className="stat-label">Detected traffic</span>
                 <strong>
                   {liveCounts.cars}c / {liveCounts.trucks}t / {liveCounts.pedestrians}p
                 </strong>
@@ -430,7 +444,7 @@ export default function App() {
                 onClick={() => {
                   setState((prev) => createTrafficJam(prev, jamApproach))
                   setLastAction(
-                    `Traffic jam on ${jamApproach} — watch gates and neurons before green moves.`,
+                    `Traffic jam on ${jamApproach} — watch the detections and the next light decision.`,
                   )
                 }}
               >
@@ -454,7 +468,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  setState(createInitialState(adaptive))
+                  previousVision.current = undefined
+                  setCameraSample(null)
+                  setState(createInitialState(adaptive, 'camera'))
                   setLastAction('Intersection reset.')
                 }}
               >
@@ -476,6 +492,7 @@ export default function App() {
           </aside>
           </div>
 
+          <VisionPanel frame={cameraSample?.pixels ?? null} vision={cameraSample?.vision ?? null} enabled={cameraEnabled} onEnabledChange={setCameraEnabled} />
           <AppliedDecisions state={state} />
           <details className="historical-model" onToggle={event => setShowHistory(event.currentTarget.open)}>
             <summary>Historical LSTM forecast — separate from light control</summary>

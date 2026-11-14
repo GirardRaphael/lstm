@@ -122,10 +122,10 @@ describe('honest comparison slides', () => {
     expect(text).not.toMatch(/LSTM won|verdict flips/i)
   })
 
-  it('distinguishes applied scene control from historical forecasts and city signals', () => {
+  it('distinguishes applied screenshot control from historical forecasts and city signals', () => {
     expect(text).toMatch(/simulation/i)
     expect(text).toMatch(/not (connected to )?city signals/i)
-    expect(text).toMatch(/scene-based controller applies green directions and durations/i)
+    expect(text).toMatch(/screenshot-driven controller applies green directions and durations/i)
     expect(text).toMatch(/separate LSTM panel/i)
     expect(text).toMatch(/forecast does not control these lights/i)
     expect(text).toMatch(/operator requests wait for a safe transition/i)

@@ -44,7 +44,7 @@ export const SLIDES: Slide[] = [
     bullets: [
       'Ordered hours: rush builds over a day; a cell state can keep or discard that history at each step',
       'Gates are explicit valves (forget / input / output) — introspect.py replays them from trained weights',
-      'The historical forecast panel shows that state; a separate scene-based controller operates the simulated lights',
+      'The historical forecast panel shows that state; a separate screenshot-driven controller operates the simulated lights',
     ],
   },
   {
@@ -119,10 +119,10 @@ export const SLIDES: Slide[] = [
     variant: 'warning',
     kicker: '07 · Product boundary',
     title: 'Simulation only. Not city signals.',
-    body: 'A deterministic controller reads visible vehicles, waiting pedestrians, and waiting times to choose the simulated lights. It is not connected to signal cabinets, roadside hardware, or a city feed.',
+    body: 'A calibrated pixel detector reads screenshots of this simulation. A rule-based controller uses its traffic estimates and tracked waits to choose the lights. It is not connected to signal cabinets, roadside hardware, or a city feed.',
     bullets: [
       'The separate LSTM panel forecasts next-hour demand on stored motorway hours; its forecast does not control these lights',
-      'The scene-based controller applies green directions and durations after clearance; the log shows the actual choices',
+      'The screenshot-driven controller applies green directions and durations after clearance; the log shows the actual choices',
       'Operator requests wait for a safe transition; pedestrian and waiting-time priority can go first. Requests do not train the model',
       'Real-world signal control and field validation remain outside this demo; it does not establish deployment readiness',
     ],
@@ -132,7 +132,7 @@ export const SLIDES: Slide[] = [
     variant: 'hero',
     kicker: '08 · Live demo',
     title: 'Jam the intersection.\nWatch the lights respond.',
-    body: 'Add cars, trucks, and pedestrians. Force a jam. Watch the controller choose the next green and record why. Expand the separate historical LSTM panel to inspect gates and neurons from the closest real test hour.',
+    body: 'Add cars, trucks, and pedestrians. Force a jam. Watch detected boxes and the next green decision. Turn the camera off to test the red hold. Expand the separate historical LSTM panel to inspect gates and neurons from the closest real test hour.',
     footer: 'Press Live intersection → in the top bar · simulation only',
   },
   {
@@ -141,7 +141,7 @@ export const SLIDES: Slide[] = [
     kicker: '09 · 3-minute talk track',
     title: 'Say this, then click Live.',
     bullets: [
-      '“The controller chooses these simulated lights from visible traffic and waiting times. The historical LSTM forecast is separate, and no city signals are connected.”',
+      '“The controller chooses these simulated lights from screenshot detections and tracked waiting times. The historical LSTM forecast is separate, and no city signals are connected.”',
       '“The exploratory legacy Metro Interstate scores were XGBoost+calendar MAE 154.3, LSTM+calendar 201.4, univariate LSTM 228.8, and last-hour 585.6. New results come from v2 manifests.”',
       '“The historical bike MAE scores were 41.3 vs 43.1, and 38.5 vs 38.6 with weather+calendar. These small gaps do not establish an LSTM advantage; its MAPE was worse.”',
       '“We still studied the LSTM for sequential hours and inspectable gates — not because it is the universal winner.”',
