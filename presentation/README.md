@@ -72,8 +72,9 @@ from `reports/REPORT.md` and the linked `models/v2/<run>/manifest.json` packages
 
 ## Live controller
 
-Automatic control and screenshot input are on by default. The displayed 800 × 800
-intersection canvas is sampled every 250ms. `screenshotVision.ts` receives only
+Automatic control and screenshot input are on by default. A hidden 800 × 800
+intersection canvas supplies raw captures every 250ms; one annotated camera view
+displays the matching image and detections. `screenshotVision.ts` receives only
 RGBA pixels, the capture clock and prior pixel detections. Color/shape components
 identify cars, trucks and pedestrian heads; calibrated image regions identify
 approaches and left lanes. Frame-to-frame matching estimates motion and waiting.
@@ -108,16 +109,18 @@ clearance before crossing/turns, and pedestrian service.
 
 ## Screenshot input and limits
 
-The live image shows detection boxes on a separate SVG layer. **What the camera
-sees** shows the exact captured image with its matching detections. Neither the
-SVG nor the preview is fed back into recognition. The old center badge was
-removed because it hid vehicles from the camera. Use **Download screenshot** and
+**What the camera sees** is the single intersection visualization. It shows the
+exact captured image with matching detection boxes added after raw capture.
+The annotated preview is never fed back into recognition. The raw source stays
+unobscured so labels cannot hide vehicles from the recognizer. Use **Download screenshot** and
 **Download detections** to save a raw PNG and its estimated boxes/counts as JSON.
 Use **Download sample** for one JSON containing both the PNG data URL
 and matching detections from the same capture. These are predicted annotations,
 not independently verified training labels.
 
-Switch **Camera on** off to test loss of input. A frame older than one simulation
+Switch **Camera on** off to test loss of input. The camera image stays frozen at
+its last capture; read the current phase banner and controller panel to follow
+the signal response. A frame older than one simulation
 second, missing frame, blank frame or failed calibration prevents new green/walk
 phases. Active green ends via the full yellow interval, then all-red. Recovery
 requires fresh frames, two consecutive clear observations and the all-red

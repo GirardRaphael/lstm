@@ -128,8 +128,8 @@ export const SLIDES: Slide[] = [
     "kicker": "03 · Read the interface",
     "title": "Follow the same evidence the controller sees.",
     "bullets": [
-      "The intersection displays traffic and its current signal phase.",
-      "The camera preview preserves the exact analyzed screenshot.",
+      "One camera view displays the captured traffic image and detection boxes.",
+      "The phase banner shows the current signal state, even when the camera image is frozen.",
       "The controller panel separates the next preview from the last applied decision.",
       "The decision log records the action, observations and actual phase duration."
     ],
@@ -157,7 +157,7 @@ export const SLIDES: Slide[] = [
     "kicker": "04 · Pixels become observations",
     "title": "The live controller really reads an image.",
     "bullets": [
-      "Capture the unmodified 800 × 800 canvas every 250 ms.",
+      "Capture the hidden, unmodified 800 × 800 source canvas every 250 ms.",
       "Use color and shape components to locate drawn road users.",
       "Map detections to calibrated approaches and lanes.",
       "Pass measured observations to the controller."
@@ -167,7 +167,7 @@ export const SLIDES: Slide[] = [
     "notes": [
       "The screenshot recognizer receives RGBA pixels, the capture clock and prior image detections. It does not receive simulator vehicle IDs, off-screen arrival demand or the historical forecast.",
       "This is classical computer vision calibrated to the app’s artwork: color ranges and connected image components identify bodies and heads; known image regions identify the roads and lanes.",
-      "Detection boxes are drawn in a separate overlay, so the recognizer does not read its own boxes back into the next image. The camera preview shows the matching capture and detections.",
+      "A hidden 800 × 800 canvas supplies the raw image. Detection boxes are added to the single displayed camera view after capture, so the recognizer does not read its own boxes back into the next image. The preview pairs each capture with its matching detections.",
       "This approach is useful here because the road geometry, scale and colors are controlled. It is not a pretrained detector for arbitrary street photographs. Changing the artwork, crop or scale can break that calibration.",
       "A good answer to “Is the data fictional?” is: the environment is simulated, but the controller’s input is measured from its rendered pixels. Real-image detection is demonstrated separately with a model trained on photographs."
     ],
@@ -402,20 +402,20 @@ export const SLIDES: Slide[] = [
     "body": "A missing or stale screenshot blocks new green and walk phases.",
     "takeaway": "Loss of evidence must be visible in the behavior and status.",
     "visual": "perception",
-    "cue": "The camera-loss scenario starts with Camera on. Wait for a vehicle green, then switch it off to show yellow and the red hold.",
+    "cue": "Wait for a vehicle green, then switch Camera off. Read the phase banner and controller for yellow and the red hold while the camera image stays frozen.",
     "demo": {
       "label": "Demonstrate camera loss and recovery",
       "target": "live",
       "scenario": "camera-loss",
       "steps": [
         "Leave Camera on and wait for a vehicle green.",
-        "Turn Camera off; watch the active green finish through yellow and hold all-red.",
+        "Turn Camera off; the image freezes. Read the phase banner and controller as green finishes through yellow and holds all-red.",
         "Turn Camera on again.",
         "Wait for fresh clear frames and all-red clearance before service resumes."
       ]
     },
     "notes": [
-      "The prepared scenario begins at all-red with Camera on. Let fresh captures establish clearance and wait for a vehicle green. Then switch Camera on off to demonstrate the complete yellow transition before the red hold.",
+      "The prepared scenario begins at all-red with Camera on. Let fresh captures establish clearance and wait for a vehicle green. Then turn the camera off. Its image stays at the last capture, so use the current phase banner and controller panel to show the complete yellow transition before the red hold.",
       "A usable capture must be valid, no later than the current simulation time, and at most one simulation second old. Missing, blank, failed-calibration and stale captures do not become empty-road evidence.",
       "When input is lost during green, the system runs the full yellow interval and then holds all-red. It never falls back to hidden simulator objects to keep choosing lights.",
       "Recovery requires usable new images, the all-red interval and clear observations. An operator request cannot bypass this condition.",

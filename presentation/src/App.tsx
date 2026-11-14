@@ -290,19 +290,17 @@ export default function App() {
         <PresentationDeck index={slideIndex} onIndex={setSlideIndex} onDemo={launchDemo} />
       ) : (
         <main className="live-stage thinking-layout">
-          <div className="live-windows">
-            <section className="live-visual">
-            <IntersectionCanvas state={state} cameraEnabled={cameraEnabled} onFrame={receiveScreenshot} />
+          <IntersectionCanvas state={state} cameraEnabled={cameraEnabled} onFrame={receiveScreenshot} />
+          <div className="live-visual">
             <div className={`response-banner ${state.jamActive ? 'hot' : ''}`}>
               <strong>{state.operatorHold ? 'Reviewed hold — waiting for release' : state.adaptive ? 'Automatic traffic control' : 'Fixed signal cycle'}</strong>
               <span>{phaseLabel(state.phase)} · {state.phaseTimer.toFixed(1)}s remaining</span>
             </div>
-            <p className="sim-disclaimer">
-              Screenshot-driven control of simulated traffic. The detector reads canvas pixels to count and track traffic.
-              The historical LSTM forecast is separate; no real street camera is connected.
-            </p>
-          </section>
+            <VisionPanel frame={cameraSample?.pixels ?? null} vision={cameraSample?.vision ?? null} enabled={cameraEnabled} onEnabledChange={setCameraEnabled} />
+            <button type="button" className="accent" disabled={!cameraSample} onClick={() => openTraining('simulation')}>Teach a decision from this screenshot</button>
+          </div>
 
+          <div className="live-windows">
           <ControllerPanel state={state} onOverride={overrideDecisionAxis} />
 
           <aside className="live-panel">
@@ -532,8 +530,6 @@ export default function App() {
           </aside>
           </div>
 
-          <button type="button" className="accent" disabled={!cameraSample} onClick={() => openTraining('simulation')}>Teach a decision from this screenshot</button>
-          <VisionPanel frame={cameraSample?.pixels ?? null} vision={cameraSample?.vision ?? null} enabled={cameraEnabled} onEnabledChange={setCameraEnabled} />
           <AppliedDecisions state={state} />
           <details className="historical-model" onToggle={event => setShowHistory(event.currentTarget.open)}>
             <summary>Historical LSTM forecast — separate from light control</summary>

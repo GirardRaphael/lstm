@@ -126,7 +126,7 @@ export function VisionPanel({ frame, vision, enabled, onEnabledChange }: Props) 
     </header>
     <p>Snapshots of the intersection supply the traffic estimates used by the lights. The boxes below show the recognizer’s results.</p>
     <p className={`vision-status ${enabled && vision?.valid ? 'vision-status-ready' : ''}`} role="status">
-      {!enabled ? 'Camera paused. The last captured image stays here.' : !vision ? 'Waiting for the first screenshot.' : vision.valid ? `Captured at ${vision.capturedAt.toFixed(2)}s · ${vision.width} × ${vision.height} pixels` : `Image unavailable: ${vision.reason}`}
+      {!enabled ? (vision ? `Camera off — image frozen at ${vision.capturedAt.toFixed(2)}s. Current light status is shown above.` : 'Camera off. No screenshot has been captured yet.') : !vision ? 'Waiting for the first screenshot.' : vision.valid ? `Captured at ${vision.capturedAt.toFixed(2)}s · ${vision.width} × ${vision.height} pixels` : `Image unavailable: ${vision.reason}`}
     </p>
     <div className="vision-image">
       {frame ? <canvas ref={canvasRef} className="vision-canvas" aria-label="Captured intersection screenshot with detected vehicle and pedestrian boxes" /> : <p className="vision-empty">The first captured frame will appear here.</p>}

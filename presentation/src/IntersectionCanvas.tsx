@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef } from 'react'
-import { cameraReady } from './trafficController'
 import {
   CENTER,
   LANE_GAP,
@@ -617,27 +616,13 @@ export function IntersectionCanvas({ state, cameraEnabled = true, onFrame }: Pro
     const now = performance.now()
     if (cameraEnabled && onFrame && now - lastCapture.current >= 250) {
       lastCapture.current = now
-      // Capture the actual displayed canvas pixels, before any detection overlays.
+      // Capture raw scene pixels. VisionPanel displays this exact frame and adds
+      // labels afterward, so recognition never reads its own detection overlays.
       onFrame(ctx.getImageData(0, 0, SIZE, SIZE), state.elapsed)
     }
   }, [state, cameraEnabled, onFrame])
 
   return (
-    <div className="intersection-frame">
-      <canvas
-        ref={ref}
-        width={SIZE}
-        height={SIZE}
-        className="intersection-canvas"
-        aria-label="Two-dimensional traffic intersection simulation"
-      />
-      {state.controlSource === 'camera' && cameraReady(state) ? <svg
-        className="detection-overlay" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true">
-        {state.vision?.detections.map(detection => <rect key={detection.id}
-          x={detection.x} y={detection.y} width={detection.width} height={detection.height}
-          fill="none" stroke={detection.kind === 'pedestrian' ? '#f6bd60' : detection.kind === 'truck' ? '#c2a1ff' : '#55e3d4'}
-          strokeWidth="1.5" />)}
-      </svg> : null}
-    </div>
+    <canvas ref={ref} width={SIZE} height={SIZE} hidden aria-hidden="true" />
   )
 }

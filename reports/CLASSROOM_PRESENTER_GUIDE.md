@@ -47,7 +47,7 @@ Point to the architecture diagram. Name the four tasks and historical forecast. 
 
 ### 1:30–3:30 — Explain the observation boundary
 
-Launch the balanced demo. Point first to the intersection, then **What the camera sees**.
+Launch the balanced demo. Point to the single intersection view, **What the camera sees**, then its detection boxes and counts.
 
 > “The renderer produces the scene. The controller's camera input receives screenshot pixels, a capture time and previous pixel detections. It does not receive the hidden vehicle list or future arrivals. It identifies objects, estimates their approaches and tracks them between frames.”
 
@@ -127,7 +127,7 @@ Use the pedestrian preset, or create a visible crowd with the pedestrian count a
 
 ### C. Missing camera input
 
-Start a populated live scene and wait for a green phase. Turn **Camera on** off in **What the camera sees**. Show the camera hold, completed yellow and all-red. Turn the camera back on and allow fresh readable observations and clearance to arrive. Keep the simulation running: pausing also pauses the clock, so it cannot demonstrate elapsed stale-input time.
+Start a populated live scene and wait for a green phase. Turn **Camera on** off in **What the camera sees**. The camera image stays frozen; use the current light status above it and the controller panel to show the camera hold, completed yellow and all-red. Turn the camera back on and allow fresh readable observations and clearance to arrive. Keep the simulation running: pausing also pauses the clock, so it cannot demonstrate elapsed stale-input time.
 
 ### D. Fixed-cycle comparison
 

@@ -12,7 +12,7 @@ export const DEMO_SCENARIOS: Record<DemoScenarioId, {
     label: 'Balanced traffic',
     description: 'A repeatable starting scene with 12 cars and 4 trucks spread across all four approaches.',
     steps: [
-      'Watch the camera capture the rendered intersection and draw its detection boxes.',
+      'Watch the single camera view show each captured intersection image with its detection boxes.',
       'Read the NS and EW scores, selected direction, and reason in the controller panel.',
       'Observe green, yellow, and all-red transitions. New arrivals continue during the demonstration.',
     ],
@@ -40,7 +40,7 @@ export const DEMO_SCENARIOS: Record<DemoScenarioId, {
     description: 'Begin with a working camera, then turn it off during a green to demonstrate the missing-input response.',
     steps: [
       'Let the camera establish a clear view and wait for a vehicle green.',
-      'Turn Camera off. Watch the active green finish through yellow before all lights hold red.',
+      'Turn Camera off. The image freezes; read the current phase banner and controller as green finishes through yellow before all lights hold red.',
       'Turn Camera on. Recovery needs fresh clear images and the all-red interval before a new green can start.',
     ],
   },
