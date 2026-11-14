@@ -12,6 +12,16 @@ The lab now uses a COCO-pretrained **EfficientDet-Lite2** object detector and ap
 
 Street anomaly classification, human-taught signal recommendations and the existing simulated controller are separate. Validation of normal/anomaly classification does not validate light choices. The prepared roundabout dataset supplies no correct signal-action labels, so teaching those choices requires signalized footage or explicitly separate simulation examples.
 
+## Real traffic videos and anomaly training
+
+Select **Real traffic videos** to observe a real signalized intersection or upload your own recording. The included FLUID excerpt is 60 seconds long; 60 source frames are prepared locally. Watch the original, analyze a frozen frame, or step through a timed sequence to inspect object detections, anomaly estimates and learned action recommendations. The monitor does not command traffic lights. A model without enough human action labels abstains.
+
+Save spaced pictures, open a picture in Train & review, and add an independent normal/anomaly/uncertain review. Uncertain examples remain unlabeled. Supply a separate preferred light action only when the scene supports it. Anomaly review collection does not yet retrain the anomaly network; the existing training button trains light preferences only. Exported packages include original pixels, timestamps, recording groups and human labels; predictions are never converted into ground truth. Keep whole recordings together in train/calibration/test partitions. One clip is one group.
+
+Media are not committed to Git. Run `python scripts/setup_signalized_video.py` with FFmpeg (or optional `imageio-ffmpeg`) available to reproduce the licensed clip and 60 pictures. See [source and setup details](reports/REAL_TRAFFIC_VIDEO_SOURCE.md).
+
+A new anomaly classifier was actually trained on 2,550 publisher-labelled real aerial frames, with recording-separated model selection and calibration. It **failed validation and was not activated**: the retrospective test found 6/45 anomalies with 26 false alerts. The source is UIT-ADrone, not validated signalized-intersection violations. See [the complete retraining result](reports/STREET_ANOMALY_RETRAINING.md); no 90% reliability claim is supported.
+
 ## Live intersection and image gallery
 
 The live intersection previously on `observatory/phase2-v2-wiring` is now included here, with automatic decisions based on vehicles and pedestrians detected in screenshots of the simulation.
@@ -128,3 +138,5 @@ V1 modules remain for reproducibility and education. Their preprocessing is not 
 See [ROAD_PRODUCT_PLAN.md](ROAD_PRODUCT_PLAN.md) for current blockers and acceptance gates. The immediate product hypothesis is a read-only observatory that lets an engineer inspect observation quality and forecast errors. Local data access, untouched future/site holdouts and field interval coverage still require external validation. Local persistence, access controls, job isolation, calibration and recovery tests are implemented; managed identity/TLS, OS isolation and encrypted secret/backup handling are still required before shared hosting. More neurons or vehicle animation will not resolve these gaps.
 
 The step-by-step implementation and verification record is [IMPLEMENTATION_LOG.md](reports/IMPLEMENTATION_LOG.md).
+
+A subsequent 320px visual fine-tuning experiment trained the last MobileNetV3 blocks on publisher-labelled images while preserving the separate action encoder. It reduced retrospective test false alerts to 10/180 normal frames, but still detected only 6/45 anomalies and failed the separate development gate. It remains inactive. [Actual fine-tuning method, checks and results](reports/STREET_ANOMALY_FINETUNING.md). Neither experiment trained the light-choice model.

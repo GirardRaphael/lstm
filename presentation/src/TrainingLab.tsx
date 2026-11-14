@@ -1,41 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import './TrainingLab.css'
+import { videoFileFingerprint, resolveVideoRecording, type VideoExample } from './videoSampling'
 
-type Action = 'ns' | 'ew' | 'walk' | 'hold'
-type Domain = 'street' | 'simulation'
-type Source = 'dataset' | 'upload' | 'simulation'
-type Metrics = Record<string, unknown>
-type Detection = {
-  available: boolean; model?: string; model_version?: string; pretrained_on?: string; telemetry_notice?: string
-  objects?: { class_id: number; class_name: string; score: number; box: [number, number, number, number] }[]
-  counts?: Record<string, number>; score_threshold?: number; scores_calibrated?: boolean
-  latency_ms?: number; image_size?: [number, number]; target?: number; target_met?: boolean
-  evaluation?: { precision: number; recall: number; f1: number; images: number; iou_threshold: number; scope: string } | null
-  reason?: string
-}
-type PolicyStatus = {
-  trained: boolean; count: number; group_count: number; label_counts: Partial<Record<Action, number>>
-  requirements?: { min_samples: number; min_groups: number; min_per_action: number }
-  reason?: string; model_version?: string | null; metrics?: Metrics | null; calibrated?: boolean; evaluation_reused?: boolean
-  reliability_target?: number; confidence_threshold?: number; target_met?: boolean | null; target_reason?: string; interval_limitation?: string
-}
-type Status = {
-  ok: boolean
-  detection?: Detection
-  vision: { available: boolean; model_version?: string; metrics?: Metrics | null; reason?: string; calibrated?: boolean; deployment_ready?: boolean; validation_passed?: boolean; adequate?: boolean; evaluation_reused?: boolean; validation_result?: unknown }
-  policy: Partial<Record<Domain, PolicyStatus>>
-  dataset: { available: boolean; total: number; counts?: Record<string, number> }
-}
-type Sample = { sample_id: string; source_video: string; split: string; label: number | string; class_name: string; image_url: string }
-type Samples = { ok: boolean; samples: Sample[]; total: number }
-type Analysis = {
-  ok: boolean; snapshot_id: string; domain: Domain; group_id: string; decision_teaching_allowed?: boolean; image_url?: string; detection?: Detection
-  anomaly?: { anomaly_probability?: number | null; calibrated?: boolean; decision?: string; model_version?: string; reason?: string; [key: string]: unknown }
-  policy: { trained?: boolean; action?: Action | null; suggested_action?: Action | null; probabilities?: Partial<Record<Action, number>> | null; confidence?: number | null; calibrated?: boolean; abstain?: boolean; reason?: string; model_version?: string | null; confidence_threshold?: number; reliability_target?: number; target_met?: boolean | null; target_reason?: string }
-}
-type Candidate = { preview: string; title: string; domain: Domain; groupId: string; sampleId?: string; dataUrl?: string }
-type Props = { frame: ImageData | null; simulationSessionId?: string; initialSource?: Source; onStartSimulation?: () => void; onApply?: (action: Action) => void }
+import type { Action, Analysis, AnomalyJudgement, AnomalyReview, Candidate, Detection, Domain, Metrics, PolicyStatus, Samples, Source, Status } from './learningTypes'
+
+type Props = { frame: ImageData | null; simulationSessionId?: string; initialSource?: Source; initialReview?: Analysis | null; onOpenVideos?: () => void; onStartSimulation?: () => void; onApply?: (action: Action) => void }
 const ACTIONS: { value: Action; label: string; detail: string }[] = [
   { value: 'ns', label: 'North / south', detail: 'Serve the vertical road' },
   { value: 'ew', label: 'East / west', detail: 'Serve the horizontal road' },
@@ -93,6 +63,45 @@ function AnomalyConfusion({ metrics }: { metrics?: Metrics | null }) {
   return <div className="lab-confusion"><h3>What the anomaly model actually got right and wrong</h3><dl className="lab-metric-grid"><div><dt>Correctly recognized normal</dt><dd>{values[0][0]}</dd></div><div><dt>False alerts on normal frames</dt><dd>{values[0][1]}</dd></div><div><dt>Missed anomalies</dt><dd>{values[1][0]}</dd></div><div><dt>Detected anomalies</dt><dd>{values[1][1]}</dd></div></dl></div>
 }
 
+const ANOMALY_CHOICES: { value: AnomalyJudgement; label: string; detail: string }[] = [
+  { value: 'normal', label: 'No anomaly visible', detail: 'I see no clear anomaly in this frame.' },
+  { value: 'anomaly', label: 'Visible anomaly', detail: 'I can identify an unusual event or behavior.' },
+  { value: 'uncertain', label: 'Cannot judge', detail: 'The scene needs more context or clearer footage.' },
+]
+
+function HumanAnomalyReview({ analysis, disabled, onSaved }: { analysis: Analysis; disabled: boolean; onSaved: (review: AnomalyReview) => void }) {
+  const [judgement, setJudgement] = useState<AnomalyJudgement | ''>('')
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const controller = useRef<AbortController | null>(null)
+  useEffect(() => () => controller.current?.abort(), [])
+  const previous = analysis.anomaly_review
+  const save = async () => {
+    if (!judgement || saving || disabled) return
+    const pending = new AbortController(); controller.current = pending
+    setSaving(true); setError(''); setNotice('')
+    try {
+      const result = await request<{ snapshot_id: string; anomaly_review: AnomalyReview }>('anomaly-feedback', { method: 'POST', signal: pending.signal, body: JSON.stringify({ snapshot_id: analysis.snapshot_id, judgement, reason }) })
+      if (pending.signal.aborted) return
+      if (result.snapshot_id !== analysis.snapshot_id) throw new Error('The saved review does not match this frame. Reopen the frame before reviewing it again.')
+      onSaved(result.anomaly_review)
+      setNotice(judgement === 'uncertain' ? 'Saved as uncertain. This records your uncertainty and supplies no normal/anomaly training label.' : 'Saved your human anomaly label for this frame. The active model has not changed.')
+    } catch (error) { if (!pending.signal.aborted) setError(errorMessage(error)) }
+    finally { if (!pending.signal.aborted) setSaving(false) }
+  }
+  return <section className="lab-teaching" aria-label="Human anomaly review">
+    <h2>Review the visible scene</h2><p>Give your own anomaly judgement for the exact real image above. This label is separate from a preferred light action and from the model’s prediction. A single frame may not reveal motion, the signal state or whether a rule was broken; choose “Cannot judge” when that context is missing.</p>
+    {previous ? <p className="lab-notice"><b>Previously saved human review: {ANOMALY_CHOICES.find(choice => choice.value === previous.judgement)?.label ?? previous.judgement}.</b>{previous.reason ? ` Observation: ${previous.reason}` : ''}</p> : null}
+    <fieldset disabled={disabled || saving}><legend>Your judgement · choose independently of the prediction</legend><div className="lab-action-options">{ANOMALY_CHOICES.map(choice => <label key={choice.value} className={judgement === choice.value ? 'selected' : ''}><input type="radio" name="human-anomaly-review" value={choice.value} checked={judgement === choice.value} onChange={() => { setJudgement(choice.value); setNotice('') }} /><span><b>{choice.label}</b><small>{choice.detail}</small></span></label>)}</div></fieldset>
+    <label className="lab-recording">Optional observation note<input value={reason} onChange={event => setReason(event.target.value)} maxLength={2000} disabled={disabled || saving} placeholder="Describe what you can see, or what makes this frame uncertain." /><span>Describe visible evidence. Avoid guessing an unseen signal or intention.</span></label>
+    {error ? <p className="lab-error" role="alert">{error}</p> : null}{notice ? <p className="lab-notice" role="status">{notice}</p> : null}
+    <div className="lab-actions"><button type="button" className="lab-button primary" disabled={!judgement || disabled || saving} onClick={() => void save()}>{saving ? 'Saving anomaly review…' : previous ? 'Update my anomaly review' : 'Save my anomaly review'}</button></div>
+    <p className="lab-note">These reviews are saved for future anomaly training. For video frames, “Download images + label manifest” in the video monitor includes these reviews; standalone image reviews are currently stored locally without that video-package export. Saving a review does not train the model. The anomaly model needs a matching training workflow and separate recordings for fitting, calibration and evaluation. “Cannot judge” exports an uncertainty record with no class label. The “Train decision model” button below trains light preferences only.</p>
+  </section>
+}
+
 function FrozenPreview({ candidate, analysis }: { candidate: Candidate; analysis: Analysis | null }) {
   const [loadedUrl, setLoadedUrl] = useState('')
   const url = analysis?.image_url ?? candidate.preview
@@ -147,21 +156,6 @@ function collectionSessionId(): string {
   }
 }
 
-async function videoFingerprint(file: File): Promise<string> {
-  // Sample stable file bytes rather than its name or modification time, so renamed
-  // copies of a recording cannot silently become independent evaluation groups.
-  const blockSize = 64 * 1024
-  const starts = [0, Math.max(0, Math.floor((file.size - blockSize) / 2)), Math.max(0, file.size - blockSize)]
-  const blocks = await Promise.all(starts.map(start => file.slice(start, Math.min(file.size, start + blockSize)).arrayBuffer()))
-  const prefix = new TextEncoder().encode(`video-size:${file.size};`)
-  const bytes = new Uint8Array(prefix.length + blocks.reduce((size, block) => size + block.byteLength, 0))
-  bytes.set(prefix)
-  let offset = prefix.length
-  for (const block of blocks) { bytes.set(new Uint8Array(block), offset); offset += block.byteLength }
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
 function captureMedia(source: HTMLImageElement | HTMLVideoElement, width: number, height: number): string {
   if (!width || !height) throw new Error('Wait until the image or video frame has loaded.')
   const scale = Math.min(1, 1600 / Math.max(width, height))
@@ -173,22 +167,23 @@ function captureMedia(source: HTMLImageElement | HTMLVideoElement, width: number
   return canvas.toDataURL('image/jpeg', 0.93)
 }
 
-export function TrainingLab({ frame, simulationSessionId, initialSource = 'upload', onStartSimulation, onApply }: Props) {
+export function TrainingLab({ frame, simulationSessionId, initialSource = 'upload', initialReview, onOpenVideos, onStartSimulation, onApply }: Props) {
   const [source, setSource] = useState<Source>(initialSource)
   const [status, setStatus] = useState<Status | null>(null)
   const [samples, setSamples] = useState<Samples | null>(null)
   const [offset, setOffset] = useState(0)
   const [candidate, setCandidate] = useState<Candidate | null>(() => {
+    if (initialReview?.image_url) return { preview: initialReview.image_url, domain: 'street', groupId: initialReview.group_id, video: initialReview.video, title: initialReview.video ? `${initialReview.video.name} · ${initialReview.video.timestamp_seconds.toFixed(2)} seconds` : 'Saved real traffic frame' }
     if (initialSource !== 'simulation' || !frame) return null
     const dataUrl = imageFromData(frame)
     return { preview: dataUrl, dataUrl, domain: 'simulation', groupId: simulationSessionId ?? collectionSessionId(), title: 'Frozen signalized intersection screenshot' }
   })
-  const [analysis, setAnalysis] = useState<Analysis | null>(null)
+  const [analysis, setAnalysis] = useState<Analysis | null>(initialReview ?? null)
   const [teachingAction, setTeachingAction] = useState<Action | ''>('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [video, setVideo] = useState<{ url: string; name: string; group: string } | null>(null)
+  const [video, setVideo] = useState<{ url: string; name: string; group: string; source_url?: string; license: string } | null>(null)
   const [videoReady, setVideoReady] = useState(false)
   const [recordingName, setRecordingName] = useState('')
   const [collectionId] = useState(collectionSessionId)
@@ -235,8 +230,10 @@ export function TrainingLab({ frame, simulationSessionId, initialSource = 'uploa
     const url = objectUrl.current
     try {
       if (file.type.startsWith('video/')) {
-        const fingerprint = await videoFingerprint(file)
-        setVideo({ url, name: file.name, group: `video-${fingerprint}` })
+        const fingerprint = await videoFileFingerprint(file)
+        const library = await request<{ videos: VideoExample[] }>('video-examples')
+        const included = library.videos.find(item => item.upload_fingerprint === fingerprint)
+        setVideo({ url, name: included?.title ?? file.name, group: resolveVideoRecording(fingerprint, library.videos), source_url: included?.source_url, license: included?.license ?? 'User-provided recording; permissions not verified' })
       } else if (file.type.startsWith('image/')) {
         setVideo(null)
         const image = new Image(); image.src = url
@@ -252,14 +249,28 @@ export function TrainingLab({ frame, simulationSessionId, initialSource = 'uploa
     try {
       element.pause()
       const dataUrl = captureMedia(element, element.videoWidth, element.videoHeight)
-      chooseCandidate({ preview: dataUrl, dataUrl, domain: 'street', groupId: video.group, title: `${video.name} · ${element.currentTime.toFixed(2)} seconds` })
+      chooseCandidate({ preview: dataUrl, dataUrl, domain: 'street', groupId: video.group, video: { recording_id: video.group, name: video.name, timestamp_seconds: element.currentTime, ...(video.source_url ? { source_url: video.source_url } : {}), license: video.license }, title: `${video.name} · ${element.currentTime.toFixed(2)} seconds` })
     } catch (error) { setError(errorMessage(error)) }
   }
   const analyze = async () => {
     if (!candidate) return
     setBusy('analyze'); setError(''); setNotice(''); setAnalysis(null); setTeachingAction('')
-    const payload = candidate.sampleId ? { sample_id: candidate.sampleId } : { image_data_url: candidate.dataUrl, domain: candidate.domain, group_id: candidate.groupId }
-    try { setAnalysis(await request<Analysis>('analyze', { method: 'POST', body: JSON.stringify(payload) })) } catch (error) { setError(errorMessage(error)) } finally { setBusy('') }
+    try {
+      let dataUrl = candidate.dataUrl
+      if (!candidate.sampleId && !dataUrl) {
+        const response = await fetch(candidate.preview)
+        if (!response.ok) throw new Error('The saved frame could not be loaded. Return to Real traffic videos and select it again.')
+        const blob = await response.blob()
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result))
+          reader.onerror = () => reject(new Error('The saved frame could not be read.'))
+          reader.readAsDataURL(blob)
+        })
+      }
+      const payload = candidate.sampleId ? { sample_id: candidate.sampleId } : { image_data_url: dataUrl, domain: candidate.domain, group_id: candidate.groupId, video: candidate.video }
+      setAnalysis(await request<Analysis>('analyze', { method: 'POST', body: JSON.stringify(payload) }))
+    } catch (error) { setError(errorMessage(error)) } finally { setBusy('') }
   }
   const teach = async () => {
     if (!analysis || !teachingAction || !teachingAllowed) return
@@ -287,7 +298,7 @@ export function TrainingLab({ frame, simulationSessionId, initialSource = 'uploa
       <article><span className="lab-eyebrow">Learned light decisions · {domain === 'street' ? 'street images' : 'app screenshots'}</span><strong>{policyStatus?.trained ? 'Trained on human choices' : 'Not trained yet'}</strong><p>{policyStatus?.reason ?? 'Needs your labeled examples before it can make learned recommendations.'}</p></article>
     </div>
     {missedAllAnomalies ? <p className="lab-error" role="status"><b>The current baseline missed all {String(status?.vision.metrics?.positives)} held-out anomalies.</b> Its {percent(status?.vision.metrics?.accuracy as number)} overall accuracy comes from predicting normal; anomaly recall is 0%. These probabilities are for inspection, not reliable anomaly warnings or signal control.</p> : status?.vision.deployment_ready === false ? <p className="lab-note">The street recognition model is experimental and has not passed deployment validation. Review its recorded error rates before interpreting a confidence value.</p> : null}
-    <section className="lab-teaching-start"><h2>Start with an intersection that has lights</h2><p>The roundabout collection measures anomaly recognition. It cannot teach which signal should turn green. For real-world teaching, upload a signalized intersection image or video with enough visible context to choose an action.</p><div className="lab-actions"><button type="button" className="lab-button primary" disabled={Boolean(busy)} onClick={() => changeSource('upload')}>Use real intersection footage</button>{onStartSimulation ? <button type="button" className="lab-button" disabled={Boolean(busy)} onClick={onStartSimulation}>Create a signalized practice scene</button> : null}</div><p className="lab-note">Practice scenes are simulated and train a separate practice model. In the live view, press “Teach a decision from this screenshot” to freeze the scene and return directly to labeling. No action labels are filled in for you.</p></section>
+    <section className="lab-teaching-start"><h2>Start with an intersection that has lights</h2><p>The roundabout collection measures anomaly recognition. It cannot teach which signal should turn green. For real-world teaching, upload a signalized intersection image or video with enough visible context to choose an action.</p><div className="lab-actions">{onOpenVideos ? <button type="button" className="lab-button primary" disabled={Boolean(busy)} onClick={onOpenVideos}>{initialReview ? 'Return to real traffic videos' : 'Monitor real traffic videos'}</button> : null}<button type="button" className="lab-button" disabled={Boolean(busy)} onClick={() => changeSource('upload')}>Use real intersection footage</button>{onStartSimulation ? <button type="button" className="lab-button" disabled={Boolean(busy)} onClick={onStartSimulation}>Create a signalized practice scene</button> : null}</div><p className="lab-note">Practice scenes are simulated and train a separate practice model. In the live view, press “Teach a decision from this screenshot” to freeze the scene and return directly to labeling. No action labels are filled in for you.</p></section>
     <div className="lab-source-tabs" aria-label="Image source">
       {([{ key: 'dataset', label: 'Roundabouts · recognition only' }, { key: 'upload', label: 'Your image or video' }, { key: 'simulation', label: 'App screenshot' }] as const).map(item => <button type="button" key={item.key} aria-pressed={source === item.key} className={source === item.key ? 'selected' : ''} onClick={() => changeSource(item.key)} disabled={Boolean(busy)}>{item.label}</button>)}
     </div>
@@ -298,7 +309,7 @@ export function TrainingLab({ frame, simulationSessionId, initialSource = 'uploa
     </div> : source === 'upload' ? <div className="lab-source-panel">
       <label className="lab-upload-label">Choose a street image or video<input type="file" accept="image/*,video/*" onChange={event => void upload(event)} disabled={Boolean(busy)} /></label>
       <p className="lab-note">Video stays in your browser. Seek to a moment, pause, then capture one frame. Only that frame is sent to the local model service. Large frames are resized to at most 1,600 pixels on their longest edge.</p>
-      {video ? <div className="lab-video"><video ref={videoRef} src={video.url} controls preload="metadata" onLoadedData={() => setVideoReady(true)} onSeeking={() => setVideoReady(false)} onSeeked={() => setVideoReady(true)} onError={() => setError('This browser could not read the video. Try an MP4 video or upload a still image.')} /><button type="button" className="lab-button" onClick={captureVideo} disabled={Boolean(busy) || !videoReady}>Capture this video frame</button><p className="lab-note">All frames from this file stay in one recording group.</p></div> : <label className="lab-recording">Recording name for still images <input value={recordingName} onChange={event => { const name = event.target.value; setRecordingName(name); setCandidate(previous => previous && !previous.sampleId ? { ...previous, groupId: name.trim() || collectionId } : previous); setAnalysis(null); setTeachingAction('') }} placeholder="For example: junction-camera-1-monday" disabled={Boolean(busy)} /><span>Use the same name for every frame from the same recording. Without a name, all images in this browser session stay in one group, including after changing app tabs.</span></label>}
+      {video ? <div className="lab-video"><video ref={videoRef} src={video.url} controls preload="metadata" onLoadedData={() => setVideoReady(true)} onSeeking={() => setVideoReady(false)} onSeeked={() => setVideoReady(true)} onError={() => setError('This browser could not read the video. Try an MP4 video or upload a still image.')} /><button type="button" className="lab-button" onClick={captureVideo} disabled={Boolean(busy) || !videoReady}>Capture this video frame</button><p className="lab-note">All frames from this file stay in one recording group.</p></div> : candidate?.video ? <p className="lab-note">Recording group: {candidate.video.recording_id}. Every frame from this recording stays together for training and evaluation.</p> : <label className="lab-recording">Recording name for still images <input value={recordingName} onChange={event => { const name = event.target.value; setRecordingName(name); setCandidate(previous => previous && !previous.sampleId ? { ...previous, groupId: name.trim() || collectionId } : previous); setAnalysis(null); setTeachingAction('') }} placeholder="For example: junction-camera-1-monday" disabled={Boolean(busy)} /><span>Use the same name for every frame from the same recording. Without a name, all images in this browser session stay in one group, including after changing app tabs.</span></label>}
     </div> : <div className="lab-source-panel"><p>Freeze the current intersection screenshot. The app’s graphics are outside the street model’s training domain, so street anomaly confidence is not shown here. App and street teaching examples train separate decision models.</p><button type="button" className="lab-button primary" disabled={Boolean(busy) || !frame} onClick={captureSimulation}>Capture app screenshot</button>{!frame ? <p className="lab-note">Open the live intersection first to capture a frame, then return here.</p> : null}<p className="lab-note">Screenshots from one simulation episode share a recording group. Reset the live intersection to begin a genuinely new episode.</p></div>}
     {error ? <p className="lab-error" role="alert">{error}</p> : null}
     {notice ? <p className="lab-notice" role="status">{notice}</p> : null}
@@ -310,9 +321,12 @@ export function TrainingLab({ frame, simulationSessionId, initialSource = 'uploa
         <div className="lab-result"><h3>Learned light recommendation</h3><strong>{analysis.policy.action ? actionName(analysis.policy.action) : analysis.policy.abstain ? 'Model abstained' : 'No trained recommendation'}</strong><p>{analysis.policy.reason}</p>{typeof analysis.policy.confidence === 'number' ? <><p>Top-action {analysis.policy.calibrated ? 'calibrated probability' : 'uncalibrated score'}: <b>{percent(analysis.policy.confidence)}</b></p><p className="lab-note">This is a model probability, not a measured success rate. The separate 90% reliability target must be checked against held-out human choices; neither proves safety or optimal traffic flow.</p></> : null}{analysis.policy.probabilities ? <ul className="lab-probabilities">{ACTIONS.map(item => <li key={item.value}><span>{item.label}</span><b>{percent(analysis.policy.probabilities?.[item.value])}</b></li>)}</ul> : null}<p className="lab-note">{analysis.policy.target_met === true ? 'The recorded experiment met its human-label agreement target. ' : 'The 90% held-out reliability target has not been demonstrated. '}Recommendations require human review. Uploaded street images never control the simulation or real infrastructure.</p>{analysis.policy.action && !analysis.policy.abstain && teachingAllowed ? <button type="button" className="lab-button" disabled={Boolean(busy)} onClick={() => { if (analysis.policy.action) setTeachingAction(analysis.policy.action) }}>Use suggested action</button> : null}</div>
       </> : <p className="lab-empty">Analyze an image to see its actual model outputs. No prediction is generated from a label you have not supplied.</p>}</article>
     </div>
+    {source === 'upload' && analysis?.domain === 'street' && analysis.snapshot_id && !candidate?.sampleId ? <HumanAnomalyReview key={analysis.snapshot_id} analysis={analysis} disabled={Boolean(busy)} onSaved={review => setAnalysis(current => current?.snapshot_id === analysis.snapshot_id ? { ...current, anomaly_review: review } : current)} /> : null}
     <section className="lab-teaching"><h2>3. Teach the light-decision model</h2><p>For the exact image above, choose the action you would prefer. For street examples, north/south means the vertical road and east/west the horizontal road in the image. If the road layout, motion or signal state does not support a choice, skip the frame. Choose “Hold all red” only when holding traffic is your intended action.</p>{candidate?.sampleId ? <p className="lab-notice">These roundabout images have no verified signal layout. They can be used to inspect anomaly recognition, but cannot supply correct north/south or east/west light labels. Upload a signalized intersection recording to teach light choices.</p> : null}<fieldset disabled={!teachingAllowed || Boolean(busy)}><legend>Your preferred action</legend><div className="lab-action-options">{ACTIONS.map(item => <label key={item.value} className={teachingAction === item.value ? 'selected' : ''}><input type="radio" name="teaching-action" value={item.value} checked={teachingAction === item.value} onChange={() => setTeachingAction(item.value)} /><span><b>{item.label}</b><small>{item.detail}</small></span></label>)}</div></fieldset><div className="lab-actions"><button type="button" className="lab-button primary" disabled={!teachingAllowed || !teachingAction || Boolean(busy)} onClick={() => void teach()}>Save teaching example</button>{analysis?.domain === 'simulation' && onApply ? <button type="button" className="lab-button" disabled={!teachingAction || Boolean(busy)} onClick={() => { if (teachingAction) onApply(teachingAction) }}>Apply my reviewed choice in the simulation</button> : null}</div><p className="lab-note">Teaching labels are your preferences. The model does not create its own correct answers, and saving an example does not immediately retrain it. Missing motion, signal-state or visibility information can make a single-frame choice unreliable.</p></section>
     <section className="lab-training"><div><h2>4. Train from your examples</h2><p>{domain === 'street' ? 'Street image' : 'App screenshot'} decision model · {policyStatus?.trained ? `version ${policyStatus.model_version ?? 'available'}` : 'not trained'}</p></div><div className="lab-counts"><span><b>{policyStatus?.count ?? 0} / {requirements.min_samples}</b> human labels</span><span><b>{policyStatus?.group_count ?? 0} / {requirements.min_groups}</b> recording groups</span>{ACTIONS.map(item => <span key={item.value}><b>{policyStatus?.label_counts[item.value] ?? 0} / {requirements.min_per_action}</b> {item.label}</span>)}</div><p className="lab-note">Recordings are separated for fitting, calibration and evaluation. More frames from one recording do not replace independent recordings. These minimums make evaluation possible; they do not establish that the policy is ready for a real road.</p><ReliabilityEvidence policy={policyStatus} /><button type="button" className="lab-button primary" onClick={() => void train()} disabled={Boolean(busy) || !enoughLabels}>{policyStatus?.trained ? 'Retrain decision model' : 'Train decision model'}</button>{!enoughLabels ? <p className="lab-note">Collect at least {requirements.min_samples} human labels across {requirements.min_groups} recording groups, with {requirements.min_per_action} examples of every action, to enable training.</p> : null}{policyStatus?.evaluation_reused ? <p className="lab-note">This evaluation has been viewed during earlier training rounds. Treat repeated results as retrospective feedback, not a new untouched test.</p> : null}<MetricEvidence metrics={policyStatus?.metrics} label="View held-out light-decision evaluation" /></section>
     <section className="lab-evidence"><h2>Object detection evidence</h2><DetectionEvidence detection={status?.detection} compact /></section>
-    <section className="lab-evidence"><h2>Street anomaly evidence</h2><p>Street anomaly evaluation and light-decision evaluation answer different questions. Good normal/anomaly classification does not prove that a chosen traffic light is safe or efficient. Real footage can differ from the aerial training data; high confidence can still be wrong.</p>{status?.vision.metrics ? <dl className="lab-metric-grid">{METRIC_NAMES.filter(item => ['accuracy', 'balanced_accuracy', 'precision', 'recall'].includes(item.key) && typeof status.vision.metrics?.[item.key] === 'number').map(item => <div key={item.key}><dt>{item.label}</dt><dd>{percent(status.vision.metrics?.[item.key] as number)}</dd></div>)}</dl> : null}{alwaysNormalAccuracy !== null ? <p className="lab-note"><b>Always-normal baseline: {percent(alwaysNormalAccuracy)} accuracy{anomalyCount > 0 ? ', with 0% anomaly recall' : ''}.</b> A useful anomaly model must improve on this simple baseline; overall accuracy alone can hide missed anomalies.</p> : null}{status?.vision.evaluation_reused ? <p className="lab-notice">Several candidate models have been inspected on this historical evaluation set. These results are retrospective. A new recording set must remain untouched to confirm performance.</p> : null}<AnomalyConfusion metrics={status?.vision.metrics} /><MetricEvidence metrics={status?.vision.metrics} label="View real-image anomaly evaluation" /></section>
+    <section className="lab-evidence"><h2>320px visual fine-tuning · rejected, inactive</h2><p>A separate MobileNetV3Small updated its final visual layers using real publisher-labelled aerial frames. It found only 1 of 21 anomalies on separate threshold-validation recordings (4.76% recall; required at least 40%), so it failed the activation gate and has not replaced the default model.</p><p>On the previously inspected test set: <b>6 detected anomalies, 39 missed anomalies, 10 false alerts and 170 correct normal predictions</b> — 37.5% precision and 13.33% recall. These are retrospective results, not validation of the included signalized camera. The object detector and action-teaching encoder were unchanged.</p><a href="/classroom/evidence/STREET_ANOMALY_FINETUNING.md" target="_blank" rel="noreferrer">Read the fine-tuning design, validation gate and complete results</a></section>
+    <section className="lab-evidence"><details><summary>Earlier frozen-feature anomaly experiment · rejected</summary><p>A new classifier was fitted on 2,550 real labelled frames from 35 recordings. It failed its separate validation gate and has not replaced the active model. On the previously viewed test set it detected 6 of 45 anomalies, missed 39 and raised 26 false alerts among 180 normal frames.</p><p><b>Rejected candidate: 18.75% anomaly precision, 13.33% recall.</b> These results do not establish recognition of red-light violations or jaywalking in the new signalized video.</p><a href="/classroom/evidence/STREET_ANOMALY_RETRAINING.md" target="_blank" rel="noreferrer">Read the complete training method and results</a></details></section>
+      <section className="lab-evidence"><h2>Street anomaly evidence</h2><p>Street anomaly evaluation and light-decision evaluation answer different questions. Good normal/anomaly classification does not prove that a chosen traffic light is safe or efficient. Real footage can differ from the aerial training data; high confidence can still be wrong.</p>{status?.vision.metrics ? <dl className="lab-metric-grid">{METRIC_NAMES.filter(item => ['accuracy', 'balanced_accuracy', 'precision', 'recall'].includes(item.key) && typeof status.vision.metrics?.[item.key] === 'number').map(item => <div key={item.key}><dt>{item.label}</dt><dd>{percent(status.vision.metrics?.[item.key] as number)}</dd></div>)}</dl> : null}{alwaysNormalAccuracy !== null ? <p className="lab-note"><b>Always-normal baseline: {percent(alwaysNormalAccuracy)} accuracy{anomalyCount > 0 ? ', with 0% anomaly recall' : ''}.</b> A useful anomaly model must improve on this simple baseline; overall accuracy alone can hide missed anomalies.</p> : null}{status?.vision.evaluation_reused ? <p className="lab-notice">Several candidate models have been inspected on this historical evaluation set. These results are retrospective. A new recording set must remain untouched to confirm performance.</p> : null}<AnomalyConfusion metrics={status?.vision.metrics} /><MetricEvidence metrics={status?.vision.metrics} label="View real-image anomaly evaluation" /></section>
   </section>
 }

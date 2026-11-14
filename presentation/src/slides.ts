@@ -41,7 +41,7 @@ export const SLIDES: Slide[] = [
     "visual": "intersection",
     "notes": [
       "Opening: “My project investigates how a system can turn visible traffic into a proposed light decision, and how we can check whether that decision deserves our trust.”",
-      "The demonstration has two practical parts: a running simulated intersection that responds to screenshots, and a learning lab that analyzes real photographs or app screenshots and stores explicit human action labels.",
+      "The demonstration combines a simulated intersection responding to screenshots with a real-footage monitor and a learning lab. The monitor samples a reusable licensed signalized-intersection clip, displays exact-frame visual outputs and collects pictures for explicit human review.",
       "State the boundary once at the start: this is a local research and teaching application. It is not connected to a city camera or physical traffic signals.",
       "The main presentation is designed for roughly 20 minutes, including demonstrations. Appendix slides supply extra technical detail for questions. The notes are a reference, not a script that must be read word for word."
     ],
@@ -611,17 +611,17 @@ export const SLIDES: Slide[] = [
     "chapter": "Real-image recognition",
     "duration": "0:45",
     "variant": "warning",
-    "kicker": "16 · A result that changes the plan",
+    "kicker": "16 · Historical baseline, still the default",
     "title": "80% accuracy can hide complete failure.",
     "bullets": [
-      "The fixed anomaly classifier labeled every test frame normal.",
+      "The historical/default classifier labeled every test frame normal.",
       "It missed all 45 anomalous frames: anomaly recall = 0%.",
       "“Always normal” also scores 80% on this 80/20 test set.",
       "Adding 1,500 training images did not fix this failure."
     ],
     "takeaway": "Compare against a simple baseline and report the errors the task actually cares about.",
     "notes": [
-      "This result belongs to the separate normal/anomaly image classifier, not EfficientDet-Lite2 and not the light-choice model.",
+      "This is the historical expanded baseline, which remains the active/default anomaly model because later candidates failed validation. It is separate from EfficientDet-Lite2 and the light-choice model.",
       "The classifier used frozen ImageNet MobileNetV3Small features, training-only standardization and balanced L2 logistic regression. A sigmoid probability calibrator was fitted on separate validation images; the classification cutoff stayed fixed at 0.5.",
       "Its test confusion matrix was 180 true normal predictions and 45 missed anomalies, with no positive predictions. Overall accuracy was 80%, balanced accuracy was 50%, and anomaly recall was zero.",
       "Rank-based average precision improved retrospectively from 0.3099 to 0.3752 after adding data, but the output probabilities stayed near 20% and the fixed-threshold decisions remained unusable.",
@@ -636,13 +636,64 @@ export const SLIDES: Slide[] = [
     ]
   },
   {
+    "id": "anomaly-finetuning",
+    "chapter": "Real-image recognition",
+    "duration": "1:00",
+    "variant": "warning",
+    "kicker": "Follow-up experiment · Actual visual fine-tuning",
+    "title": "Visual weights changed. Validation still failed.",
+    "bullets": [
+      "A separate 320px MobileNetV3Small updated its final visual blocks using publisher labels.",
+      "Separate recording validation found 1 of 21 anomalies: 4.76% recall; required ≥40%.",
+      "The candidate was rejected and remains inactive. Training completion is not validation."
+    ],
+    "metricRows": [
+      {
+        "label": "Retrospective anomaly precision",
+        "value": "37.5%",
+        "note": "6 true alerts / 16 alerts"
+      },
+      {
+        "label": "Retrospective anomaly recall",
+        "value": "13.3%",
+        "note": "6 found / 45 anomalies"
+      },
+      {
+        "label": "Retrospective false alerts",
+        "value": "10 / 180",
+        "note": "170 normal frames correctly left unflagged"
+      }
+    ],
+    "footer": "Previously inspected test set: TP 6 · FN 39 · FP 10 · TN 170. No new reliability claim.",
+    "takeaway": "Keep the failed candidate out of use; use its errors to design the next independent experiment.",
+    "notes": [
+      "This experiment genuinely changed visual convolution weights. It used a separate ImageNet MobileNetV3Small at 320×320, mean/max pooling and a regularized 64-unit head. The original 224px action encoder and pretrained object detector were unchanged.",
+      "The early image stem stayed frozen and was cached. Three head warm-up epochs were followed by five low-learning-rate epochs updating the final two inverted residual blocks and final convolution. Batch-normalization statistics and weights stayed frozen. Original images and deterministic mild brightness/contrast views used the publisher labels; no labels were invented.",
+      "Training gradients used 2,082 frames from 27 recordings. A different 468 frames from eight recordings chose the checkpoint. From the existing validation partition, 106 frames from four recordings calibrated scores and 119 from four other recordings selected the operating threshold. Whole recordings stayed separate.",
+      "The threshold-validation subset determined the 0.25823751 threshold under a 20% false-alert ceiling. Activation required at least 40% recall, at least 30% precision, at most 20% false alerts and positive calibration slope. Validation recall was only 1/21, or 4.76%; precision was 50% and one of 98 normal frames caused a false alert. The gate failed before test scoring.",
+      "On the 225-image historical test, the candidate found six anomalies, missed 39, raised ten false alerts and correctly left 170 normal frames unflagged. Precision was 37.5%, recall 13.33%, balanced accuracy 53.89% and overall accuracy 78.22%. The historical test had already been inspected, so these numbers are retrospective rather than fresh reliability evidence.",
+      "The candidate remains inactive. The default baseline is also inadequate; keeping a rejected replacement inactive does not make that baseline reliable. No verified anomaly labels were supplied for the included FLUID signalized footage. Single-frame appearance cannot establish red-light running or jaywalking without motion, geometry and signal context.",
+      "For a live observation example, use the top navigation Real traffic videos, choose the included FLUID clip and Analyze this frame. Show actual boxes, any missed vehicles, anomaly output and policy abstention. Return to Slideshow and select the next teaching slide; the video never controls any light."
+    ],
+    "sources": [
+      {
+        "label": "320px fine-tuning method, validation and test",
+        "href": "/classroom/evidence/STREET_ANOMALY_FINETUNING.md"
+      },
+      {
+        "label": "Included real signalized-footage provenance",
+        "href": "/classroom/evidence/REAL_TRAFFIC_VIDEO_SOURCE.md"
+      }
+    ]
+  },
+  {
     "id": "review-demo",
     "chapter": "Teaching decisions",
     "duration": "1:20",
     "variant": "hero",
     "kicker": "17 · Demonstration D",
     "title": "Teach a choice from\na signalized scene.",
-    "body": "Use an app screenshot for the class demonstration. Upload a real signalized intersection recording for street-model teaching.",
+    "body": "Teach from a simulated screenshot or an exact saved frame from Real traffic videos. The two action models stay separate.",
     "takeaway": "A human action label is new supervision; an object box alone is not a light label.",
     "visual": "training",
     "cue": "Open Train & review and choose Create a signalized practice scene. The roundabout gallery is for recognition only.",
@@ -659,11 +710,12 @@ export const SLIDES: Slide[] = [
     "notes": [
       "Use a prepared signalized simulation scene for a reliable classroom teaching demonstration. Open Live intersection, allow a fresh screenshot, then choose Teach a decision from this screenshot or select App screenshot in the lab.",
       "The supplied real street gallery contains roundabouts. It supports inspection of detections and anomaly labels, but cannot provide verified north/south or east/west signal choices. Say this explicitly if someone clicks a gallery image and finds teaching disabled.",
-      "For the real-image model, select Your image or video and upload a signalized recording. Seek to a frame, capture it, and analyze the frozen image. The vertical road is north/south and the horizontal road is east/west for the action labels.",
+      "For real footage, choose Real traffic videos in the top navigation, select the included licensed FLUID sample, then Analyze this frame or Observe video. Capture this frame & review opens the exact saved frame in the teaching workspace. A chosen model score is not a human label; inspect visible evidence before making your own judgement.",
       "Choose North / south, East / west, Pedestrian walk or Hold all red, then save. Do not automatically treat missing information as a correct all-red label; skip ambiguous frames unless you can justify the intended action.",
       "Saving stores your preference for that exact image. It does not immediately retrain the model. A suggested action still needs explicit human confirmation and saving.",
       "Do not save invented labels merely to make a progress bar fill. For class, demonstrate one real human choice and show the requirements. Correcting object boxes to retrain recognition is not implemented; these controls teach action preferences.",
-      "Street and simulation examples train separate models. Only an explicitly reviewed simulation choice can be applied to the simulator, through the existing clearance controller."
+      "Street and simulation examples train separate models. Only an explicitly reviewed simulation choice can be applied to the simulator, through the existing clearance controller.",
+      "Real saved frames now also accept an explicit anomaly review: No anomaly visible, Visible anomaly or Cannot judge, with an optional observation note. These reviews stay separate from light preferences; no choice is preselected, and saving does not train the anomaly model. Video packages include these human reviews for a future matching training workflow."
     ],
     "sources": [
       {
@@ -1111,7 +1163,7 @@ export const SLIDES: Slide[] = [
     "takeaway": "Name the component, the evidence and the limitation in the same answer.",
     "notes": [
       "“Can it recognize jaywalking or red-light violations?” Not reliably as implemented. Object detection provides locations and classes; movement-dependent violations also require trajectories, signal state, appropriate rules and verified violation labels.",
-      "“Can I improve it by reviewing the supplied gallery?” You can inspect model failures in the roundabout gallery. The current teaching controls save light-action preferences for a signalized screenshot or uploaded intersection scene. They do not correct bounding boxes, and roundabouts cannot supply verified light actions.",
+      "The publisher roundabout gallery remains recognition inspection only. Saved real uploads and video frames can receive explicit human anomaly judgements, including uncertainty, separately from light-action preferences. These controls do not correct bounding boxes; saving a review does not retrain a model. Publisher labels are not edited.",
       "“Does it learn while cars move?” The live screenshot controller follows fixed rules. The learner changes its classifier weights only after human examples are explicitly saved and training is requested. A live operator override is not a training label.",
       "“Why not use a huge neural model?” A more complex model might help with sufficient representative labels and evaluation. Here, frozen visual features plus a small classifier offer a tractable baseline; complexity alone does not solve missing action labels or weak domain coverage.",
       "“Does confidence mean safe?” No. The calibrated action probability is about agreement with human preferences, and even that must be tested. It is not a probability of legal, safe or optimal control.",

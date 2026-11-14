@@ -1,6 +1,6 @@
 # Classroom presenter guide: seeing traffic, explaining decisions
 
-This guide accompanies **Slideshow**, **Live intersection**, and **Train & review**. It supports a 15–20 minute talk, a shorter demonstration, and detailed questions afterward. Implementation and measured results are from November 14, 2026; the lab's live status is the authority for labels or models added later.
+This guide accompanies **Slideshow**, **Live intersection**, **Real traffic videos**, and **Train & review**. It supports a 15–20 minute talk, a shorter demonstration, and detailed questions afterward. Implementation and measured results are from November 14, 2026; the lab's live status is the authority for labels or models added later.
 
 ## Your central message
 
@@ -15,7 +15,9 @@ This describes a functioning classroom research prototype. It does not imply tha
 | Live screenshot perception | Pixels from the 800 × 800 simulated intersection | Estimated traffic, queues, waiting and occupied regions | Color/shape recognition and tracking, specialized to these graphics |
 | Live signal operation | Observations, requests and elapsed waiting | Phase, duration and explanation | Explicit rules plus a phase/clearance controller; demonstrated operation, not measured real-road superiority |
 | Real-image object recognition | Photograph or selected video frame | Boxes, classes and raw scores | COCO-pretrained EfficientDet-Lite2; 80.98% precision and 48.18% recall on a 500-image general benchmark |
-| Real-image anomaly experiment | Real aerial frame | Binary normal/anomaly probability | Frozen MobileNetV3Small features and trained logistic classifier; 0 of 45 test anomalies detected at the preset threshold |
+| Historical/default anomaly model | Real aerial frame | Binary normal/anomaly probability | Frozen MobileNetV3Small features and logistic classifier; 0 of 45 test anomalies detected |
+| Separate 320px visual fine-tuning | Real aerial frame | Candidate anomaly score | Final visual blocks updated; failed separate validation, remains inactive; retrospective test found 6/45 anomalies with 10 false alerts |
+| Real traffic video monitor | Included FLUID clip or local video | Exact-frame boxes, scores, anomaly estimate and learned preference/abstention | Serial processing-paced observation, frame capture and human review; no signal-control connection |
 | Human light-choice learning | Image features, observed counts and explicit action labels | Suggested action or abstention | Separate classifier, calibration and group-held-out evaluation; initially untrained |
 | Historical LSTM forecast | Stored sequence of hourly traffic volumes | Next-volume estimate | Separate recurrent network experiment; it does not choose the intersection lights |
 
@@ -28,7 +30,7 @@ For a spoken map, group these into four tasks: **recognize objects, recognize an
 3. Open **Train & review** → **Roundabouts · recognition only** → select a thumbnail → **Analyze this image**. First inference may take longer while models load. Confirm the source image, boxes and evidence panels appear.
 4. Open **Live intersection**. Confirm traffic moves, **Camera on** is checked, screenshots arrive, and the applied-decision log gains an entry.
 5. Rehearse the balanced, east-jam, pedestrian, camera-loss and fixed-cycle demo presets. Use **Return to slide** to keep your place in the talk.
-6. Prepare a readable signalized-intersection video or still that you may use. If its visible state cannot justify a light choice, skip the frame instead of inventing a label. The existing roundabout gallery is for recognition inspection, not signal teaching.
+6. Open **Real traffic videos**, select the included reusable FLUID clip, and rehearse **Analyze this frame**, **Observe video**, **Stop**, and **Capture this frame & review**. You may also use your own permitted signalized footage. If the visible state cannot justify a judgement, record uncertainty or skip the action instead of inventing a label.
 7. Decide whether to save a genuine teaching label during class. Saving changes the local collection. Analysis alone does not save an action or train a model.
 8. Download this guide, rehearse at the projected resolution, and check readability from the back of the room. Keep detailed notes for speaking rather than reading every line on screen.
 9. Keep a captured successful analysis and decision log as a fallback. Describe them as captured results if used; do not present a screenshot as live execution.
@@ -71,7 +73,7 @@ The last image may remain visible while stale input is rejected. This demonstrat
 
 ### 8:00–10:30 — Show real recognition and interpret 81%
 
-Open **Train & review**, select a real gallery frame and analyze it. Point out a visible detection and, where present, a missed object or questionable box.
+Open **Real traffic videos**, choose the included FLUID signalized clip, and press **Analyze this frame**. Briefly **Observe video**, then **Stop** to explain a completed result. Point out a detection and any visibly missed object or questionable box. The roundabout gallery remains an alternative for recognition inspection.
 
 > “This is a real photograph processed by pretrained EfficientDet-Lite2. It finds objects, not the best light action. On 500 fixed benchmark images, precision was 80.98% and recall 48.18%. Most accepted boxes were correct, but roughly half the labeled objects were missed.”
 
@@ -81,9 +83,9 @@ The benchmark is general COCO imagery containing vehicles, not an independent te
 
 Show data partitions and anomaly results.
 
-> “I expanded the aerial collection from 1,500 to 3,000 distinct real images, keeping whole recordings separate across training and evaluation. Their labels mean normal or anomalous; they are not object boxes or correct light actions. The expanded anomaly model still missed all 45 test anomalies. Its 80% accuracy matched always predicting normal.”
+> “I expanded the aerial collection from 1,500 to 3,000 distinct real images, keeping whole recordings separate across training and evaluation. Their labels mean normal or anomalous; they are not object boxes or correct light actions. The historical/default anomaly model still missed all 45 test anomalies. Its 80% accuracy matched always predicting normal. I then actually fine-tuned a separate 320px visual model, but it failed validation on different recordings and remains inactive.”
 
-Point to the confusion matrix. Ranking average precision improved retrospectively, but the fixed decision threshold remained ineffective. This is why overall accuracy alone is inadequate.
+Point to both anomaly slides. The default baseline missed all 45 test anomalies. The new visual fine-tune found only 1/21 anomalies on threshold validation, below the 40% recall requirement, so it was rejected. Its later retrospective test found 6/45 anomalies with ten false alerts: 37.5% precision and 13.3% recall. Training completed successfully; validation did not. Neither result supports a reliability claim for the included real intersection.
 
 ### 12:30–15:30 — Teach an action and explain training
 
@@ -150,6 +152,20 @@ North/south means the vertical road in this view; east/west means horizontal. A 
 Open **Live intersection**, wait for a captured frame, then press **Teach a decision from this screenshot**. The lab automatically opens **App screenshot** with the captured frame frozen. Press **Analyze this image**. Save a genuine preference if appropriate. **Apply my reviewed choice in the simulation** sends that reviewed request through the existing controller; it does not enable an autonomous learned street policy.
 
 Street and simulation labels train separate models. One simulation episode is one group. Many frames in one episode are not independent groups; resetting the same prepared scene repeatedly also does not create new environmental diversity.
+
+### H. Observe real traffic and collect reviewable pictures
+
+1. Use the top navigation **Real traffic videos**. Under **Included reusable footage**, select the FLUID signalized-intersection sample. Its source, license and attribution are available under **Recording source and training limits**.
+2. Press **Watch original video**, pause at a moment, then **Analyze this frame**. The single visual surface changes to the exact frozen frame. Point to predicted boxes and raw scores, then compare the counts with objects visibly missed. A small aerial vehicle can be present even when it has no box.
+3. Press **Observe video**. The app samples at the selected video-time interval, waits for each inference, and displays its result before advancing. This is processing-paced observation, not real-time infrastructure control. **Stop** or seeking cancels the current observation. A captured frame with no completed inference has no model results to present.
+4. Read the anomaly output and the separate **Learned signal preference**. Until a street decision model has sufficient reviewed examples and is trained, it says **Needs your reviewed examples**. A trained model may abstain. No command is sent to the recorded intersection or the live simulator.
+5. Choose **Capture this frame & review**, or **Collect spaced pictures** for a bounded batch. Saved images retain exact video timestamps and the same recording group. The gallery separately reports light-action reviews and anomaly reviews, including uncertainty.
+6. In **Train & review**, inspect the saved image. Under **Review the visible scene**, independently choose **No anomaly visible**, **Visible anomaly** or **Cannot judge** and an optional note. Nothing is preselected. A single frame may omit the motion or signal state needed to establish a violation. Save only your own defensible review.
+7. A preferred light action is a different label in **Teach the light-decision model**. Saving either type does not immediately train a model. The decision-training button uses action preferences; anomaly reviews are collected for a matching future anomaly-training workflow.
+8. **Return to real traffic videos** preserves the selected clip. **Download images + label manifest** exports the saved video frames with explicit human reviews; unreviewed actions remain empty, and uncertain anomaly reviews have no binary class label. Pagination keeps larger saved collections accessible.
+9. To resume the talk, open **Slideshow** and use **Choose slide**. There is no dedicated real-footage demo preset or automatic change to a physical light.
+
+The included clip provides authentic imagery, not verified optimal light choices or a camera-specific reliability result. Multiple frames from its one source recording must remain one group. Renamed copies of the installed clip map back to that source group. Edited excerpts from the same source must also stay together rather than becoming independent evaluation recordings.
 
 ## Technical explanation and speaking notes
 
@@ -240,7 +256,7 @@ New images came only from the original training recordings; all 450 held-out ima
 
 The original subset and both holdouts retain 80% normal / 20% anomaly. Expanded training is approximately 55.37% normal / 44.63% anomaly. Describing the entire expanded collection as uniformly 80/20 would be inaccurate.
 
-Training uses frozen ImageNet MobileNetV3Small features, standardization fitted on training data only, and balanced L2 logistic regression with fixed `C=0.1`. A sigmoid calibrator uses validation scores. The threshold remains 0.5; convolutional weights are not fine-tuned.
+The historical/default experiment used frozen ImageNet MobileNetV3Small features, training-only standardization and balanced L2 logistic regression with fixed `C=0.1`. A sigmoid calibrator used validation scores. Its threshold remained 0.5 and its convolutional weights were not fine-tuned. The separate later experiment below did update visual weights, but was rejected.
 
 | Actual label | Predicted normal | Predicted anomaly |
 |---|---:|---:|
@@ -250,6 +266,33 @@ Training uses frozen ImageNet MobileNetV3Small features, standardization fitted 
 Accuracy is 80%, anomaly recall 0%, and balanced accuracy 50%. Probabilities are nearly constant around 20%. Calibration can make a base-rate prediction look plausible without making individual cases distinguishable.
 
 A separate higher-resolution candidate found 42 of 45 anomalies but flagged 161 of 180 normal frames: 93.3% recall with only 20.7% precision. Quoting recall alone would hide false alarms. The expanded baseline remains the documented default. Repeated comparisons used an inspected test set, so they are retrospective; untouched recordings are needed for confirmation.
+
+### 6a. Separate 320px visual fine-tuning: trained, rejected, inactive
+
+A later experiment actually updated pretrained visual weights in a **separate** MobileNetV3Small at 320×320. It used mean and maximum pooling, a regularized 64-unit head and dropout. After three head warm-up epochs, five low-learning-rate epochs updated the final two inverted residual blocks and final convolution. The early stem and all batch-normalization weights/statistics stayed frozen. Deterministic mild brightness/contrast views supplemented the original fitting images; the labels remained the publisher's labels.
+
+| Role | Frames | Independent recording groups | What it could influence |
+|---|---:|---:|---|
+| Gradient fitting | 2,082 | 27 | Classifier and selected visual weights |
+| Checkpoint selection | 468 | 8 | Which fitting checkpoint to retain |
+| Probability calibration | 106 | 4 | Score calibration |
+| Threshold validation | 119 | 4 | Operating threshold and acceptance gate |
+| Historical test | 225 | 8 | Retrospective evaluation only |
+
+The operating threshold was **0.25823751**, selected on threshold-validation recordings under a 20% false-alert ceiling. Activation required recall at least 40%, precision at least 30%, false-alert rate at most 20%, and positive calibration slope. That validation subset found **1 of 21 anomalies (4.76% recall)**, with one false alert among 98 normal frames and 50% precision. The gate failed, so the candidate was rejected **before** test scoring.
+
+The previously inspected 225-image test produced:
+
+| Actual label | Predicted normal | Predicted review |
+|---|---:|---:|
+| Normal | 170 | 10 |
+| Anomaly | 39 | 6 |
+
+This means **37.50% precision, 13.33% recall**, 53.89% balanced accuracy and 78.22% overall accuracy. Six anomalies were found; 39 were missed. Training and checkpoint selection did not establish useful recognition on separate recordings. Because earlier experiments had already viewed this test set, these numbers are **retrospective**, not a fresh reliability estimate.
+
+The candidate **remains inactive**. Its model version is `24954ab96fc2254e-finetuned320`. It changed neither the original 224px action-teaching encoder nor EfficientDet-Lite2. The default anomaly baseline is also inadequate; retaining it does not establish safe or reliable performance. No independently verified anomaly labels were supplied for the included FLUID signalized video.
+
+A concise explanation for class: “I trained the final visual layers, then checked different recordings. The model failed the acceptance criterion, so I kept it out of use. The experiment teaches us where more representative labels and temporal context are needed.” See [the fine-tuning report](STREET_ANOMALY_FINETUNING.md).
 
 ### 7. Human light-choice learning
 
@@ -390,6 +433,8 @@ Skip unprepared live training. Showing how a defensible label enters the pipelin
 - [Detector evaluation](PRETRAINED_DETECTOR_EVALUATION.md): fixed sample, matching, class results and reproduction.
 - [Aerial data expansion](STREET_VISION_DATA_EXPANSION.md): counts, recordings and unchanged holdouts.
 - [Expanded anomaly evaluation](STREET_VISION_EXPANDED_EVALUATION.md): training configuration, actual confusion matrix and limitations.
+- [320px visual fine-tuning](STREET_ANOMALY_FINETUNING.md): actual updated visual layers, failed validation gate, retrospective test and inactive status.
+- [Reusable real signalized footage](REAL_TRAFFIC_VIDEO_SOURCE.md): source, licensing, recording identity and permitted demonstration use.
 - [Higher-resolution candidate](STREET_VISION_CANDIDATE_EVALUATION.md): sensitivity/false-alarm tradeoff; not the default model.
 - [Hourly forecasting evidence](REPORT.md): separate historical comparisons and retrospective scope.
 - [Presentation README](../presentation/README.md): startup and exact live behavior.

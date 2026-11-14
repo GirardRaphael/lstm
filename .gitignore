@@ -23,3 +23,4 @@ var/
 # Additional local real-image training and recognition data
 /data/intersection_anomalies_expanded/
 /data/detector_benchmark/
+/data/signalized_traffic/

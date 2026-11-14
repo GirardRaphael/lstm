@@ -39,7 +39,12 @@ def sigmoid(values):
 def score_embeddings(embeddings: np.ndarray, parameters: dict) -> np.ndarray:
     features = np.asarray(embeddings, dtype=np.float64)
     scaled = (features - np.asarray(parameters["scaler_mean"])) / np.asarray(parameters["scaler_scale"])
-    raw = scaled @ np.asarray(parameters["classifier_coef"]) + float(parameters["classifier_intercept"])
+    if parameters.get("classifier_type", "logistic") == "rbf_svm":
+        support = np.asarray(parameters["support_vectors"], dtype=np.float64)
+        distances = np.maximum((scaled * scaled).sum(axis=1)[:, None] + (support * support).sum(axis=1)[None, :] - 2 * scaled @ support.T, 0)
+        raw = np.exp(-float(parameters["gamma"]) * distances) @ np.asarray(parameters["dual_coef"]) + float(parameters["classifier_intercept"])
+    else:
+        raw = scaled @ np.asarray(parameters["classifier_coef"]) + float(parameters["classifier_intercept"])
     return sigmoid(raw * float(parameters["calibrator_coef"]) + float(parameters["calibrator_intercept"]))
 
 
@@ -87,10 +92,10 @@ class StreetVision:
             "embedding_version": self._backbone_metadata.get("embedding_version"),
             "embedding_dimensions": self._backbone_metadata.get("embedding_dimensions"),
             "model_version": self._manifest.get("model_version") if self._manifest else None,
-            "architecture": "ImageNet MobileNetV3Small frozen features + regularized logistic regression + validation sigmoid calibration",
+            "architecture": self._manifest.get("architecture", "ImageNet MobileNetV3Small frozen features + regularized logistic regression + validation sigmoid calibration") if self._manifest else "ImageNet MobileNetV3Small frozen image encoder",
             "task": "binary anomaly classification of real aerial street frames",
             "calibrated": ready,
-            "calibration_method": "Sigmoid fitted on validation scores only",
+            "calibration_method": self._manifest.get("calibration_method", "Sigmoid fitted on validation scores only") if self._manifest else None,
             "validation_result": self._manifest.get("validation_result") if ready else "not evaluated",
             "validation_scope": "Held-out UIT-ADrone source recordings; not an object detector or signal-policy validation",
             "metrics": self._manifest.get("test_metrics") if ready else None,
@@ -99,6 +104,7 @@ class StreetVision:
             "signal_control_validated": False,
             "deployment_ready": False,
             "evaluation_reused": bool(self._manifest.get("evaluation_reused", False)) if self._manifest else False,
+            "review_candidate_accepted": self._manifest.get("review_candidate_accepted") if self._manifest else None,
         }
 
     def _require_model(self):
@@ -158,7 +164,7 @@ class StreetVision:
         if embedding_version is not None and embedding_version != self._parameters["embedding_version"]:
             raise ValueError("Image embedding version does not match the anomaly classifier")
         values = np.asarray(embedding, dtype=np.float64)
-        if values.ndim != 1 or len(values) != len(self._parameters["classifier_coef"]) or not np.isfinite(values).all():
+        if values.ndim != 1 or len(values) != len(self._parameters["scaler_mean"]) or not np.isfinite(values).all():
             raise ValueError("Expected a finite vector from this model's image encoder")
         return self._prediction(values)
 

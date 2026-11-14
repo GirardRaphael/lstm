@@ -65,6 +65,7 @@ def test_empty_state_never_claims_training_or_confidence(tmp_path):
     assert status["confidence_threshold"] == 0.90
     assert status["requirements"] == {"min_samples": 80, "min_groups": 12, "min_per_action": 8}
     prediction = learner.predict([1, 0, 0, 0], "street", VERSION)
+    assert prediction["trained"] is False
     assert prediction["action"] is None and prediction["abstain"]
     assert prediction["confidence"] is None and prediction["probabilities"] is None
     assert not learner.train("street")["ok"]
@@ -136,11 +137,13 @@ def test_actual_fit_calibration_and_test_report_are_separate(trained):
 def test_predicts_learned_human_actions_and_abstains_without_support(trained):
     for index, action in enumerate(ACTIONS):
         prediction = trained.predict((np.eye(4)[index] * 4).tolist(), "simulation", VERSION)
+        assert prediction["trained"] is True
         assert prediction["action"] == action and not prediction["abstain"]
         assert prediction["confidence"] > 0.9 and prediction["calibrated"]
         assert sum(prediction["probabilities"].values()) == pytest.approx(1)
         assert prediction["review_only"]
     uncertain = trained.predict([1, 1, 1, 1], "simulation", VERSION)
+    assert uncertain["trained"] is True
     assert uncertain["action"] is None and uncertain["abstain"]
     different = trained.predict([-4, 0, 0, 0], "simulation", VERSION)
     assert different["action"] is None and different["abstain"]
@@ -164,7 +167,8 @@ def test_label_corrections_invalidate_model_but_duplicate_submissions_do_not(tra
     kwargs["chosen_action"] = ACTIONS[(ACTIONS.index(kwargs["chosen_action"]) + 1) % 4]
     trained.record_feedback(**kwargs)
     assert not trained.status("simulation")["trained"]
-    assert trained.predict(record["embedding"], "simulation", VERSION)["abstain"]
+    stale = trained.predict(record["embedding"], "simulation", VERSION)
+    assert stale["abstain"] and stale["trained"] is False
 
 
 def test_test_labels_never_tune_fit_or_calibration_and_groups_stay_frozen(trained):

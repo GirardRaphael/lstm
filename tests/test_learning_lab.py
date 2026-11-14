@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 from PIL import Image
@@ -45,6 +46,43 @@ class LearningLabTests(unittest.TestCase):
         self.lab = LearningLab(self.root, vision=FakeVision(), detector=FakeDetector())
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_separate_anomaly_network_does_not_replace_action_embeddings(self):
+        class SeparateAnomaly:
+            def status(self):
+                return {'available': True, 'model_version': 'separate-anomaly', 'review_candidate_accepted': True}
+            def predict(self, image):
+                return {'anomaly_probability': .82, 'model_version': 'separate-anomaly'}
+        baseline = self.lab.analyze({'image_data_url': png_data(), 'domain': 'street', 'group_id': 'same-camera'})
+        self.lab._anomaly_model = SeparateAnomaly()
+        updated = self.lab.analyze({'image_data_url': png_data(), 'domain': 'street', 'group_id': 'same-camera'})
+        first = self.lab._snapshot(baseline['snapshot_id'])
+        second = self.lab._snapshot(updated['snapshot_id'])
+        self.assertEqual(first['embedding'], second['embedding'])
+        self.assertEqual(first['embedding_version'], second['embedding_version'])
+        self.assertEqual(updated['anomaly']['model_version'], 'separate-anomaly')
+        self.assertEqual(self.lab.status()['vision']['model_version'], 'separate-anomaly')
+        simulated = self.lab.analyze({'image_data_url': png_data(), 'domain': 'simulation', 'group_id': 'episode'})
+        self.assertIsNone(simulated['anomaly']['anomaly_probability'])
+
+    def test_unactivated_experiment_never_changes_the_active_anomaly_model(self):
+        directory = self.root / '.runtime/street_anomaly_finetuned'
+        directory.mkdir(parents=True)
+        (directory / 'manifest.json').write_text('{"review_candidate_accepted":false}')
+        self.assertIsNone(self.lab.trained_anomaly)
+        self.assertEqual(self.lab.status()['vision']['model_version'], 'fixture-anomaly')
+
+    def test_rejected_or_mismatched_anomaly_activation_is_refused(self):
+        directory = self.root / '.runtime/street_anomaly_finetuned'
+        directory.mkdir(parents=True)
+        (directory / 'activation.json').write_text('{"enabled":true,"model_version":"approved"}')
+        for result in [{'review_candidate_accepted': False, 'model_version': 'approved'},
+                       {'review_candidate_accepted': True, 'model_version': 'different'}]:
+            with patch('finetuned_anomaly.FineTunedAnomaly') as constructor:
+                constructor.return_value.status.return_value = result
+                with self.assertRaisesRegex(RuntimeError, 'development gate or activation identity'):
+                    _ = self.lab.trained_anomaly
+                self.assertIsNone(self.lab._anomaly_model)
 
     def test_analyze_freezes_pixels_and_human_feedback_is_required(self):
         result = self.lab.analyze({'image_data_url': png_data(), 'domain': 'simulation', 'group_id': 'episode-one'})
@@ -121,6 +159,7 @@ class LearningLabTests(unittest.TestCase):
         result = self.lab.analyze({'image_data_url': png_data(), 'domain': 'street', 'group_id': 'footage'})
         self.assertFalse(result['decision_teaching_allowed'])
         self.assertTrue(result['policy']['abstain'])
+        self.assertFalse(result['policy']['trained'])
         with self.assertRaisesRegex(LabError, 'detector'):
             self.lab.feedback({'snapshot_id': result['snapshot_id'], 'action': 'ns'})
 

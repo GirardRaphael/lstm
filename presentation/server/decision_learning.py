@@ -425,7 +425,7 @@ class DecisionLearner:
         vector = _embedding(embedding)
         with self._lock, self._connect() as db:
             status = self._status(db, domain)
-            baseline = {"domain": domain, "action": None, "suggested_action": None,
+            baseline = {"domain": domain, "trained": status["trained"], "action": None, "suggested_action": None,
                         "probabilities": None, "confidence": None, "calibrated": False,
                         "abstain": True, "model_version": status["model_version"],
                         "review_only": True, "road_safety_validated": False,

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VisionPanel } from './VisionPanel'
 import { TrainingLab } from './TrainingLab'
+import { VideoMonitor } from './VideoMonitor'
+import type { Analysis } from './learningTypes'
 import { analyzeScreenshot, type VisionFrame } from './screenshotVision'
 import { IntersectionCanvas } from './IntersectionCanvas'
 import { PresentationDeck } from './PresentationDeck'
@@ -32,12 +34,13 @@ import {
 } from './simulation'
 import './App.css'
 
-type Mode = 'slides' | 'live' | 'learn'
+type Mode = 'slides' | 'live' | 'learn' | 'footage'
 
 export default function App() {
   const [mode, setMode] = useState<Mode>(() => initialClassroomRoute(window.location.hash).mode)
   const [slideIndex, setSlideIndex] = useState(() => initialClassroomRoute(window.location.hash).slideIndex)
   const [teachingSource, setTeachingSource] = useState<'dataset' | 'upload' | 'simulation'>('upload')
+  const [videoReview, setVideoReview] = useState<Analysis | null>(null)
   const [guidedDemo, setGuidedDemo] = useState<NonNullable<Slide['demo']> | null>(null)
   const [cars, setCars] = useState(12)
   const [trucks, setTrucks] = useState(3)
@@ -207,8 +210,14 @@ export default function App() {
   }
 
   const openTraining = (source: 'dataset' | 'upload' | 'simulation' = 'upload') => {
+    setVideoReview(null)
     setTeachingSource(source)
     setMode('learn')
+    window.scrollTo({ top: 0 })
+  }
+  const openVideos = () => { setMode('footage'); window.scrollTo({ top: 0 }) }
+  const reviewVideoFrame = (analysis: Analysis) => {
+    setVideoReview(analysis); setTeachingSource('upload'); setMode('learn')
     window.scrollTo({ top: 0 })
   }
   const startClassroomScenario = (id: DemoScenarioId) => {
@@ -275,18 +284,20 @@ export default function App() {
           >
             Live intersection
           </button>
+          <button type="button" className={mode === 'footage' ? 'active' : ''} onClick={openVideos}>Real traffic videos</button>
         </nav>
         <div className="top-hint">
-          {mode === 'slides' ? '← → navigate · L live' : mode === 'learn' ? 'Real images · model evidence · your corrections' : 'R spawn · J jam · screenshot detections'}
+          {mode === 'slides' ? '← → navigate · L live' : mode === 'learn' ? 'Real images · model evidence · your corrections' : mode === 'footage' ? 'Recorded footage · observation only' : 'R spawn · J jam · screenshot detections'}
         </div>
       </header>
 
-      {guidedDemo && mode !== 'slides' ? <aside className="classroom-return" aria-label="Guided classroom demonstration"><div><p className="visual-eyebrow">CLASSROOM DEMONSTRATION</p><strong>{guidedDemo.label}</strong><ol>{guidedDemo.steps.map(step => <li key={step}>{step}</li>)}</ol></div><div><button className="accent" onClick={() => { setMode('slides'); window.scrollTo({ top: 0 }) }}>Return to slide {slideIndex + 1}</button>{guidedDemo.scenario ? <button onClick={() => startClassroomScenario(guidedDemo.scenario!)}>Restart this scenario</button> : null}<button onClick={() => setGuidedDemo(null)}>Close demo guide</button></div></aside> : null}
+      {guidedDemo && (mode === 'learn' || mode === 'live') ? <aside className="classroom-return" aria-label="Guided classroom demonstration"><div><p className="visual-eyebrow">CLASSROOM DEMONSTRATION</p><strong>{guidedDemo.label}</strong><ol>{guidedDemo.steps.map(step => <li key={step}>{step}</li>)}</ol></div><div><button className="accent" onClick={() => { setMode('slides'); window.scrollTo({ top: 0 }) }}>Return to slide {slideIndex + 1}</button>{guidedDemo.scenario ? <button onClick={() => startClassroomScenario(guidedDemo.scenario!)}>Restart this scenario</button> : null}<button onClick={() => setGuidedDemo(null)}>Close demo guide</button></div></aside> : null}
+      <main className="learning-stage" hidden={mode !== 'footage'}><VideoMonitor active={mode === 'footage'} onReview={reviewVideoFrame} onOpenTraining={() => openTraining('upload')} /></main>
       {mode === 'learn' ? (
         <main className="learning-stage">
-          <TrainingLab frame={cameraSample?.pixels ?? null} simulationSessionId={simulationSessionId} initialSource={teachingSource} onStartSimulation={startTeachingPractice} onApply={applyReviewedAction} />
+          <TrainingLab frame={cameraSample?.pixels ?? null} simulationSessionId={simulationSessionId} initialSource={teachingSource} initialReview={videoReview} onOpenVideos={openVideos} onStartSimulation={startTeachingPractice} onApply={applyReviewedAction} />
         </main>
-      ) : mode === 'slides' ? (
+      ) : mode === 'footage' ? null : mode === 'slides' ? (
         <PresentationDeck index={slideIndex} onIndex={setSlideIndex} onDemo={launchDemo} />
       ) : (
         <main className="live-stage thinking-layout">

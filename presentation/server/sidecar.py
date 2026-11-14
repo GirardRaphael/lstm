@@ -19,11 +19,13 @@ if str(HERE) not in sys.path:
 
 from infer import LiveEngine  # noqa: E402
 from learning_lab import LearningLab, LabError  # noqa: E402
+from video_library import VideoLibrary, parse_byte_range  # noqa: E402
 
 HOST = "127.0.0.1"
 PORT = 43126
 ENGINE = LiveEngine()
 LAB = LearningLab(HERE.parents[1])
+VIDEOS = VideoLibrary(HERE.parents[1])
 LOCAL_ORIGINS = {f'http://{host}:{port}' for host in ('127.0.0.1', 'localhost') for port in (43125, 43126)}
 
 
@@ -72,6 +74,63 @@ class Handler(BaseHTTPRequestHandler):
             self.log_message("learning service unavailable: %s", exc)
             self._write(503, json.dumps({"ok": False, "error": str(exc)}).encode())
 
+    def _video_response(self, identifier: str) -> None:
+        try:
+            path, content_type = VIDEOS.video_path(identifier)
+            with path.open('rb') as source:
+                size = path.stat().st_size
+                try:
+                    selected = parse_byte_range(self.headers.get('Range'), size)
+                except LabError:
+                    self.send_response(416)
+                    self.send_header('Content-Range', f'bytes */{size}')
+                    self.send_header('Content-Length', '0')
+                    self._cors()
+                    self.end_headers()
+                    return
+                start, end = selected if selected else (0, size - 1)
+                self.send_response(206 if selected else 200)
+                self.send_header('Content-Type', content_type)
+                self.send_header('Content-Length', str(max(0, end - start + 1)))
+                self.send_header('Accept-Ranges', 'bytes')
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                if selected:
+                    self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+                self._cors()
+                self.end_headers()
+                source.seek(start)
+                remaining = end - start + 1
+                while remaining > 0:
+                    chunk = source.read(min(128 * 1024, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass  # Seeking or changing recordings cancels a browser's current stream.
+        except (LabError, OSError, ValueError) as exc:
+            self._write(getattr(exc, 'status', 404), json.dumps({'ok': False, 'error': str(exc)}).encode())
+
+    def _training_package_response(self, group_id: str | None) -> None:
+        try:
+            with LAB.training_package(group_id) as source:
+                size = source.seek(0, 2)
+                source.seek(0)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/zip')
+                self.send_header('Content-Disposition', 'attachment; filename="traffic-video-training.zip"')
+                self.send_header('Content-Length', str(size))
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                self._cors()
+                self.end_headers()
+                while chunk := source.read(128 * 1024):
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
+        except (LabError, OSError, ValueError) as exc:
+            self._write(getattr(exc, 'status', 503), json.dumps({'ok': False, 'error': str(exc)}).encode())
+
     def do_OPTIONS(self) -> None:  # noqa: N802
         if self._local_request():
             self._write(204, b"")
@@ -91,6 +150,18 @@ class Handler(BaseHTTPRequestHandler):
                     int((query.get('offset') or ['0'])[0]), int((query.get('limit') or ['12'])[0])))
             elif path == '/api/learning/export':
                 self._learning_response(lambda: LAB.export((query.get('domain') or ['street'])[0]))
+            elif path == '/api/learning/video-examples':
+                self._learning_response(VIDEOS.examples)
+            elif path.startswith('/api/learning/video/'):
+                self._video_response(path.rsplit('/', 1)[1])
+            elif path == '/api/learning/review-frames':
+                self._learning_response(lambda: LAB.review_frames(
+                    (query.get('group_id') or [None])[0],
+                    int((query.get('offset') or ['0'])[0]), int((query.get('limit') or ['48'])[0])))
+            elif path.startswith('/api/learning/review-frame/'):
+                self._learning_response(lambda: LAB.review_frame(path.rsplit('/', 1)[1]))
+            elif path == '/api/learning/training-package':
+                self._training_package_response((query.get('group_id') or [None])[0])
             elif path.startswith('/api/learning/image/') or path.startswith('/api/learning/snapshot/'):
                 try:
                     identifier = path.rsplit('/', 1)[1]
@@ -135,7 +206,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._write(getattr(exc, 'status', 400), json.dumps({'ok': False, 'error': str(exc)}).encode())
                 return
             operations = {'/api/learning/analyze': LAB.analyze,
+                          '/api/learning/monitor': LAB.monitor,
                           '/api/learning/feedback': LAB.feedback,
+                          '/api/learning/anomaly-feedback': LAB.anomaly_feedback,
                           '/api/learning/train': LAB.train}
             operation = operations.get(path)
             if operation:

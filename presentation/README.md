@@ -3,7 +3,7 @@
 Run `./run_app.ps1` from the repository root. The Train & review view opens automatically
 at http://127.0.0.1:43125/. Select **Slideshow** for the classroom presentation,
 **Live intersection** for the operating simulation, or **Train & review** for real-image
-inspection and human teaching labels.
+inspection and human teaching labels. **Real traffic videos** opens the observation-only video monitor.
 Use Ctrl+C in the launcher terminal to stop both services.
 
 The launcher uses `.venv/Scripts/python.exe` or the existing
@@ -143,3 +143,17 @@ effect, camera loss and recovery, and image-only crossing/left-lane decisions.
 ## Train & review
 
 See [the teaching guide](../reports/DECISION_TRAINING_GUIDE.md). The lab accepts real images/video frames and frozen app screenshots, stores explicit human action labels, trains separate models by image domain, and reports held-out group results. The initial street anomaly experiment was trained and evaluated on real images; its failures are visible in the lab and [report](../reports/STREET_VISION_EVALUATION.md). Neither a fitted calibration nor a high score is proof of road-ready decisions.
+
+## Real video demonstration
+
+1. Select **Real traffic videos** and the included FLUID example. Watch the original recording to establish what is visible.
+2. Pause at a moment, then choose **Analyze this frame**. The overlay and results refer to that frozen frame and its timestamp. Detector counts are partial observations, not a verified traffic census.
+3. Choose **Observe video** to step through spaced frames. This processes sequentially at model speed; it is not a live camera feed. **Stop** cancels the sequence.
+4. Collect spaced pictures, then open a saved frame to review it. Return to the monitor without losing the selected video. Saved frames remain unlabelled until a human supplies an action.
+5. Download the review package for original pictures and provenance. Keep all frames from the recording in one data split.
+
+The sample is a 60-second, CC BY 4.0 FLUID signalized-intersection excerpt and 60 extracted pictures. Run `python scripts/setup_signalized_video.py` from the repository root to install it on a fresh checkout. [Source, licensing and reproduction](../reports/REAL_TRAFFIC_VIDEO_SOURCE.md).
+
+The pretrained detector can miss many tiny aerial vehicles. It does not read traffic-light color or infer right-of-way. Anomaly scores come from a separate aerial classifier and do not establish any particular violation. The latest retraining failed its validation gate and remains inactive; [actual training results](../reports/STREET_ANOMALY_RETRAINING.md). No physical signal is connected.
+
+A subsequent 320px visual fine-tuning experiment trained the last MobileNetV3 blocks on publisher-labelled images while preserving the separate action encoder. It reduced retrospective test false alerts to 10/180 normal frames, but still detected only 6/45 anomalies and failed the separate development gate. It remains inactive. [Actual fine-tuning method, checks and results](../reports/STREET_ANOMALY_FINETUNING.md). Neither experiment trained the light-choice model.
